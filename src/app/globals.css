@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/* Paleta da marca: preto, branco e cinza. Os valores são padrão, troque se a marca tiver outras cores. */
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --muted: #e0e0e0;
+  --surface: #111111;
+  --border: #262626;
+  --accent: #f5f5f5; /* destaque neutro: o dono pediu para tirar o vermelho */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-archivo);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-anton), Impact, sans-serif;
+}
+
+/* Títulos de impacto: condensados, caixa alta. */
+.display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.92;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0,0); }
+  50% { transform: translate(0,0); }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  animation: marquee 28s linear infinite;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Grão de xerox sobre tudo: a superfície parece impressa, não digital. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -50%;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.09;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Sombra dura, sem blur: o botão e o card "saltam" da página. */
+.brutal-shadow {
+  box-shadow: 6px 6px 0 0 var(--accent);
+}
+.brutal-shadow:hover {
+  box-shadow: 2px 2px 0 0 var(--accent);
+  transform: translate(4px, 4px);
+}
+.brutal-shadow {
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+/* Fita adesiva colada no canto. */
+.tape {
+  position: absolute;
+  background: rgba(245, 245, 245, 0.92);
+  color: #fff;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  padding: 0.25rem 1.25rem;
+  transform: translate(0,0);
+}
+
+/* Palavra gigante em contorno, cortada pela borda: textura de parede pichada. */
+.outline-wall {
+  position: absolute;
+  right: -4vw;
+  top: 50%;
+  transform: translateY(-50%) translate(0,0);
+  font-family: var(--font-display);
+  font-size: clamp(12rem, 34vw, 32rem);
+  line-height: 0.8;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+@keyframes spin-slow {
+  to { transform: translate(0,0); }
+}
+
+/* Adesivo redondo girando, como selo colado na parede. */
+.sticker-spin {
+  animation: spin-slow 14s linear infinite;
+}
+
+/* Título riscado, como pichação mal feita. */
+.strike {
+  text-decoration: line-through;
+  text-decoration-thickness: 0.12em;
+  text-decoration-color: var(--accent);
+}
+
+body {
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-weight: 450;
+  font-stretch: 100%;
+}
+
+/* Texto em caixa alta com espaçamento, para a estética de rua. */
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
