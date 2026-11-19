@@ -71,6 +71,17 @@ Em desenvolvimento não é preciso configurar nada: sem `DATABASE_URL`, o projet
 | `DATABASE_URL` | Conexão com o Postgres de produção (Neon). Na Vercel, o Marketplace cria o banco e injeta essa variável. |
 | `PGLITE_DIR` | Opcional. Troca a pasta do banco local (padrão `./.data/pglite`). |
 
+### Painel do dono
+
+O painel fica em `/admin` e protege tudo com uma senha única.
+
+| Variável | Para que serve |
+| --- | --- |
+| `ADMIN_PASSWORD` | Senha de entrada do painel. |
+| `ADMIN_SESSION_SECRET` | Segredo que assina o cookie de sessão (mínimo de 32 caracteres, aleatório). |
+
+Copie `.env.example` para `.env.local` e preencha as duas. Sem elas, o painel não abre. A sessão dura 12 horas, o cookie é `httpOnly` e `sameSite=strict`, e cada página e cada ação conferem a sessão. O login tem limite de 5 erros em 15 minutos por IP.
+
 Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez de usar um banco que se perderia a cada execução.
 
 ### Outros pontos de ajuste
@@ -90,10 +101,10 @@ Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez
 Os produtos ficam na tabela `products` do banco. O arquivo `src/data/products.ts` só popula um banco **vazio**: depois da primeira execução, editá-lo não muda o catálogo.
 
 1. Coloque a foto em `public/products/`.
-2. Insira a linha em `products` com `slug`, `name`, `price_cents` (preço em centavos), `description`, `category`, `sizes`, `colors`, `stock` e `image`.
-3. Para peça escura em foto com fundo transparente, use `photo_bg = 'light'`. Ela ganha um contorno de luz fino e aparece sobre os cards escuros.
+2. Em `/admin/produtos/novo`, preencha os campos e informe o caminho da foto (por exemplo `/products/arquivo.png`).
+3. Para peça escura em foto com fundo transparente, escolha "Escura" em "Peça da foto". Ela ganha um contorno de luz fino e aparece sobre os cards escuros.
 
-Produto sem `image` mostra uma camiseta desenhada no lugar da foto. Enquanto o painel do dono não existe, essa edição é feita direto no banco.
+Produto sem foto mostra uma camiseta desenhada no lugar. Estoque, ocultar e mostrar na loja são feitos na lista de produtos do painel.
 
 ## Estrutura do projeto
 
@@ -103,10 +114,9 @@ public/
   products/         fotos dos produtos
 src/
   app/              rotas, layout e estilos globais
+    (site)/         páginas públicas (home, loja, personalizar, carrinho, institucionais)
+    admin/          painel do dono (login, pedidos, encomendas, produtos)
     api/            rotas de API (produtos, pedidos, encomendas)
-    loja/           catálogo e página de produto
-    personalizar/   encomenda com a arte do cliente
-    carrinho/       carrinho e fechamento pelo WhatsApp
   components/       componentes de interface
   data/             catálogo de produtos
   lib/              regras de negócio (carrinho, pedidos, WhatsApp, marca)
@@ -124,6 +134,7 @@ src/
 | `/sobre` | Sobre a marca |
 | `/faq` | Perguntas frequentes |
 | `/contato` | Contato por WhatsApp |
+| `/admin` | Painel do dono (exige senha): resumo, pedidos, encomendas e produtos |
 
 ## API
 
@@ -156,7 +167,8 @@ curl -X POST http://localhost:3000/api/orders \
 
 O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **persistidos em banco**. Ainda faltam peças para ser um e-commerce completo:
 
-- **Sem painel administrativo:** produtos e estoque são editados direto no banco. O cancelamento de pedido existe como função, mas ainda não há tela nem rota protegida para usá-lo.
+- **Painel simples:** senha única, sem vários usuários nem recuperação de senha (para isso, migrar para um provedor como o Clerk). O limite de tentativas de login fica na memória de cada instância.
+- **Sem upload de foto no painel:** a foto é um arquivo em `public/products/` e o painel recebe só o caminho. Upload direto exigiria um armazenamento como o Vercel Blob.
 - **Sem pagamento online:** Pix e cartão são combinados no WhatsApp. O pedido nasce como `pendente`.
 - **Estoque reservado sem prazo:** a baixa acontece quando o pedido é registrado. Pedido que nunca é pago segura a peça até alguém cancelar. Falta expirar pedidos pendentes.
 - **Sem cálculo de frete.**
@@ -167,7 +179,7 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 
 ## Próximos passos
 
-1. Painel do dono: login, produtos, estoque, pedidos e cancelamento.
+1. Upload de fotos pelo painel.
 2. Pagamento online com Pix e cartão, com confirmação automática (webhook) mudando o pedido para `pago`.
 3. Expiração de pedidos pendentes, devolvendo o estoque.
 4. Cálculo de frete.
