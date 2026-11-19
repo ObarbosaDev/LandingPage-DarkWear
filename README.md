@@ -88,7 +88,7 @@ Em desenvolvimento não é preciso configurar nada: sem `DATABASE_URL`, o projet
 | `DATABASE_URL` | Conexão com o Postgres de produção (Neon). Na Vercel, o Marketplace cria o banco e injeta essa variável. |
 | `PGLITE_DIR` | Opcional. Troca a pasta do banco local (padrão `./.data/pglite`). Com `memory://`, o banco vive só na memória (usado nos testes e no CI). |
 
-**Migrações.** O esquema é versionado em `src/server/db/migrations.ts`. Cada migração tem um `up` (a subida, que aplica a mudança) e um `down` (a descida, que a desfaz). Uma migração que apagaria dados ao ser desfeita (a `0001_baseline`) é marcada como irreversível, e o sistema se recusa a desfazê-la.
+**Migrações.** O esquema é versionado em **arquivos SQL** na pasta `db/migrations/`, dois por migração: `0003_integridade.up.sql` (a subida, que aplica a mudança) e `0003_integridade.down.sql` (a descida, que a desfaz). São SQL puro: dá para ler, colar no console do Neon e versionar no Git. O executor fica em `src/server/db/migrations.ts`. Uma migração sem arquivo `.down.sql` é irreversível (é o caso da `0001_baseline`, porque desfazê-la apagaria todas as tabelas), e o sistema se recusa a desfazê-la.
 
 | Comando | O que faz |
 | --- | --- |
@@ -107,7 +107,9 @@ Garantias do executor:
 
 **Subida do servidor.** Por padrão, o servidor aplica as migrações pendentes ao conectar. Para produção com publicação controlada, defina `DB_AUTO_MIGRATE=false`: o servidor passa a **só conferir** se o banco está em dia (e falha com uma mensagem clara se faltar migração), e as migrações rodam antes, com `npm run db:migrate`. Os comandos `db:*` leem o `.env.local`; com `DATABASE_URL` eles falam com o banco de produção, sem ela, com o banco local (pare o servidor de desenvolvimento antes: dois processos no mesmo banco embutido podem corromper os dados).
 
-Para mudar o banco: crie uma migração nova no fim da lista (com `up` e `down`), atualize `src/server/db/schema.ts` e rode `npm run db:migrate`. Um banco criado antes das migrações é adotado sem perder dados.
+Para mudar o banco: crie os dois arquivos da migração nova em `db/migrations/` (o próximo número com 4 dígitos, por exemplo `0006_algo.up.sql` e `0006_algo.down.sql`), atualize `src/server/db/schema.ts` e rode `npm run db:migrate`. O carregador recusa nomes fora do padrão, descida sem subida e dois arquivos com o mesmo número. O teste `tests/migrations-frozen.test.ts` guarda o carimbo das migrações já publicadas e quebra no CI se alguém editar uma delas.
+
+Os arquivos `.sql` são incluídos no pacote de produção pelo `outputFileTracingIncludes` do `next.config.ts`: o servidor os lê ao subir. Um banco criado antes das migrações é adotado sem perder dados.
 
 **Integridade.** O banco não confia só no código: ele próprio recusa dado inválido.
 
@@ -171,7 +173,7 @@ src/
   components/         componentes de interface
   lib/                código que roda no navegador e no servidor: carrinho, WhatsApp, dinheiro, opções
   server/             só roda no servidor (marcado com server-only)
-    db/               conexão, esquema, DDL e dados iniciais
+    db/               conexão, esquema, executor de migrações e dados iniciais
     admin/            autenticação e acesso a dados do painel, por domínio
     catalog.ts        leitura do catálogo, com cache
     orders.ts         pedidos de peças prontas e cancelamento

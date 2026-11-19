@@ -6,7 +6,6 @@
 
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
-import { DDL } from "@/server/db/ddl";
 import { MIGRATIONS, runMigrations, type SqlRunner } from "@/server/db/migrations";
 
 // Um banco em memória novo para cada teste, fora do getDb (que já migra sozinho).
@@ -46,7 +45,7 @@ describe("runMigrations", () => {
   // tem dados. Deve entrar no sistema de migrações sem perder nenhuma linha.
   it("adota um banco criado antes das migrações, sem perder dados", async () => {
     const { c, runner, historico } = novoBanco();
-    await c.exec(DDL); // como estava um banco antigo: só as tabelas, sem histórico
+    await c.exec(MIGRATIONS[0].up); // como estava um banco antigo: só as tabelas, sem histórico
     await c.exec(
       "INSERT INTO products (slug, name, price_cents, category, sizes, colors, stock) VALUES ('camisa-x', 'X', 1000, 'Pronta entrega', '[\"M\"]', '[\"Preta\"]', 3)",
     );

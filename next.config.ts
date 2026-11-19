@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
   // Postgres embutido (só em desenvolvimento): não deve ser empacotado.
   // O PGlite carrega arquivos próprios em tempo de execução; empacotá-lo junto do código quebraria.
   serverExternalPackages: ["@electric-sql/pglite"],
+  // Inclui os arquivos .sql das migrações no pacote de produção: o servidor os lê do disco ao subir
+  // (para aplicar ou conferir as migrações), e o Next só copia o que ele consegue "enxergar" no código.
+  outputFileTracingIncludes: {
+    "/*": ["./db/migrations/**/*.sql"],
+  },
   // Pré-carrega, nos links visíveis, apenas a parte estática das páginas: a navegação parece instantânea.
   partialPrefetching: true,
   // Processamento do CSS pelo Turbopack (o empacotador do Next): arquivos .css passam pelo Tailwind.
