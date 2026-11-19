@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/lib/cart";
 import { formatBRL, SITE } from "@/lib/site";
-import { PageHero } from "@/components/PageHero";
 
 export default function CarrinhoPage() {
   const { items, total, setQty, remove, clear, ready } = useCart();
@@ -37,7 +36,17 @@ export default function CarrinhoPage() {
 
   return (
     <>
-      <PageHero word="Pedido" title="Sacola" />
+      {/* Tela de trabalho: cabeçalho enxuto, sem abertura gigante. */}
+      <section className="bg-background text-foreground">
+        <div className="mx-auto flex max-w-5xl items-end justify-between gap-6 border-b-2 border-foreground px-6 pb-6 pt-12">
+          <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,7vw,6rem)] uppercase leading-[0.9]">Sacola</h1>
+          {ready && items.length > 0 ? (
+            <p className="pb-1 font-mono text-sm uppercase tracking-[0.15em]">
+              {items.reduce((n, i) => n + i.qty, 0)} peça(s)
+            </p>
+          ) : null}
+        </div>
+      </section>
 
       <section className="bg-foreground text-background">
         <div className="mx-auto max-w-5xl px-6 py-16">
