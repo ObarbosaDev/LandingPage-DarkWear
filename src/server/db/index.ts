@@ -44,7 +44,7 @@ async function connect(): Promise<Db> {
     const { drizzle } = await import("drizzle-orm/pglite");
     const { mkdirSync } = await import("node:fs");
     const dir = process.env.PGLITE_DIR ?? "./.data/pglite";
-    mkdirSync(dir, { recursive: true });
+    if (!dir.startsWith("memory://")) mkdirSync(dir, { recursive: true }); // memory:// vale nos testes
     const client = new PGlite(dir);
     await client.exec(DDL);
     db = drizzle({ client, schema }) as unknown as Db;

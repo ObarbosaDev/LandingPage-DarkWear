@@ -27,14 +27,14 @@ export function adminConfigured(): boolean {
 
 const sign = (payload: string, key: string) => createHmac("sha256", key).update(payload).digest("base64url");
 
-function createSessionToken(): string {
+export function createSessionToken(): string {
   const key = sessionSecret();
   if (!key) throw new Error("ADMIN_SESSION_SECRET ausente ou curto (mínimo 32 caracteres).");
   const payload = Buffer.from(JSON.stringify({ exp: Date.now() + SESSION_HOURS * 3600 * 1000 })).toString("base64url");
   return `${payload}.${sign(payload, key)}`;
 }
 
-function verifySessionToken(token: string): boolean {
+export function verifySessionToken(token: string): boolean {
   const key = sessionSecret();
   if (!key) return false;
   const [payload, sig] = token.split(".");
