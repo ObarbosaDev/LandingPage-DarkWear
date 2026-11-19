@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getProducts } from "@/lib/catalog";
-import { ProductTile } from "@/components/ProductTile";
+import { IndiceLoja } from "@/components/IndiceLoja";
 
 export const metadata: Metadata = { title: "Loja" };
 
@@ -38,13 +38,7 @@ async function Resultados({ searchParams }: { searchParams: Promise<{ q?: string
           Nenhuma peça com esse nome. Tente outro termo.
         </p>
       ) : (
-        <div className="mx-auto max-w-7xl px-6 pb-24">
-          <div className="grid border-l border-t border-foreground sm:grid-cols-2 lg:grid-cols-3">
-            {list.map((p, i) => (
-              <ProductTile key={p.slug} product={p} index={i} />
-            ))}
-          </div>
-        </div>
+        <IndiceLoja products={list} />
       )}
     </>
   );
