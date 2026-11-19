@@ -1,5 +1,6 @@
 // Regras de pedido, com persistência em banco e estoque protegido por transação.
 
+import "server-only";
 import { and, eq, gte, ne, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { orderItems, orders, products, type OrderStatus } from "@/server/db/schema";

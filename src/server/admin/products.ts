@@ -1,5 +1,6 @@
 // Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
+import "server-only";
 import { asc, eq, max } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { products, type ProductRow } from "@/server/db/schema";

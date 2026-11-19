@@ -1,3 +1,4 @@
+import "server-only";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { count } from "drizzle-orm";
 import { DDL } from "@/server/db/ddl";

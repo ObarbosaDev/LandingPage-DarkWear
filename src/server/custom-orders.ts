@@ -1,5 +1,6 @@
 // Encomenda com arte do cliente: validação da entrada e registro no banco.
 
+import "server-only";
 import { getDb } from "@/server/db";
 import { customOrders } from "@/server/db/schema";
 import { COLORS, MODELS, PLACEMENTS, SIZES, isOneOf } from "@/lib/custom-order-options";

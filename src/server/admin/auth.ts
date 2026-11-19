@@ -2,6 +2,7 @@
 // Sem dependências externas. Para vários usuários ou recuperação de senha, migrar para um provedor
 // de autenticação (ex.: Clerk, pelo Marketplace da Vercel).
 
+import "server-only";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
