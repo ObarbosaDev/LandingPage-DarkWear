@@ -1,20 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ShirtPlacer, type PlacementId } from "@/components/ShirtPlacer";
+import { ShirtPlacer } from "@/components/ShirtPlacer";
+import { COLORS, MODELS, SIZES, type PlacementId } from "@/lib/custom-order-options";
 import { formatBRL } from "@/lib/site";
 
-const MODELS = ["Camiseta", "Moletom", "Oversized"];
-const SIZES = ["P", "M", "G", "GG", "XG"];
-const COLORS = ["Preta", "Off-white", "Cinza chumbo"];
 const ACCEPT = ".png,.jpg,.jpeg,.svg,.pdf";
 const MAX_MB = 25;
 const PRICE_FROM = 70; // preço de partida, exemplo: troque pelo valor real da encomenda
 
 export default function PersonalizarPage() {
   const [name, setName] = useState("");
-  const [model, setModel] = useState(MODELS[0]);
-  const [color, setColor] = useState(COLORS[0]);
+  const [model, setModel] = useState<string>(MODELS[0]);
+  const [color, setColor] = useState<string>(COLORS[0]);
   const [size, setSize] = useState("M");
   const [placement, setPlacement] = useState<PlacementId>("frente");
   const [notes, setNotes] = useState("");

@@ -1,14 +1,7 @@
 "use client";
 
 // Escolha de onde a arte vai: quatro botões grandes, sem desenho de camiseta.
-export const PLACEMENTS = [
-  { id: "peito", label: "Peito", note: "Logo pequeno, do lado esquerdo" },
-  { id: "frente", label: "Frente", note: "Arte grande no centro do peito" },
-  { id: "costas", label: "Costas", note: "Arte grande nas costas" },
-  { id: "manga", label: "Manga", note: "Detalhe na manga" },
-] as const;
-
-export type PlacementId = (typeof PLACEMENTS)[number]["id"];
+import { PLACEMENTS, type PlacementId } from "@/lib/custom-order-options";
 
 export function ShirtPlacer({
   value,

@@ -2,7 +2,7 @@
 
 import { getDb } from "@/server/db";
 import { customOrders } from "@/server/db/schema";
-
+import { COLORS, MODELS, PLACEMENTS, SIZES, isOneOf } from "@/lib/custom-order-options";
 
 export type CustomOrderInput = {
   name: string;
@@ -13,10 +13,6 @@ export type CustomOrderInput = {
   notes?: string;
   fileName?: string;
 };
-
-const MODELS = ["Camiseta", "Moletom", "Oversized"] as const;
-const SIZES = ["P", "M", "G", "GG", "XG"] as const;
-const PLACEMENT_IDS = ["peito", "frente", "costas", "manga"] as const;
 
 export function validateCustom(
   input: unknown,
@@ -32,11 +28,10 @@ export function validateCustom(
   const fileName = str(r.fileName, 120);
   const placement = str(r.placement, 20);
 
-  if (!(MODELS as readonly string[]).includes(model)) return { ok: false, error: "Modelo inválido." };
-  if (!(SIZES as readonly string[]).includes(size)) return { ok: false, error: "Tamanho inválido." };
-  if (!color) return { ok: false, error: "Escolha uma cor." };
-  if (!(PLACEMENT_IDS as readonly string[]).includes(placement))
-    return { ok: false, error: "Escolha onde a arte vai." };
+  if (!isOneOf(MODELS, model)) return { ok: false, error: "Modelo inválido." };
+  if (!isOneOf(SIZES, size)) return { ok: false, error: "Tamanho inválido." };
+  if (!isOneOf(COLORS, color)) return { ok: false, error: "Escolha uma cor." };
+  if (!isOneOf(PLACEMENTS.map((p) => p.id), placement)) return { ok: false, error: "Escolha onde a arte vai." };
 
   return { ok: true, order: { name, model, color, size, placement, notes, fileName: fileName || undefined } };
 }
