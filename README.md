@@ -80,12 +80,26 @@ A cada envio para a `main` e em todo pull request, o GitHub roda lint, testes e 
 
 ### Banco de dados
 
-Em desenvolvimento não é preciso configurar nada: sem `DATABASE_URL`, o projeto usa um Postgres embutido (PGlite), gravado em `.data/pglite` e ignorado pelo git. Na primeira execução o catálogo é carregado de `src/data/products.ts` para o banco. Para recomeçar do zero em desenvolvimento, apague a pasta `.data`.
+Em desenvolvimento não é preciso configurar nada: sem `DATABASE_URL`, o projeto usa um Postgres embutido (PGlite), gravado em `.data/pglite` e ignorado pelo git. Na primeira execução o catálogo é carregado de `src/server/db/seed-data.ts` para o banco. Para recomeçar do zero em desenvolvimento, apague a pasta `.data`.
 
 | Variável | Para que serve |
 | --- | --- |
 | `DATABASE_URL` | Conexão com o Postgres de produção (Neon). Na Vercel, o Marketplace cria o banco e injeta essa variável. |
-| `PGLITE_DIR` | Opcional. Troca a pasta do banco local (padrão `./.data/pglite`). |
+| `PGLITE_DIR` | Opcional. Troca a pasta do banco local (padrão `./.data/pglite`). Com `memory://`, o banco vive só na memória (usado nos testes e no CI). |
+
+**Migrações.** O esquema é versionado em `src/server/db/migrations.ts`. Ao conectar, o sistema aplica as migrações que faltam, uma vez cada, cada uma em uma transação, com trava para duas instâncias não migrarem juntas. O histórico fica na tabela `schema_migrations`. Para mudar o banco, **não edite uma migração existente**: acrescente uma nova no fim da lista e atualize `src/server/db/schema.ts`. Um banco criado antes das migrações é adotado sem perder dados.
+
+### Pedidos pendentes e limites
+
+- **Expiração.** Pedido pendente segura as peças. Todo dia às 9h UTC o cron da Vercel (`vercel.json`) chama `/api/cron/expire-orders`, que cancela pedidos pendentes com mais de 48 horas (ajustável em `PENDING_ORDER_HOURS`) e devolve as peças. A rota só aceita `Authorization: Bearer <CRON_SECRET>`.
+- **Limite de uso.** `POST /api/orders` aceita 10 chamadas a cada 10 minutos por origem, e `POST /api/custom-orders` aceita 5. Acima disso a resposta é `429` com `Retry-After`. A contagem fica no banco e vale entre instâncias.
+- **Conferência na subida.** `src/instrumentation.ts` confere a configuração quando o servidor sobe e escreve avisos no log (prefixo `[config]`). Na produção da Vercel, configuração com erro, como a falta de `DATABASE_URL`, o painel pela metade ou o número de WhatsApp de exemplo, impede a subida.
+
+| Variável | Para que serve |
+| --- | --- |
+| `CRON_SECRET` | Autoriza o cron de expiração. Sem ela a rota fica fechada. |
+| `PENDING_ORDER_HOURS` | Opcional. Horas até o pedido pendente expirar (padrão 48). |
+| `SITE_URL` | Endereço público do site, usado no sitemap e no `robots.txt`. |
 
 ### Painel do dono
 
@@ -191,20 +205,19 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 - **Painel simples:** senha única, sem vários usuários nem recuperação de senha (para isso, migrar para um provedor como o Clerk).
 - **Sem upload de foto no painel:** a foto é um arquivo em `public/products/` e o painel recebe só o caminho. Upload direto exigiria um armazenamento como o Vercel Blob.
 - **Sem pagamento online:** Pix e cartão são combinados no WhatsApp. O pedido nasce como `pendente`.
-- **Estoque reservado sem prazo:** a baixa acontece quando o pedido é registrado. Pedido que nunca é pago segura a peça até alguém cancelar. Falta expirar pedidos pendentes.
+- **Pedido pendente expira só por prazo fixo:** a baixa acontece quando o pedido é registrado, e o cron cancela os pendentes depois de 48 horas. Não há aviso ao cliente nem prazo por pedido.
 - **Sem cálculo de frete.**
 - **Sem contas de cliente:** a compra é sem cadastro.
-- **Esquema sem migrações versionadas:** o esquema é criado por SQL idempotente (`src/db/ddl.ts`). Antes de mudar tabelas com dados reais em produção, adotar migrações (drizzle-kit).
 - **Neon ainda não testado:** o caminho de produção usa o driver serverless do Neon, mas foi validado apenas contra o Postgres embutido. Teste com um banco Neon real antes de publicar.
 - **Catálogo de exemplo:** nomes, preços e estoque são de exemplo e devem ser substituídos pelos reais.
 
 ## Próximos passos
 
-1. Upload de fotos pelo painel.
-2. Pagamento online com Pix e cartão, com confirmação automática (webhook) mudando o pedido para `pago`.
-3. Expiração de pedidos pendentes, devolvendo o estoque.
-4. Cálculo de frete.
-5. Migrações versionadas e banco Neon provisionado na Vercel.
+1. Provisionar o Neon na Vercel (precisa da conta do dono) e testar contra o banco real.
+2. Trocar o número de WhatsApp de exemplo em `src/lib/site.ts` pelo número da loja.
+3. Pagamento online com Pix e cartão, com confirmação automática (webhook) mudando o pedido para `pago`.
+4. Upload de fotos pelo painel.
+5. Cálculo de frete.
 6. Área "Meus pedidos", opcional e sem cadastro obrigatório.
 
 ## Direitos de imagem
