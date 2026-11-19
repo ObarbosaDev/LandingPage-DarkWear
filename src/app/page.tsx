@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PRODUCTS } from "@/data/products";
+import { getProducts } from "@/lib/catalog";
 import { ProductArc } from "@/components/ProductArc";
 import { CatalogGrid } from "@/components/CatalogGrid";
 import { HeroType } from "@/components/HeroType";
@@ -7,8 +7,9 @@ import { TypeBackdrop } from "@/components/TypeBackdrop";
 import { CountUp } from "@/components/CountUp";
 import { Reveal } from "@/components/Reveal";
 
-export default function HomePage() {
-  const destaques = PRODUCTS.slice(0, 3);
+export default async function HomePage() {
+  const products = await getProducts();
+  const destaques = products.slice(0, 3);
 
   return (
     <>
@@ -56,7 +57,7 @@ export default function HomePage() {
         <h2 className="mb-10 font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">
           Catálogo
         </h2>
-        <CatalogGrid products={PRODUCTS} />
+        <CatalogGrid products={products} />
       </div>
       </section>
 
