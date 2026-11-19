@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
-const FOTO = "/products/porsche-gt3.png";
+const FOTO = "/products/porsche-gt3.webp";
 
 const ETAPAS = [
   {
@@ -99,10 +99,10 @@ export function ProcessoDTF() {
             }}
             className="flex min-h-[55vh] flex-col justify-center gap-4 border-t-2 border-foreground py-10 md:min-h-[75vh]"
           >
-            <span className="font-[family-name:var(--font-display)] text-[clamp(6rem,14vw,12rem)] leading-[0.8]">
+            <span className="font-display text-[clamp(6rem,14vw,12rem)] leading-[0.8]">
               {String(i + 1).padStart(2, "0")}
             </span>
-            <h3 className="font-[family-name:var(--font-display)] text-5xl uppercase leading-none md:text-7xl">{e.titulo}</h3>
+            <h3 className="font-display text-5xl uppercase leading-none md:text-7xl">{e.titulo}</h3>
             <p className="max-w-md text-xl font-medium">{e.texto}</p>
           </li>
         ))}

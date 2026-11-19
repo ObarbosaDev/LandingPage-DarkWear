@@ -91,7 +91,7 @@ Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez
 | Número do WhatsApp da loja (formato `55` + DDD + número) | `src/lib/site.ts` → `whatsappNumber` |
 | Nome da marca, descrição e observação de pagamento | `src/lib/site.ts` |
 | Catálogo inicial (usado só para popular o banco vazio) | `src/data/products.ts` |
-| Fotos dos produtos | `public/products/` (PNG com fundo transparente) |
+| Fotos dos produtos | `public/products/` (WebP com fundo transparente, até uns 1600 px) |
 | Logo | `public/brand/logo-dark.jpg` |
 
 > O número do WhatsApp atual é um valor de exemplo (`5500000000000`). Troque pelo número real antes de publicar.
@@ -101,7 +101,7 @@ Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez
 Os produtos ficam na tabela `products` do banco. O arquivo `src/data/products.ts` só popula um banco **vazio**: depois da primeira execução, editá-lo não muda o catálogo.
 
 1. Coloque a foto em `public/products/`.
-2. Em `/admin/produtos/novo`, preencha os campos e informe o caminho da foto (por exemplo `/products/arquivo.png`).
+2. Em `/admin/produtos/novo`, preencha os campos e informe o caminho da foto (por exemplo `/products/arquivo.webp`).
 3. Para peça escura em foto com fundo transparente, escolha "Escura" em "Peça da foto". Ela ganha um contorno de luz fino e aparece sobre os cards escuros.
 
 Produto sem foto mostra uma camiseta desenhada no lugar. Estoque, ocultar e mostrar na loja são feitos na lista de produtos do painel.

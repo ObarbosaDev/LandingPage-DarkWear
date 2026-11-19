@@ -90,7 +90,7 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
       <div className="grid gap-8 sm:grid-cols-2">
         <div className="flex flex-col gap-3">
           <label htmlFor="image" className={label}>Foto (caminho em /public)</label>
-          <input id="image" name="image" placeholder="/products/arquivo.png" defaultValue={v("image", product?.image ?? "")} className={field} />
+          <input id="image" name="image" placeholder="/products/arquivo.webp" defaultValue={v("image", product?.image ?? "")} className={field} />
           <p className="text-base font-medium">
             Coloque o arquivo na pasta <code>public/products</code> do projeto e informe o caminho aqui.
           </p>
@@ -120,7 +120,7 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
         <button
           type="submit"
           disabled={pending}
-          className="border-2 border-foreground bg-foreground px-8 py-4 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground disabled:cursor-wait"
+          className="border-2 border-foreground bg-foreground px-8 py-4 font-display text-2xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground disabled:cursor-wait"
         >
           {pending ? "Salvando…" : "Salvar produto"}
         </button>

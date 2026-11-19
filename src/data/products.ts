@@ -26,7 +26,7 @@ export const PRODUCTS: Product[] = [
     sizes: ["P", "M", "G", "GG"],
     colors: ["Preta"],
     stock: 12,
-    image: "/products/porsche-gt3.png",
+    image: "/products/porsche-gt3.webp",
     photoBg: "light",
   },
   {
@@ -39,7 +39,7 @@ export const PRODUCTS: Product[] = [
     sizes: ["P", "M", "G", "GG", "XG"],
     colors: ["Branca"],
     stock: 5,
-    image: "/products/blusa-2.png",
+    image: "/products/blusa-2.webp",
     photoBg: "dark",
   },
   {
@@ -51,7 +51,7 @@ export const PRODUCTS: Product[] = [
     sizes: ["P", "M", "G", "GG"],
     colors: ["Preta"],
     stock: 8,
-    image: "/products/eu-faco-programa.png",
+    image: "/products/eu-faco-programa.webp",
     photoBg: "light",
   },
 ];

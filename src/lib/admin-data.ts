@@ -172,7 +172,7 @@ export function parseProductForm(
 
   const image = get("image");
   if (image && !/^\/products\/[\w.-]+$/.test(image)) {
-    return { ok: false, error: "A foto deve ser um caminho como /products/arquivo.png." };
+    return { ok: false, error: "A foto deve ser um caminho como /products/arquivo.webp." };
   }
 
   const photoBg = get("photoBg");
