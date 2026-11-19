@@ -26,20 +26,18 @@ export function ProductBuy({ product }: { product: Product }) {
     setAdded(true);
   }
 
+  const chip = (on: boolean) =>
+    `min-h-11 border-2 px-4 py-2 text-base font-medium transition-colors ${
+      on ? "border-foreground bg-foreground text-background" : "border-foreground text-foreground hover:bg-foreground hover:text-background"
+    }`;
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <fieldset>
-        <legend className="eyebrow mb-3">Cor</legend>
+        <legend className="mb-3 font-mono text-sm uppercase tracking-[0.15em] text-foreground">Cor</legend>
         <div className="flex flex-wrap gap-2">
           {product.colors.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setColor(c)}
-              className={`border px-4 py-2 text-sm uppercase tracking-widest ${
-                color === c ? "border-foreground bg-foreground text-background" : "border-border text-muted hover:text-foreground"
-              }`}
-            >
+            <button key={c} type="button" onClick={() => setColor(c)} aria-pressed={color === c} className={chip(color === c)}>
               {c}
             </button>
           ))}
@@ -47,17 +45,10 @@ export function ProductBuy({ product }: { product: Product }) {
       </fieldset>
 
       <fieldset>
-        <legend className="eyebrow mb-3">Tamanho</legend>
+        <legend className="mb-3 font-mono text-sm uppercase tracking-[0.15em] text-foreground">Tamanho</legend>
         <div className="flex flex-wrap gap-2">
           {product.sizes.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSize(s)}
-              className={`h-11 min-w-11 border px-3 text-sm font-bold ${
-                size === s ? "border-foreground bg-foreground text-background" : "border-border text-muted hover:text-foreground"
-              }`}
-            >
+            <button key={s} type="button" onClick={() => setSize(s)} aria-pressed={size === s} className={`${chip(size === s)} min-w-14`}>
               {s}
             </button>
           ))}
@@ -65,32 +56,32 @@ export function ProductBuy({ product }: { product: Product }) {
       </fieldset>
 
       {soldOut ? (
-        <p className="border border-border p-4 text-sm text-muted">
+        <p className="border-2 border-foreground p-5 text-lg font-medium text-foreground">
           Esgotado no momento. Quer uma parecida?{" "}
-          <Link href="/personalizar" className="underline hover:text-foreground">
+          <Link href="/personalizar" className="underline underline-offset-4">
             Encomende a sua
           </Link>
           .
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <button
             type="button"
             onClick={handleAdd}
             disabled={!size}
-            className="bg-foreground py-4 text-sm font-bold uppercase tracking-widest text-background enabled:hover:opacity-85 disabled:opacity-30"
+            className="border-2 border-foreground bg-foreground px-8 py-5 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-background transition-colors enabled:hover:bg-transparent enabled:hover:text-foreground disabled:cursor-not-allowed disabled:bg-transparent disabled:text-foreground"
           >
-            {size ? "Adicionar ao carrinho" : "Escolha um tamanho"}
+            {size ? "Adicionar à sacola" : "Escolha um tamanho"}
           </button>
           {added && (
-            <Link href="/carrinho" className="text-center text-sm uppercase tracking-widest text-muted hover:text-foreground">
-              Ir para o carrinho →
+            <Link href="/carrinho" className="text-lg font-medium text-foreground underline underline-offset-4">
+              Ir para a sacola →
             </Link>
           )}
         </div>
       )}
 
-      <p className="text-xs text-muted">Pix ou cartão, combinado no WhatsApp. Estoque limitado.</p>
+      <p className="text-base font-medium text-foreground">Pix ou cartão, combinado no WhatsApp. Estoque limitado.</p>
     </div>
   );
 }
