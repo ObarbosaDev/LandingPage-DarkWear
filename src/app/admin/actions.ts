@@ -72,7 +72,12 @@ export async function changeOrderStatusAction(form: FormData): Promise<void> {
   const next = String(form.get("next") ?? "") as OrderStatus;
   if (!Number.isInteger(id) || !ORDER_STATUS.includes(next)) return;
 
-  await updateOrderStatus(id, next);
+  const result = await updateOrderStatus(id, next);
+  if (result !== "ok") {
+    // Outra pessoa já mudou o pedido (ou a mudança não é permitida): avisa em vez de falhar calado.
+    revalidatePath("/admin", "layout");
+    redirect("/admin/pedidos?aviso=mudou");
+  }
   if (next === "cancelado") refreshCatalog(); // cancelar devolve peças ao estoque
   revalidatePath("/admin", "layout");
 }

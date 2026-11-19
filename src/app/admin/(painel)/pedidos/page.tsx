@@ -14,9 +14,9 @@ export const metadata: Metadata = { title: "Pedidos" };
 
 const dataHora = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
 
-export default async function PedidosPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function PedidosPage({ searchParams }: { searchParams: Promise<{ status?: string; aviso?: string }> }) {
   await requireAdmin();
-  const { status } = await searchParams;
+  const { status, aviso } = await searchParams;
   const filtro = ORDER_STATUS.find((s) => s === status);
   const pedidos = await listOrders(filtro);
 
@@ -28,6 +28,12 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
   return (
     <div className="flex flex-col gap-10">
       <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Pedidos</h1>
+
+      {aviso === "mudou" ? (
+        <p role="alert" className="border-2 border-foreground p-4 text-lg font-bold">
+          Esse pedido já foi alterado por outra pessoa, ou a mudança não é permitida. A lista foi atualizada.
+        </p>
+      ) : null}
 
       <nav aria-label="Filtrar por status" className="flex flex-wrap gap-2">
         <Link href="/admin/pedidos" className={chip(!filtro)}>
