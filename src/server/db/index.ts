@@ -13,7 +13,7 @@ import "server-only";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { count } from "drizzle-orm";
 // Executor das migrações (cria/atualiza as tabelas ao conectar).
-import { runMigrations } from "@/server/db/migrations";
+import { prepararBanco } from "@/server/db/migrations";
 // Descrição das tabelas, que o Drizzle usa para montar as consultas com tipos.
 import * as schema from "@/server/db/schema";
 // Catálogo de exemplo, gravado só na primeira execução (banco vazio).
@@ -49,6 +49,9 @@ export function getDb(): Promise<Db> {
  */
 async function connect(): Promise<Db> {
   const url = process.env.DATABASE_URL;
+  // Por padrão o servidor aplica as migrações que faltam ao conectar. Com DB_AUTO_MIGRATE=false ele
+  // não mexe no banco: só confere se está em dia (as migrações rodam antes, com "npm run db:migrate").
+  const autoMigrar = process.env.DB_AUTO_MIGRATE !== "false";
   let db: Db;
 
   if (url) {
@@ -61,7 +64,7 @@ async function connect(): Promise<Db> {
     // As migrações precisam de uma conexão só (transação e trava): o Pool reparte as chamadas entre várias.
     const conn = await pool.connect();
     try {
-      await runMigrations({ exec: (sql) => conn.query(sql), query: (sql, params) => conn.query(sql, params) });
+      await prepararBanco({ exec: (sql) => conn.query(sql), query: (sql, params) => conn.query(sql, params) }, autoMigrar);
     } finally {
       // Sempre devolve a conexão ao Pool, mesmo se a migração falhar.
       conn.release();
@@ -82,7 +85,7 @@ async function connect(): Promise<Db> {
     const dir = process.env.PGLITE_DIR ?? "./.data/pglite";
     if (!dir.startsWith("memory://")) mkdirSync(dir, { recursive: true }); // memory:// vale nos testes
     const client = new PGlite(dir);
-    await runMigrations({ exec: (sql) => client.exec(sql), query: (sql, params) => client.query(sql, params) });
+    await prepararBanco({ exec: (sql) => client.exec(sql), query: (sql, params) => client.query(sql, params) }, autoMigrar);
     db = drizzle({ client, schema }) as unknown as Db;
   }
 

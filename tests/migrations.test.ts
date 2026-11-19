@@ -114,9 +114,9 @@ describe("runMigrations", () => {
   it("uma migração que falha não deixa rastro, e as anteriores continuam valendo", async () => {
     const { c, runner, historico, tabelas } = novoBanco();
     const lista = [
-      { id: "0001_ok", sql: "CREATE TABLE a (id int)" },
-      { id: "0002_quebrada", sql: "CREATE TABLE b (id int); SELECT coluna_que_nao_existe FROM a;" },
-      { id: "0003_nunca", sql: "CREATE TABLE c (id int)" },
+      { id: "0001_ok", up: "CREATE TABLE a (id int)", down: null },
+      { id: "0002_quebrada", up: "CREATE TABLE b (id int); SELECT coluna_que_nao_existe FROM a;", down: null },
+      { id: "0003_nunca", up: "CREATE TABLE c (id int)", down: null },
     ];
     await expect(runMigrations(runner, lista)).rejects.toThrow(/0002_quebrada/);
     expect(await historico()).toEqual(["0001_ok"]);
@@ -126,7 +126,7 @@ describe("runMigrations", () => {
     expect(t).not.toContain("c"); // não chegou a rodar
 
     // Corrigida a migração, a próxima rodada continua de onde parou.
-    lista[1] = { id: "0002_quebrada", sql: "CREATE TABLE b (id int)" };
+    lista[1] = { id: "0002_quebrada", up: "CREATE TABLE b (id int)", down: null };
     expect(await runMigrations(runner, lista)).toEqual(["0002_quebrada", "0003_nunca"]);
     await c.close();
   });
