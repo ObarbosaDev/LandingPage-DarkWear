@@ -55,7 +55,11 @@ export async function createOrder(input: unknown): Promise<OrderView> {
     let total = 0;
     const resolved: OrderView["items"] = [];
 
-    for (const l of lines) {
+    // Baixa em ordem alfabética de produto: dois pedidos com os mesmos itens em ordens diferentes
+    // travam as linhas na mesma sequência e não entram em deadlock. A ordem original é mantida na resposta.
+    const byIndex = lines.map((l, i) => ({ l, i })).sort((a, b) => (a.l.slug < b.l.slug ? -1 : a.l.slug > b.l.slug ? 1 : 0));
+
+    for (const { l, i } of byIndex) {
       const [p] = await tx.select().from(products).where(eq(products.slug, l.slug));
       if (!p || !p.active) throw new OrderError("Produto indisponível.");
       if (!p.sizes.includes(l.size)) throw new OrderError(`Tamanho inválido para ${p.name}.`);
@@ -72,7 +76,7 @@ export async function createOrder(input: unknown): Promise<OrderView> {
 
       const { name, priceCents } = updated[0];
       total += priceCents * l.qty;
-      resolved.push({ name, size: l.size, color: l.color, qty: l.qty, unitPriceCents: priceCents });
+      resolved[i] = { name, size: l.size, color: l.color, qty: l.qty, unitPriceCents: priceCents };
     }
 
     const [order] = await tx
