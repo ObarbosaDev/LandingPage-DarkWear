@@ -29,7 +29,7 @@ describe("runMigrations", () => {
     const feitas = await runMigrations(runner);
     expect(feitas).toEqual(MIGRATIONS.map((m) => m.id));
     expect(await historico()).toEqual(MIGRATIONS.map((m) => m.id));
-    for (const t of ["products", "orders", "order_items", "custom_orders", "login_attempts", "rate_limits", "schema_migrations"]) {
+    for (const t of ["products", "orders", "order_items", "custom_orders", "login_attempts", "rate_limits", "order_status_history", "schema_migrations"]) {
       expect(await tabelas(), t).toContain(t);
     }
   });
@@ -48,12 +48,58 @@ describe("runMigrations", () => {
     const { c, runner, historico } = novoBanco();
     await c.exec(DDL); // como estava um banco antigo: só as tabelas, sem histórico
     await c.exec(
-      "INSERT INTO products (slug, name, price_cents, category, sizes, colors, stock) VALUES ('x', 'X', 1000, 'Pronta entrega', '[\"M\"]', '[\"Preta\"]', 3)",
+      "INSERT INTO products (slug, name, price_cents, category, sizes, colors, stock) VALUES ('camisa-x', 'X', 1000, 'Pronta entrega', '[\"M\"]', '[\"Preta\"]', 3)",
     );
     const feitas = await runMigrations(runner);
     expect(feitas).toEqual(MIGRATIONS.map((m) => m.id));
-    expect((await c.query("SELECT stock FROM products WHERE slug = 'x'")).rows).toEqual([{ stock: 3 }]);
+    expect((await c.query("SELECT stock FROM products WHERE slug = 'camisa-x'")).rows).toEqual([{ stock: 3 }]);
     expect(await historico()).toHaveLength(MIGRATIONS.length);
+  });
+
+  // O caso que mais importa em produção: um banco que JÁ TEM pedidos, criado antes das regras de
+  // integridade e do histórico. As migrações novas não podem perder nada, e o histórico dos pedidos
+  // antigos deve ser reconstruído (criação + status atual).
+  it("atualiza um banco com pedidos existentes e reconstrói o histórico deles", async () => {
+    const { c, runner } = novoBanco();
+    await runMigrations(runner, MIGRATIONS.slice(0, 2)); // o estado "antigo": só as duas primeiras
+    await c.exec(
+      "INSERT INTO products (slug, name, price_cents, category, sizes, colors, stock) VALUES ('camisa-x', 'X', 1000, 'Pronta entrega', '[\"M\"]', '[\"Preta\"]', 3)",
+    );
+    await c.exec("INSERT INTO orders (id, status, total_cents) VALUES (1, 'pendente', 1000), (2, 'pago', 2000), (3, 'cancelado', 500)");
+    await c.exec(
+      "INSERT INTO order_items (order_id, product_slug, name, size, color, qty, unit_price_cents) VALUES (1, 'camisa-x', 'X', 'M', 'Preta', 1, 1000), (2, 'camisa-x', 'X', 'M', 'Preta', 2, 1000)",
+    );
+
+    expect(await runMigrations(runner)).toEqual(MIGRATIONS.slice(2).map((m) => m.id));
+
+    // Os dados continuam todos lá.
+    expect((await c.query("SELECT count(*)::int AS n FROM orders")).rows).toEqual([{ n: 3 }]);
+    expect((await c.query("SELECT count(*)::int AS n FROM order_items")).rows).toEqual([{ n: 2 }]);
+    // Histórico reconstruído: todo pedido tem a criação; os que já saíram de "pendente" ganham mais uma linha.
+    const linhas = (
+      await c.query("SELECT order_id, coalesce(from_status, 'início') AS de, to_status AS para FROM order_status_history ORDER BY order_id, id")
+    ).rows;
+    expect(linhas).toEqual([
+      { order_id: 1, de: "início", para: "pendente" },
+      { order_id: 2, de: "início", para: "pendente" },
+      { order_id: 2, de: "pendente", para: "pago" },
+      { order_id: 3, de: "início", para: "pendente" },
+      { order_id: 3, de: "pendente", para: "cancelado" },
+    ]);
+  });
+
+  // Se o banco antigo já tiver um dado que as regras novas proíbem, a migração deve FALHAR inteira
+  // (sem aplicar pela metade), para o problema ser corrigido antes de seguir.
+  it("falha sem deixar rastro se o banco antigo tem dado que viola as regras novas", async () => {
+    const { c, runner, historico } = novoBanco();
+    await runMigrations(runner, MIGRATIONS.slice(0, 2));
+    await c.exec(
+      "INSERT INTO products (slug, name, price_cents, category, sizes, colors, stock) VALUES ('Slug Inválido', 'X', 1000, 'Pronta entrega', '[\"M\"]', '[\"Preta\"]', 3)",
+    );
+    await expect(runMigrations(runner)).rejects.toThrow(/0003_integridade/);
+    expect(await historico()).toEqual(["0001_baseline", "0002_rate_limits"]);
+    // Nenhuma regra nova ficou pela metade.
+    expect((await c.query("SELECT count(*)::int AS n FROM pg_constraint WHERE conname = 'products_categoria'")).rows).toEqual([{ n: 0 }]);
   });
 
   // Simula um deploy futuro: o banco está na migração 1 e o código novo traz a 2.

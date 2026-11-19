@@ -102,6 +102,19 @@ Em desenvolvimento não é preciso configurar nada: sem `DATABASE_URL`, o projet
 | `PENDING_ORDER_HOURS` | Opcional. Horas até o pedido pendente expirar (padrão 48). |
 | `SITE_URL` | Endereço público do site, usado no sitemap e no `robots.txt`. |
 
+**Integridade.** O banco não confia só no código: ele próprio recusa dado inválido.
+
+| Proteção | O que garante |
+| --- | --- |
+| `CHECK` em produtos | endereço (slug) no padrão, categoria válida, tamanhos e cores como lista de 1 a 12 itens, foto só dentro de `/products/`, preço e estoque nunca negativos |
+| `CHECK` em pedidos e encomendas | só os status que existem; quantidade de 1 a 99 por item |
+| Chave estrangeira | todo item de pedido aponta para uma peça que existe, e uma peça que já tem pedido não pode ser apagada |
+| Gatilho `updated_at` | a data de alteração de produtos e pedidos é atualizada pelo próprio banco, sem depender do código |
+| Índices compostos e parciais | listagem de pedidos por status, expiração de pendentes e vitrine continuam rápidas com muitos dados |
+| Trava de linha (`FOR UPDATE`) | duas pessoas mudando ou cancelando o mesmo pedido ao mesmo tempo: só uma vence, e as peças voltam ao estoque uma vez só |
+
+**Histórico de status.** A tabela `order_status_history` guarda cada mudança de status de um pedido: de qual status, para qual, quando e por quem (o cliente, o painel ou o prazo de expiração). Ele aparece em cada pedido em `/admin/pedidos` e responde "quando esse pedido foi pago?". Pedidos que já existiam antes dessa tabela ganham um histórico reconstruído (criação e status atual).
+
 ### Painel do dono
 
 O painel fica em `/admin` e protege tudo com uma senha única.
