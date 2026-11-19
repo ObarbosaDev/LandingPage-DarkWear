@@ -7,8 +7,8 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { and, count, eq, gt, lt } from "drizzle-orm";
-import { getDb } from "@/db";
-import { loginAttempts } from "@/db/schema";
+import { getDb } from "@/server/db";
+import { loginAttempts } from "@/server/db/schema";
 
 export const ADMIN_COOKIE = "dw_admin";
 const SESSION_HOURS = 12;

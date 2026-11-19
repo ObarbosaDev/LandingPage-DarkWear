@@ -1,9 +1,9 @@
 // Acesso a dados do painel do dono. Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
 import { and, asc, count, desc, eq, inArray, lte, max } from "drizzle-orm";
-import { getDb } from "@/db";
-import { customOrders, orderItems, orders, products, ORDER_STATUS, type OrderStatus, type ProductRow } from "@/db/schema";
-import { cancelOrder, orderNumber } from "@/lib/orders";
+import { getDb } from "@/server/db";
+import { customOrders, orderItems, orders, products, ORDER_STATUS, type OrderStatus, type ProductRow } from "@/server/db/schema";
+import { cancelOrder, orderNumber } from "@/server/orders";
 
 // ---------- Pedidos ----------
 

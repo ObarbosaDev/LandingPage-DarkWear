@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { buildCartMessage, whatsappLink } from "@/lib/whatsapp";
-import { OrderError, createOrder } from "@/lib/orders";
+import { OrderError, createOrder } from "@/server/orders";
 
 // POST /api/orders  →  registra o pedido, baixa o estoque e devolve o link do WhatsApp para fechar.
 export async function POST(request: Request) {

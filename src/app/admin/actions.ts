@@ -15,7 +15,7 @@ import {
   registerFailure,
   requireAdmin,
   startSession,
-} from "@/lib/admin-auth";
+} from "@/server/admin/auth";
 import {
   createProduct,
   parseProductForm,
@@ -24,8 +24,8 @@ import {
   setProductStock,
   updateOrderStatus,
   updateProduct,
-} from "@/lib/admin-data";
-import { ORDER_STATUS, type OrderStatus } from "@/db/schema";
+} from "@/server/admin/data";
+import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
 
 // Em erro de validação, devolvemos também o que foi digitado: o React limpa o formulário depois de
 // cada envio, e o dono não pode perder o que escreveu por causa de um campo errado.

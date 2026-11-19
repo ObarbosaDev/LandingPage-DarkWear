@@ -1,8 +1,8 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { and, asc, eq } from "drizzle-orm";
-import { getDb } from "@/db";
-import { products, type ProductRow } from "@/db/schema";
-import type { Product } from "@/data/products";
+import { getDb } from "@/server/db";
+import { products, type ProductRow } from "@/server/db/schema";
+import type { Product } from "@/lib/product";
 
 // O catálogo vem do banco. Fica em cache e é invalidado pela etiqueta "products"
 // sempre que estoque ou produto mudam (ver revalidateTag nas rotas de API).

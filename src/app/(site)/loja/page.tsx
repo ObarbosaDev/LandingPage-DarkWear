@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { getProducts } from "@/lib/catalog";
+import { getProducts } from "@/server/catalog";
 import { IndiceLoja } from "@/components/IndiceLoja";
 
 export const metadata: Metadata = { title: "Loja" };

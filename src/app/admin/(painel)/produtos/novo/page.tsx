@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/server/admin/auth";
 import { createProductAction } from "@/app/admin/actions";
 import { ProductForm } from "../ProductForm";
 

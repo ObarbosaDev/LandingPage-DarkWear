@@ -1,8 +1,8 @@
 // Regras de pedido, com persistência em banco e estoque protegido por transação.
 
 import { and, eq, gte, ne, sql } from "drizzle-orm";
-import { getDb } from "@/db";
-import { customOrders, orderItems, orders, products, type OrderStatus } from "@/db/schema";
+import { getDb } from "@/server/db";
+import { customOrders, orderItems, orders, products, type OrderStatus } from "@/server/db/schema";
 
 export type OrderItemInput = { slug: string; size: string; color: string; qty: number };
 

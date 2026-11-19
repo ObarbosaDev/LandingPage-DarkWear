@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { Product } from "@/data/products";
+import type { Product } from "@/lib/product";
 import { ProductImage } from "@/components/ProductImage";
 import { formatBRL } from "@/lib/site";
 

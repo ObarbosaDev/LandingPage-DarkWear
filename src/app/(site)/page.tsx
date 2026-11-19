@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProducts } from "@/lib/catalog";
+import { getProducts } from "@/server/catalog";
 import { ProductArc } from "@/components/ProductArc";
 import { CatalogGrid } from "@/components/CatalogGrid";
 import { HeroType } from "@/components/HeroType";

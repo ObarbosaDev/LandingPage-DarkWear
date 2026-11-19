@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/server/admin/auth";
 import { AdminNav } from "./AdminNav";
 
 // Área privada: não precisa de casca estática instantânea. Ela bloqueia no servidor até validar a sessão.

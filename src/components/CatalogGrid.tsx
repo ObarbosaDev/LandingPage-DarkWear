@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Product } from "@/data/products";
+import type { Product } from "@/lib/product";
 import { ProductTile } from "@/components/ProductTile";
 
 // Catálogo geral com filtro por categoria. Mostra tudo por padrão.

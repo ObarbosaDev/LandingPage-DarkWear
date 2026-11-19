@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getProduct, getProducts } from "@/lib/catalog";
+import { getProduct, getProducts } from "@/server/catalog";
 import { formatBRL } from "@/lib/site";
 import { ProductBuy } from "./ProductBuy";
 import { ProductImage } from "@/components/ProductImage";

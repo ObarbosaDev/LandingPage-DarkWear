@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/lib/cart";
-import type { Product } from "@/data/products";
+import type { Product } from "@/lib/product";
 
 export function ProductBuy({ product }: { product: Product }) {
   const { add } = useCart();

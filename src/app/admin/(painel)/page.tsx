@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { dashboardStats } from "@/lib/admin-data";
+import { dashboardStats } from "@/server/admin/data";
 import { formatBRL } from "@/lib/site";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin } from "@/server/admin/auth";
 
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
 export const instant = false;

@@ -1,8 +1,8 @@
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { count } from "drizzle-orm";
-import { DDL } from "@/db/ddl";
-import * as schema from "@/db/schema";
-import { PRODUCTS } from "@/data/products";
+import { DDL } from "@/server/db/ddl";
+import * as schema from "@/server/db/schema";
+import { PRODUCTS } from "@/server/db/seed-data";
 
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 

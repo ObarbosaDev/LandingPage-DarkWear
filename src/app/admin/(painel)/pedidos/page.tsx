@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireAdmin } from "@/lib/admin-auth";
-import { NEXT_STATUS, listOrders } from "@/lib/admin-data";
-import { ORDER_STATUS, type OrderStatus } from "@/db/schema";
+import { requireAdmin } from "@/server/admin/auth";
+import { NEXT_STATUS, listOrders } from "@/server/admin/data";
+import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
 import { formatBRL } from "@/lib/site";
 import { changeOrderStatusAction } from "@/app/admin/actions";
 import { ConfirmButton } from "../ConfirmButton";

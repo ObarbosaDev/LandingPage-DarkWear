@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { Product } from "@/data/products";
+import type { Product } from "@/lib/product";
 import { ShirtArt } from "@/components/ShirtArt";
 
 // Foto real do produto quando existe; senão, a camiseta desenhada.

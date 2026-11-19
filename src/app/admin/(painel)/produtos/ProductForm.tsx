@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import type { FormState } from "@/app/admin/actions";
-import type { ProductRow } from "@/db/schema";
+import type { ProductRow } from "@/server/db/schema";
 
 const label = "font-mono text-sm uppercase tracking-[0.15em]";
 const field =

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/admin-auth";
-import { getProductRow } from "@/lib/admin-data";
+import { requireAdmin } from "@/server/admin/auth";
+import { getProductRow } from "@/server/admin/data";
 import { updateProductAction } from "@/app/admin/actions";
 import { ProductForm } from "../ProductForm";
 
