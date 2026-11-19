@@ -7,16 +7,18 @@ import { PRODUCTS } from "@/data/products";
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 // Uma conexão por processo, criada sob demanda (nada roda durante o import, então o build não quebra).
-let pending: Promise<Db> | null = null;
+// Fica em globalThis: no desenvolvimento, cada recarga de código reavalia este módulo, e uma variável
+// local abriria um segundo PGlite na mesma pasta.
+const g = globalThis as unknown as { __dwDb?: Promise<Db> | null };
 
 export function getDb(): Promise<Db> {
-  if (!pending) {
-    pending = connect().catch((e) => {
-      pending = null; // deixa tentar de novo na próxima chamada
+  if (!g.__dwDb) {
+    g.__dwDb = connect().catch((e) => {
+      g.__dwDb = null; // deixa tentar de novo na próxima chamada
       throw e;
     });
   }
-  return pending;
+  return g.__dwDb;
 }
 
 async function connect(): Promise<Db> {
@@ -69,5 +71,5 @@ async function seedIfEmpty(db: Db) {
       photoBg: p.photoBg ?? null,
       position: i,
     })),
-  );
+  ).onConflictDoNothing(); // duas partidas simultâneas não derrubam uma à outra
 }
