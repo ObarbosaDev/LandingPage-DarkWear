@@ -1,7 +1,7 @@
 // Regras de pedido, com persistência em banco e estoque protegido por transação.
 
 import "server-only";
-import { and, eq, gte, ne, sql } from "drizzle-orm";
+import { and, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { orderItems, orders, products, type OrderStatus } from "@/server/db/schema";
 
@@ -101,8 +101,9 @@ export async function createOrder(input: unknown): Promise<OrderView> {
   });
 }
 
-// Cancela o pedido e devolve as peças ao estoque. Fica pronto para o painel do dono.
-export async function cancelOrder(id: number): Promise<boolean> {
+// Cancela o pedido e devolve as peças ao estoque. Com `somenteSe`, só cancela se o pedido ainda estiver
+// nesse status (a expiração usa "pendente": se o dono marcou como pago no meio do caminho, não mexe).
+export async function cancelOrder(id: number, somenteSe?: OrderStatus): Promise<boolean> {
   const db = await getDb();
   return db.transaction(async (tx) => {
     // Só quem de fato muda o status para "cancelado" devolve as peças: o UPDATE condicional trava a
@@ -110,7 +111,7 @@ export async function cancelOrder(id: number): Promise<boolean> {
     const changed = await tx
       .update(orders)
       .set({ status: "cancelado", updatedAt: new Date() })
-      .where(and(eq(orders.id, id), ne(orders.status, "cancelado")))
+      .where(and(eq(orders.id, id), somenteSe ? eq(orders.status, somenteSe) : ne(orders.status, "cancelado")))
       .returning({ id: orders.id });
     if (changed.length === 0) return false;
 
@@ -123,4 +124,21 @@ export async function cancelOrder(id: number): Promise<boolean> {
     }
     return true;
   });
+}
+
+// Pedido pendente segura as peças no estoque. Se ninguém fechou depois de `maxAgeHours`, ele é cancelado
+// e as peças voltam à venda. Devolve quantos pedidos foram cancelados.
+export async function expirePendingOrders(maxAgeHours = 48): Promise<number> {
+  const db = await getDb();
+  const limite = new Date(Date.now() - maxAgeHours * 3600 * 1000);
+  const velhos = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.status, "pendente"), lt(orders.createdAt, limite)));
+
+  let cancelados = 0;
+  for (const { id } of velhos) {
+    if (await cancelOrder(id, "pendente")) cancelados++;
+  }
+  return cancelados;
 }
