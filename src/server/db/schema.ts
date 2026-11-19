@@ -146,7 +146,8 @@ export const rateLimits = pgTable(
 // ---------------------------------------------------------------------------
 // order_status_history: o histórico de status dos pedidos (migração 0004).
 // Uma linha a cada mudança: de qual status, para qual, quando e por quem (origin):
-//   "pedido" = o cliente criou o pedido; "painel" = o dono mudou; "expiracao" = o cron cancelou por prazo.
+//   "pedido" = o cliente criou o pedido; "painel" = o dono mudou; "expiracao" = o cron cancelou por prazo;
+//   "pagamento" = o Mercado Pago avisou (webhook) que o pagamento foi aprovado.
 // ---------------------------------------------------------------------------
 export const orderStatusHistory = pgTable(
   "order_status_history",
@@ -165,5 +166,39 @@ export const orderStatusHistory = pgTable(
 );
 
 // De onde veio uma mudança de status (ver order_status_history).
-export const STATUS_ORIGIN = ["pedido", "painel", "expiracao"] as const;
+export const STATUS_ORIGIN = ["pedido", "painel", "expiracao", "pagamento"] as const;
 export type StatusOrigin = (typeof STATUS_ORIGIN)[number];
+
+// ---------------------------------------------------------------------------
+// payments: os pagamentos online dos pedidos (migração 0005), hoje só do Mercado Pago.
+// Uma linha nasce "iniciado" quando o cliente é levado à página de pagamento e é atualizada pelos
+// avisos (webhook) do Mercado Pago. O status aqui é o NOSSO, já traduzido do deles (ver
+// src/server/payments/mercadopago.ts).
+// ---------------------------------------------------------------------------
+export const PAYMENT_STATUS = ["iniciado", "pendente", "aprovado", "recusado", "cancelado", "estornado"] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUS)[number];
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    provider: text("provider").$type<"mercadopago">().notNull(),
+    // Identifica a "página de pagamento" criada para o pedido (a preferência do Mercado Pago).
+    preferenceId: text("preference_id"),
+    // Identifica o pagamento de fato. Único: o mesmo aviso repetido cai na mesma linha.
+    providerPaymentId: text("provider_payment_id").unique(),
+    status: text("status").$type<PaymentStatus>().notNull(),
+    // Forma de pagamento (credit_card, debit_card, pix...), como o Mercado Pago informa.
+    method: text("method"),
+    installments: integer("installments"),
+    // Valor cobrado, em centavos. É conferido com o total do pedido antes de marcá-lo como pago.
+    amountCents: integer("amount_cents"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("payments_order_idx").on(t.orderId), index("payments_preference_idx").on(t.preferenceId)],
+);

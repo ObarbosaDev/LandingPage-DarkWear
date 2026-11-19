@@ -27,7 +27,7 @@ export const metadata: Metadata = { title: "Pedidos" };
 const dataHora = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
 
 // Texto legível de quem fez cada mudança de status (o banco guarda só o código curto).
-const ORIGEM: Record<StatusOrigin, string> = { pedido: "cliente", painel: "painel", expiracao: "prazo" };
+const ORIGEM: Record<StatusOrigin, string> = { pedido: "cliente", painel: "painel", expiracao: "prazo", pagamento: "pagamento" };
 
 // searchParams: os parâmetros do endereço. "status" é o filtro escolhido (?status=pago) e "aviso"
 // aparece quando uma mudança de status não foi aplicada (?aviso=mudou).

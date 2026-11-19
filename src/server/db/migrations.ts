@@ -155,6 +155,46 @@ INSERT INTO order_status_history (order_id, from_status, to_status, origin, at)
     // só com a criação e o status atual: o detalhe de cada mudança intermediária se perde.
     down: `DROP TABLE IF EXISTS order_status_history;`,
   },
+  // Pagamentos online (Mercado Pago): uma linha por tentativa/pagamento de um pedido.
+  //   - status normalizado do pagamento (iniciado, pendente, aprovado, recusado, cancelado, estornado);
+  //   - provider_payment_id é ÚNICO: o mesmo aviso do Mercado Pago chegando duas vezes (acontece
+  //     por causa das reentregas) cai na mesma linha, e o pedido nunca é "pago" duas vezes;
+  //   - o histórico de status passa a aceitar a origem "pagamento" (pedido pago pelo webhook).
+  {
+    id: "0005_pagamentos",
+    up: `
+CREATE TABLE payments (
+  id serial PRIMARY KEY,
+  order_id integer NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+  provider text NOT NULL CHECK (provider IN ('mercadopago')),
+  preference_id text,
+  provider_payment_id text UNIQUE,
+  status text NOT NULL CHECK (status IN ('iniciado', 'pendente', 'aprovado', 'recusado', 'cancelado', 'estornado')),
+  method text,
+  installments integer CHECK (installments IS NULL OR installments BETWEEN 1 AND 36),
+  amount_cents integer CHECK (amount_cents IS NULL OR amount_cents >= 0),
+  paid_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX payments_order_idx ON payments (order_id);
+CREATE INDEX payments_preference_idx ON payments (preference_id);
+CREATE TRIGGER payments_set_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE order_status_history DROP CONSTRAINT order_status_history_origin_check;
+ALTER TABLE order_status_history
+  ADD CONSTRAINT order_status_history_origin_check CHECK (origin IN ('pedido', 'painel', 'expiracao', 'pagamento'));
+`,
+    // Descer APAGA a tabela de pagamentos (os registros de quem pagou o quê). Por isso exige --confirm.
+    // As linhas de histórico criadas pelo webhook passam a constar como feitas pelo painel.
+    down: `
+UPDATE order_status_history SET origin = 'painel' WHERE origin = 'pagamento';
+ALTER TABLE order_status_history DROP CONSTRAINT order_status_history_origin_check;
+ALTER TABLE order_status_history
+  ADD CONSTRAINT order_status_history_origin_check CHECK (origin IN ('pedido', 'painel', 'expiracao'));
+DROP TABLE IF EXISTS payments;
+`,
+  },
 ];
 
 // O que o executor precisa do banco. Os dois drivers (Neon e PGlite) cabem aqui: assim o executor

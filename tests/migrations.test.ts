@@ -29,7 +29,7 @@ describe("runMigrations", () => {
     const feitas = await runMigrations(runner);
     expect(feitas).toEqual(MIGRATIONS.map((m) => m.id));
     expect(await historico()).toEqual(MIGRATIONS.map((m) => m.id));
-    for (const t of ["products", "orders", "order_items", "custom_orders", "login_attempts", "rate_limits", "order_status_history", "schema_migrations"]) {
+    for (const t of ["products", "orders", "order_items", "custom_orders", "login_attempts", "rate_limits", "order_status_history", "payments", "schema_migrations"]) {
       expect(await tabelas(), t).toContain(t);
     }
   });
