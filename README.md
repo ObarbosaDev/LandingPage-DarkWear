@@ -9,6 +9,7 @@ Loja online de camisetas estampadas em DTF. O cliente escolhe uma peça pronta d
 - [Como rodar](#como-rodar)
 - [Configuração](#configuração)
 - [Estrutura do projeto](#estrutura-do-projeto)
+- [Como ler o código](#como-ler-o-código)
 - [Rotas](#rotas)
 - [API](#api)
 - [Identidade visual](#identidade-visual)
@@ -156,6 +157,18 @@ src/
     orders.ts         pedidos de peças prontas e cancelamento
     custom-orders.ts  encomendas com arte do cliente
 ```
+
+## Como ler o código
+
+Todo arquivo de código começa com um cabeçalho que diz **o que ele é, quem o usa e em qual tela ou rota ele aparece**. Ao longo do arquivo, cada bloco importante tem um comentário explicando o **porquê** (e não só o quê): a regra de negócio por trás, o cuidado de segurança, a razão de uma escolha que parece estranha. Os comentários estão em português, como o resto do projeto.
+
+Um caminho sugerido para entender o sistema:
+
+1. `src/server/orders.ts`: como um pedido é registrado e o estoque é protegido.
+2. `src/server/admin/auth.ts`: como o painel do dono é protegido.
+3. `src/app/(site)/carrinho/page.tsx` e `src/app/api/orders/route.ts`: o caminho do clique em "Finalizar" até o WhatsApp.
+4. `src/app/admin/actions.ts`: tudo o que o dono pode fazer no painel.
+5. `tests/`: cada teste explica, em uma frase, a regra que ele garante.
 
 ## Rotas
 
