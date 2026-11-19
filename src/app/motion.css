@@ -1,15 +1,26 @@
+/* ============================================================================
+   Animações do site. Só existem as que são usadas:
+     - .reveal        → componente Reveal (blocos que aparecem subindo ao rolar a página)
+     - .steps-line    → home, seção "Como funciona" (linha que se desenha ligando os passos)
+     - .drift-left/right → TypeBackdrop e HeroType (textos gigantes que derivam ao fundo)
+   Quem prefere menos movimento (configuração do sistema) tem tudo isso desligado no fim de cada bloco.
+   ============================================================================ */
+
 /* Revelação ao rolar: começa invisível e sobe quando entra na tela. */
+/* Estado inicial: invisível e 32px abaixo da posição final. A transição suaviza a mudança. */
 .reveal {
   opacity: 0;
   transform: translateY(32px);
   transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* O componente Reveal adiciona "is-visible" quando o bloco entra na tela: aí ele sobe e aparece. */
 .reveal.is-visible {
   opacity: 1;
   transform: translateY(0);
 }
 
+/* Quem pediu menos movimento ao sistema: o bloco já aparece pronto, sem animar. */
 @media (prefers-reduced-motion: reduce) {
   .reveal {
     opacity: 1;
@@ -19,17 +30,21 @@
 }
 
 /* Linha que se desenha ligando os passos. */
+/* A linha cresce da esquerda para a direita (de 0% a 100% da largura) em 1,4 s. */
 @keyframes steps-draw {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
 }
 
+/* transform-origin: left faz a linha crescer a partir da esquerda, e não do centro. */
 .steps-line {
   transform-origin: left;
   animation: steps-draw 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 /* Fundo tipográfico do hero: linhas de texto que derivam devagar em sentidos opostos. */
+/* A linha de texto é duplicada lado a lado; andar 50% e recomeçar dá a impressão de um loop sem
+   emenda. As duas animações vão em sentidos opostos para o fundo ter vida sem ser cansativo. */
 @keyframes drift-left {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
@@ -40,10 +55,12 @@
   to { transform: translateX(0); }
 }
 
+/* Durações longas (110 s e 130 s) de propósito: o movimento é quase imperceptível, só ambiente. */
 .drift-left { animation: drift-left 110s linear infinite; }
 
 .drift-right { animation: drift-right 130s linear infinite; }
 
+/* Quem pediu menos movimento: o texto de fundo fica parado. */
 @media (prefers-reduced-motion: reduce) {
   .drift-left,
   .drift-right {

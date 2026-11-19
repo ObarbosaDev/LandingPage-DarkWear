@@ -1,6 +1,14 @@
+/* ============================================================================
+   Estilos GLOBAIS do projeto: valem para o site todo e para o painel.
+   Aqui ficam as cores da marca, o tema do Tailwind (as classes utilitárias como bg-background e
+   font-display) e as regras base da página. As animações ficam em motion.css.
+   ============================================================================ */
+
+/* Carrega o Tailwind, que fornece as classes utilitárias usadas nos componentes (flex, px-6, etc.). */
 @import "tailwindcss";
 
 /* Paleta da marca: preto, branco e cinza. Os valores são padrão, troque se a marca tiver outras cores. */
+/* Estas são as variáveis "de verdade" das cores. Mudar um valor aqui muda o site inteiro. */
 :root {
   --background: #000000;
   --foreground: #ffffff;
@@ -10,6 +18,9 @@
   --accent: #f5f5f5; /* destaque neutro: o dono pediu para tirar o vermelho */
 }
 
+/* Ensina ao Tailwind os nomes das cores e das fontes, para existirem classes como bg-background,
+   text-foreground, border-border e font-display. "inline" faz o Tailwind ler o valor atual das
+   variáveis acima (e não congelar uma cópia). */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -17,12 +28,15 @@
   --color-surface: var(--surface);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  /* As três fontes da marca (carregadas em src/app/layout.tsx):
+     texto corrido = Archivo; rótulos pequenos = Geist Mono; títulos = Anton (com Impact de reserva). */
   --font-sans: var(--font-archivo);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-anton), Impact, sans-serif;
 }
 
 /* Títulos de impacto: condensados, caixa alta. */
+/* Classe pronta ".display" para um título no estilo da marca de uma vez só. */
 .display {
   font-family: var(--font-display);
   text-transform: uppercase;
@@ -30,6 +44,8 @@
   line-height: 0.92;
 }
 
+/* Reserva sempre o espaço da barra de rolagem. Sem isso, a página "pula" alguns pixels para o lado
+   quando a barra aparece ou some (e o cabeçalho parecia tremer). */
 html {
   scrollbar-gutter: stable;
 }
@@ -40,12 +56,16 @@ h1 {
   pointer-events: none;
 }
 
+/* Fundo preto e texto branco desde o primeiro instante (evita um "clarão" branco ao carregar). */
 html, body {
   background: var(--background);
   color: var(--foreground);
 }
 
 /* Grão de xerox sobre tudo: a superfície parece impressa, não digital. */
+/* Uma camada fixa, maior que a tela, com ruído (um desenho SVG embutido no próprio CSS, sem arquivo
+   de imagem) em 9% de opacidade. pointer-events: none faz o clique atravessá-la, para não
+   atrapalhar nenhum botão. */
 body::before {
   content: "";
   position: fixed;
@@ -56,6 +76,8 @@ body::before {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
+/* Texto padrão do site: Archivo (com Arial como reserva), um pouco mais encorpado que o normal
+   (450) para ler bem em fundo preto. */
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   font-weight: 450;
