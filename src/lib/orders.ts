@@ -1,6 +1,6 @@
 // Regras de pedido, com persistência em banco e estoque protegido por transação.
 
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { customOrders, orderItems, orders, products, type OrderStatus } from "@/db/schema";
 
@@ -100,8 +100,15 @@ export async function createOrder(input: unknown): Promise<OrderView> {
 export async function cancelOrder(id: number): Promise<boolean> {
   const db = await getDb();
   return db.transaction(async (tx) => {
-    const [o] = await tx.select().from(orders).where(eq(orders.id, id));
-    if (!o || o.status === "cancelado") return false;
+    // Só quem de fato muda o status para "cancelado" devolve as peças: o UPDATE condicional trava a
+    // linha, então um segundo cancelamento simultâneo não encontra nada para alterar e sai sem repor.
+    const changed = await tx
+      .update(orders)
+      .set({ status: "cancelado", updatedAt: new Date() })
+      .where(and(eq(orders.id, id), ne(orders.status, "cancelado")))
+      .returning({ id: orders.id });
+    if (changed.length === 0) return false;
+
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id));
     for (const it of items) {
       await tx
@@ -109,7 +116,6 @@ export async function cancelOrder(id: number): Promise<boolean> {
         .set({ stock: sql`${products.stock} + ${it.qty}`, updatedAt: new Date() })
         .where(eq(products.slug, it.productSlug));
     }
-    await tx.update(orders).set({ status: "cancelado", updatedAt: new Date() }).where(eq(orders.id, id));
     return true;
   });
 }
