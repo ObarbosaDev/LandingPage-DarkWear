@@ -64,7 +64,7 @@ export function IndiceLoja({ products }: { products: Product[] }) {
                   <span className="hidden font-mono text-sm uppercase tracking-[0.15em] md:block">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span className="font-[family-name:var(--font-display)] text-[clamp(2.25rem,7.5vw,6.5rem)] uppercase leading-[0.95]">
+                  <span className="font-[family-name:var(--font-display)] text-[clamp(2.25rem,7.5vw,6.5rem)] uppercase leading-[1.08]">
                     {p.name}
                   </span>
                   <span className="font-mono text-sm uppercase tracking-[0.15em] md:text-right">

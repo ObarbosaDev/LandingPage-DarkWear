@@ -41,7 +41,7 @@ export default async function ProdutoPage({
         </Link>
 
         {/* O nome ocupa a largura toda: a peça é a manchete. */}
-        <h1 className="mt-6 font-[family-name:var(--font-display)] text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[0.88]">
+        <h1 className="mt-6 font-[family-name:var(--font-display)] text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[1.14]">
           {product.name}
         </h1>
 

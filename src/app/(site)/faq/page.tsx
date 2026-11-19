@@ -37,7 +37,7 @@ export default function FaqPage() {
     <>
       <section className="bg-background text-foreground">
         <div className="mx-auto max-w-7xl px-6 pb-4 pt-16 md:pt-24">
-          <h1 className="font-[family-name:var(--font-display)] text-[clamp(4rem,14vw,13rem)] uppercase leading-[0.86]">
+          <h1 className="font-[family-name:var(--font-display)] text-[clamp(4rem,14vw,13rem)] uppercase leading-[1.14]">
             Pergunta
             <br />aí
           </h1>

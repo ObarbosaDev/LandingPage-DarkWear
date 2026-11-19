@@ -26,7 +26,7 @@ export default function SobrePage() {
       <section className="bg-background text-foreground">
         <div className="mx-auto max-w-7xl px-6 pb-16 pt-16 md:pb-24 md:pt-24">
           <p className="font-mono text-sm uppercase tracking-[0.15em]">Sobre a {SITE.name}</p>
-          <h1 className="mt-6 font-[family-name:var(--font-display)] text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[0.88]">
+          <h1 className="mt-6 font-[family-name:var(--font-display)] text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[1.14]">
             Do arquivo
             <br />à camiseta
           </h1>
