@@ -1,6 +1,13 @@
+// ============================================================================
+// Testes da CONFERÊNCIA DE CONFIGURAÇÃO (checkEnv em src/server/env.ts).
+// Por que testar: ela decide se o servidor sobe ou não em produção, e quais avisos o dono recebe.
+// Cada teste simula um "ambiente" diferente passando um objeto de variáveis (sem tocar no real).
+// ============================================================================
+
 import { describe, expect, it } from "vitest";
 import { checkEnv, WHATSAPP_EXEMPLO } from "@/server/env";
 
+// Um número de WhatsApp "real" (de mentira, mas diferente do de exemplo) e um segredo longo o bastante.
 const REAL = "5511999999999";
 const SEGREDO = "x".repeat(40);
 
@@ -15,10 +22,12 @@ const completo = {
 };
 
 describe("checkEnv", () => {
+  // O caso ideal: tudo configurado, nenhum aviso.
   it("ambiente de produção completo não tem erro nem aviso", () => {
     expect(checkEnv(completo, REAL)).toEqual({ errors: [], warnings: [] });
   });
 
+  // No computador do desenvolvedor, sem nada configurado, só deve avisar que o painel está desligado.
   it("desenvolvimento sem nada configurado só avisa do painel", () => {
     const r = checkEnv({ NODE_ENV: "development" }, WHATSAPP_EXEMPLO);
     expect(r.errors).toEqual([]);
@@ -26,6 +35,7 @@ describe("checkEnv", () => {
     expect(r.warnings[0]).toMatch(/painel/);
   });
 
+  // Na Vercel o disco some a cada execução: sem banco de verdade, os pedidos se perderiam.
   it("na Vercel, sem DATABASE_URL é erro", () => {
     const r = checkEnv({ ...completo, VERCEL: "1", DATABASE_URL: undefined }, REAL);
     expect(r.errors.join(" ")).toMatch(/DATABASE_URL/);
@@ -37,6 +47,7 @@ describe("checkEnv", () => {
     expect(r.warnings.join(" ")).toMatch(/banco local/);
   });
 
+  // Configurar só a senha (ou só o segredo) quase sempre é esquecimento: é erro, e não "painel desligado".
   it("painel pela metade é erro: só a senha, só o segredo ou segredo curto", () => {
     expect(checkEnv({ ...completo, ADMIN_SESSION_SECRET: undefined }, REAL).errors.join(" ")).toMatch(/ADMIN_SESSION_SECRET/);
     expect(checkEnv({ ...completo, ADMIN_PASSWORD: undefined }, REAL).errors.join(" ")).toMatch(/ADMIN_PASSWORD/);
@@ -62,6 +73,8 @@ describe("checkEnv", () => {
     expect(checkEnv({ ...completo, PENDING_ORDER_HOURS: "24" }, REAL).warnings).toEqual([]);
   });
 
+  // O número de exemplo só barra a subida na produção de verdade; prévias e testes locais só recebem aviso
+  // (senão ninguém conseguiria testar o site antes de ter o número real).
   it("número de WhatsApp de exemplo: erro na produção da Vercel, aviso nos demais", () => {
     expect(checkEnv({ ...completo, VERCEL: "1", VERCEL_ENV: "production" }, WHATSAPP_EXEMPLO).errors.join(" ")).toMatch(/WhatsApp/);
     const previa = checkEnv({ ...completo, VERCEL: "1", VERCEL_ENV: "preview" }, WHATSAPP_EXEMPLO);

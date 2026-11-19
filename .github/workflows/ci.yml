@@ -2,37 +2,48 @@ name: CI
 
 # Roda a cada envio para a main e em todo pull request: estilo, testes e o build de produção.
 # O build também confere os tipos, então um erro de TypeScript derruba a verificação.
+# Se qualquer passo falhar, o GitHub marca o envio com um "X" vermelho: assim um código quebrado
+# não passa despercebido.
 
+# Quando rodar: em todo envio para a branch main e em todo pull request.
 on:
   push:
     branches: [main]
   pull_request:
 
+# Se chegar um envio novo enquanto o anterior ainda roda, o anterior é cancelado (economiza tempo).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verificar:
+    # Máquina virtual Linux do GitHub; o limite de 15 minutos evita um travamento consumir horas.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # 1. Baixa o código do repositório.
       - uses: actions/checkout@v4
 
+      # 2. Instala o Node 22 (a mesma versão usada no desenvolvimento) e guarda as dependências em cache.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
+      # 3. Instala as dependências exatamente como estão no package-lock.json.
       - name: Instalar dependências
         run: npm ci
 
+      # 4. Confere o estilo do código (ESLint).
       - name: Lint
         run: npm run lint
 
+      # 5. Roda os testes automáticos (regras de pedido, estoque, login etc.).
       - name: Testes
         run: npm test
 
+      # 6. Gera o build de produção (também confere os tipos do TypeScript).
       - name: Build de produção
         run: npm run build
         env:

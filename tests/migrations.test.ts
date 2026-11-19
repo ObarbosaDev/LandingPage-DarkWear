@@ -1,9 +1,16 @@
+// ============================================================================
+// Testes das MIGRAÇÕES DO BANCO (runMigrations em src/server/db/migrations.ts).
+// Por que testar: o banco de produção guarda dados reais. Uma migração que apaga dados, roda duas
+// vezes ou deixa o banco pela metade seria um desastre.
+// ============================================================================
+
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
 import { DDL } from "@/server/db/ddl";
 import { MIGRATIONS, runMigrations, type SqlRunner } from "@/server/db/migrations";
 
 // Um banco em memória novo para cada teste, fora do getDb (que já migra sozinho).
+// Devolve ainda dois ajudantes: a lista de tabelas existentes e o histórico de migrações aplicadas.
 function novoBanco() {
   const c = new PGlite();
   const runner: SqlRunner = { exec: (s) => c.exec(s), query: (s, p) => c.query(s, p) };
@@ -27,6 +34,7 @@ describe("runMigrations", () => {
     }
   });
 
+  // Reiniciar o servidor roda as migrações de novo: nada pode ser reaplicado.
   it("rodar de novo não aplica nada", async () => {
     const { runner, historico } = novoBanco();
     await runMigrations(runner);
@@ -34,6 +42,8 @@ describe("runMigrations", () => {
     expect(await historico()).toHaveLength(MIGRATIONS.length);
   });
 
+  // Caso real: um banco criado ANTES de existirem migrações (só as tabelas, sem histórico) e que já
+  // tem dados. Deve entrar no sistema de migrações sem perder nenhuma linha.
   it("adota um banco criado antes das migrações, sem perder dados", async () => {
     const { c, runner, historico } = novoBanco();
     await c.exec(DDL); // como estava um banco antigo: só as tabelas, sem histórico
@@ -46,12 +56,15 @@ describe("runMigrations", () => {
     expect(await historico()).toHaveLength(MIGRATIONS.length);
   });
 
+  // Simula um deploy futuro: o banco está na migração 1 e o código novo traz a 2.
   it("aplica só as migrações novas quando já existe histórico", async () => {
     const { runner } = novoBanco();
     await runMigrations(runner, MIGRATIONS.slice(0, 1));
     expect(await runMigrations(runner)).toEqual(MIGRATIONS.slice(1).map((m) => m.id));
   });
 
+  // A 2ª migração cria a tabela "b" e DEPOIS falha. O teste prova três coisas: a "b" é desfeita
+  // (a migração é atômica), a 1ª continua valendo e a 3ª nem chega a rodar.
   it("uma migração que falha não deixa rastro, e as anteriores continuam valendo", async () => {
     const { c, runner, historico, tabelas } = novoBanco();
     const lista = [
@@ -72,6 +85,7 @@ describe("runMigrations", () => {
     await c.close();
   });
 
+  // Proteção contra erro de digitação ao criar uma migração nova: id repetido ou fora de ordem.
   it("os ids são únicos e em ordem crescente", () => {
     const ids = MIGRATIONS.map((m) => m.id);
     expect(new Set(ids).size).toBe(ids.length);

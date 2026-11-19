@@ -1,3 +1,14 @@
+// ============================================================================
+// Testes de PEDIDO e CANCELAMENTO (src/server/orders.ts): as regras que mexem com dinheiro e estoque.
+// Cada teste roda contra um banco em memória com o catálogo de exemplo (veja tests/helpers/db.ts).
+//
+// O que mais importa provar aqui:
+//   - o servidor calcula o total (o preço que o navegador mandar é ignorado);
+//   - o pedido é "tudo ou nada" (se um item falha, nada é gravado nem descontado);
+//   - nunca se vende mais do que existe, nem com muitos pedidos ao mesmo tempo;
+//   - cancelar devolve as peças UMA vez só, mesmo cancelando várias vezes ao mesmo tempo.
+// ============================================================================
+
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
@@ -5,11 +16,17 @@ import { products } from "@/server/db/schema";
 import { cancelOrder, createOrder, orderNumber, OrderError } from "@/server/orders";
 import { resetDb, stockOf } from "./helpers/db";
 
+// Itens do catálogo de exemplo usados nos testes (sem a quantidade; cada teste define a sua).
 const GT3 = { slug: "oversized-gt3-rs", size: "M", color: "Preta" }; // estoque inicial 12, R$ 89,90
 const MUMIA = { slug: "camisa-mumia", size: "G", color: "Branca" }; // estoque inicial 5, R$ 99,90
 
+// Antes de CADA teste, volta o banco ao estado inicial: um teste nunca depende do que outro fez.
 beforeEach(resetDb);
 
+/**
+ * Espera que a promessa FALHE com um OrderError (erro de regra de negócio) e devolve esse erro,
+ * para o teste poder conferir a mensagem ou o status. Se a promessa der certo, o teste falha.
+ */
 async function falha(promessa: Promise<unknown>): Promise<OrderError> {
   try {
     await promessa;
@@ -23,6 +40,7 @@ async function falha(promessa: Promise<unknown>): Promise<OrderError> {
 describe("createOrder", () => {
   it("registra o pedido, calcula o total no servidor e baixa o estoque", async () => {
     const pedido = await createOrder([{ ...GT3, qty: 2 }, { ...MUMIA, qty: 1 }]);
+    // 2 x R$ 89,90 + 1 x R$ 99,90, em centavos.
     expect(pedido.totalCents).toBe(2 * 8990 + 9990);
     expect(pedido.status).toBe("pendente");
     expect(pedido.number).toBe(orderNumber(pedido.id));
@@ -31,11 +49,14 @@ describe("createOrder", () => {
     expect(await stockOf("camisa-mumia")).toBe(4);
   });
 
+  // O servidor baixa o estoque em ordem alfabética (para evitar deadlock), mas a resposta deve
+  // seguir a ordem em que o cliente montou a sacola.
   it("mantém a ordem do carrinho mesmo baixando o estoque em ordem alfabética", async () => {
     const pedido = await createOrder([{ ...MUMIA, qty: 1 }, { ...GT3, qty: 1 }]);
     expect(pedido.items.map((i) => i.name)).toEqual(["Camisa Múmia", "Oversized GT3 RS"]);
   });
 
+  // Sem isso, duas linhas de qtd 2 passariam cada uma por um estoque de 3, vendendo 4.
   it("junta linhas repetidas do mesmo item", async () => {
     const pedido = await createOrder([{ ...GT3, qty: 1 }, { ...GT3, qty: 2 }]);
     expect(pedido.items).toHaveLength(1);
@@ -43,6 +64,7 @@ describe("createOrder", () => {
     expect(await stockOf("oversized-gt3-rs")).toBe(9);
   });
 
+  // Segurança: um cliente mal-intencionado poderia tentar enviar "preço R$ 0,01". Tem de ser ignorado.
   it("ignora qualquer preço enviado pelo cliente", async () => {
     const pedido = await createOrder([{ ...GT3, qty: 1, price: 0.01, priceCents: 1 }]);
     expect(pedido.totalCents).toBe(8990);
@@ -54,6 +76,7 @@ describe("createOrder", () => {
     expect(await stockOf("camisa-mumia")).toBe(5);
   });
 
+  // O primeiro item tem estoque, o segundo não: o primeiro NÃO pode ficar descontado.
   it("é tudo ou nada: se um item falha, o outro não é descontado", async () => {
     await falha(createOrder([{ ...GT3, qty: 2 }, { ...MUMIA, qty: 99 }]));
     expect(await stockOf("oversized-gt3-rs")).toBe(12);
@@ -66,6 +89,7 @@ describe("createOrder", () => {
     expect(await stockOf("oversized-gt3-rs")).toBe(12);
   });
 
+  // Quantidade deve ser um número inteiro entre 1 e 99; o texto "2" e o null também são recusados.
   it("recusa quantidade inválida e carrinho vazio", async () => {
     for (const qty of [0, -1, 1.5, 100, "2", null]) await falha(createOrder([{ ...GT3, qty }]));
     await falha(createOrder([]));
@@ -80,6 +104,7 @@ describe("createOrder", () => {
 
   // O PGlite atende uma consulta por vez, então aqui o que se prova é a regra (o UPDATE condicional
   // nunca deixa o estoque negativo nem vende além dele), não a disputa de linhas do Postgres real.
+  // 20 pedidos de 1 peça disparados juntos contra um estoque de 12: devem passar 12 e falhar 8.
   it("com muitos pedidos ao mesmo tempo, só vende o que existe", async () => {
     const resultados = await Promise.allSettled(Array.from({ length: 20 }, () => createOrder([{ ...GT3, qty: 1 }])));
     expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(12);
@@ -96,6 +121,8 @@ describe("cancelOrder", () => {
     expect(await stockOf("camisa-mumia")).toBe(5);
   });
 
+  // Defeito real que a revisão de código achou: cancelar duas vezes devolvia as peças em dobro,
+  // deixando a loja com mais peças do que existem.
   it("cancelar de novo não devolve estoque em dobro", async () => {
     const p = await createOrder([{ ...GT3, qty: 2 }]);
     expect(await cancelOrder(p.id)).toBe(true);
@@ -103,6 +130,7 @@ describe("cancelOrder", () => {
     expect(await stockOf("oversized-gt3-rs")).toBe(12);
   });
 
+  // O mesmo defeito, agora com dois ou três cliques acontecendo juntos (duas abas, dois funcionários).
   it("três cancelamentos ao mesmo tempo repõem o estoque uma vez só", async () => {
     const p = await createOrder([{ ...GT3, qty: 2 }]);
     const r = await Promise.all([cancelOrder(p.id), cancelOrder(p.id), cancelOrder(p.id)]);
