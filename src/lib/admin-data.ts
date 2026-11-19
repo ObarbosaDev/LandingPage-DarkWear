@@ -127,11 +127,13 @@ function parseList(raw: string, label: string): string[] | string {
   return list;
 }
 
-// "89,90" ou "1.299,90" (padrão brasileiro) ou "89.90" → centavos inteiros.
+// "89,90", "1.299,90", "1.299" (milhar) ou "89.90" → centavos inteiros.
 export function parsePriceToCents(raw: string): number | null {
   const s = raw.trim();
   if (!s) return null;
-  const norm = s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s;
+  // Sem vírgula, só pontos de milhar ("1.299", "1.299.000") são tratados como milhar; "89.90" segue decimal.
+  const thousandsOnly = !s.includes(",") && /^\d{1,3}(\.\d{3})+$/.test(s);
+  const norm = s.includes(",") || thousandsOnly ? s.replace(/\./g, "").replace(",", ".") : s;
   const n = Number(norm);
   if (!Number.isFinite(n) || n < 0 || n > 100000) return null;
   return Math.round(n * 100);
