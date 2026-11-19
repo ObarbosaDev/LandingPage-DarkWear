@@ -36,10 +36,10 @@ function parseItems(input: unknown): OrderItemInput[] {
   const merged = new Map<string, OrderItemInput>();
   for (const raw of input) {
     const r = (raw ?? {}) as Partial<OrderItemInput>;
-    const qty = Number(r.qty);
+    const qty = r.qty;
     if (typeof r.slug !== "string" || typeof r.size !== "string" || typeof r.color !== "string")
       throw new OrderError("Item inválido no carrinho.");
-    if (!Number.isInteger(qty) || qty < 1 || qty > 99) throw new OrderError("Quantidade inválida.");
+    if (typeof qty !== "number" || !Number.isInteger(qty) || qty < 1 || qty > 99) throw new OrderError("Quantidade inválida.");
     const key = `${r.slug}|${r.size}|${r.color}`;
     const prev = merged.get(key);
     if (prev) prev.qty += qty;
