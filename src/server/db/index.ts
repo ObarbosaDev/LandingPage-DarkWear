@@ -1,7 +1,7 @@
 import "server-only";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { count } from "drizzle-orm";
-import { DDL } from "@/server/db/ddl";
+import { runMigrations } from "@/server/db/migrations";
 import * as schema from "@/server/db/schema";
 import { PRODUCTS } from "@/server/db/seed-data";
 
@@ -31,7 +31,13 @@ async function connect(): Promise<Db> {
     const { Pool } = await import("@neondatabase/serverless");
     const { drizzle } = await import("drizzle-orm/neon-serverless");
     const pool = new Pool({ connectionString: url });
-    await pool.query(DDL);
+    // As migrações precisam de uma conexão só (transação e trava): o Pool reparte as chamadas entre várias.
+    const conn = await pool.connect();
+    try {
+      await runMigrations({ exec: (sql) => conn.query(sql), query: (sql, params) => conn.query(sql, params) });
+    } finally {
+      conn.release();
+    }
     db = drizzle({ client: pool, schema }) as unknown as Db;
   } else {
     if (process.env.VERCEL) {
@@ -46,7 +52,7 @@ async function connect(): Promise<Db> {
     const dir = process.env.PGLITE_DIR ?? "./.data/pglite";
     if (!dir.startsWith("memory://")) mkdirSync(dir, { recursive: true }); // memory:// vale nos testes
     const client = new PGlite(dir);
-    await client.exec(DDL);
+    await runMigrations({ exec: (sql) => client.exec(sql), query: (sql, params) => client.query(sql, params) });
     db = drizzle({ client, schema }) as unknown as Db;
   }
 

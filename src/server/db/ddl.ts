@@ -1,5 +1,5 @@
-// Esquema em SQL puro, idempotente: roda igual no Postgres embutido (desenvolvimento) e no Neon (produção).
-// Quando o esquema precisar mudar com dados em produção, trocar por migrações versionadas (drizzle-kit).
+// Esquema inicial (migração 0001_baseline), em SQL puro e idempotente: roda igual no Postgres embutido
+// (desenvolvimento) e no Neon (produção). NÃO edite: mudanças novas entram como migrações em migrations.ts.
 export const DDL = `
 CREATE TABLE IF NOT EXISTS products (
   slug text PRIMARY KEY,

@@ -81,3 +81,15 @@ export const loginAttempts = pgTable(
   },
   (t) => [index("login_attempts_key_idx").on(t.key, t.failedAt)],
 );
+
+// Contador de requisições por origem, para o limite de uso das rotas públicas.
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    id: serial("id").primaryKey(),
+    bucket: text("bucket").notNull(),
+    key: text("key").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("rate_limits_idx").on(t.bucket, t.key, t.at)],
+);
