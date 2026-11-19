@@ -1,3 +1,14 @@
+// ============================================================================
+// Tela inicial do painel: /admin ("Painel").
+//
+// É a primeira coisa que o dono vê depois do login. Responde "o que precisa da minha atenção?":
+//   - quatro blocos com contadores (pedidos pendentes, pagos a enviar, enviados, encomendas novas),
+//     cada um levando direto à lista filtrada;
+//   - peças com estoque baixo;
+//   - os 5 pedidos mais recentes.
+// Os números vêm de dashboardStats (src/server/admin/dashboard.ts).
+// ============================================================================
+
 import Link from "next/link";
 import { dashboardStats } from "@/server/admin/dashboard";
 import { formatCents } from "@/lib/money";
@@ -7,9 +18,11 @@ import { requireAdmin } from "@/server/admin/auth";
 export const instant = false;
 
 export default async function PainelPage() {
+  // Confere a sessão também aqui (e não só no layout): cada página se protege sozinha.
   await requireAdmin();
   const s = await dashboardStats();
 
+  // Os quatro blocos de contador. "href" leva à lista já filtrada por aquele status.
   const blocos = [
     { rotulo: "Pedidos pendentes", valor: s.pendentes, href: "/admin/pedidos?status=pendente" },
     { rotulo: "Pagos, a enviar", valor: s.pagos, href: "/admin/pedidos?status=pago" },
@@ -21,6 +34,7 @@ export default async function PainelPage() {
     <div className="flex flex-col gap-14">
       <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Painel</h1>
 
+      {/* Contadores: uma grade de blocos clicáveis que invertem de cor ao passar o mouse. */}
       <section aria-label="Resumo" className="grid border-l-2 border-t-2 border-foreground sm:grid-cols-2 lg:grid-cols-4">
         {blocos.map((b) => (
           <Link
@@ -35,6 +49,7 @@ export default async function PainelPage() {
       </section>
 
       <section className="grid gap-12 lg:grid-cols-2">
+        {/* Coluna da esquerda: peças acabando (3 unidades ou menos). Cada nome leva à edição da peça. */}
         <div>
           <h2 className="mb-4 font-display text-4xl uppercase">Estoque baixo</h2>
           {s.lowStock.length === 0 ? (
@@ -53,6 +68,7 @@ export default async function PainelPage() {
           )}
         </div>
 
+        {/* Coluna da direita: os pedidos mais recentes (número, status e total). */}
         <div>
           <h2 className="mb-4 font-display text-4xl uppercase">Últimos pedidos</h2>
           {s.latest.length === 0 ? (
