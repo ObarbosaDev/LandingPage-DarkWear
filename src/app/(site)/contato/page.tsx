@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import { SITE } from "@/lib/site";
-import { whatsappLink } from "@/lib/whatsapp";
+import { Compositor } from "@/components/Compositor";
 
 export const metadata: Metadata = { title: "Contato" };
+
+const ASSUNTOS = [
+  { id: "duvida", rotulo: "Dúvida", texto: `Olá! Tenho uma dúvida sobre a ${SITE.name}.` },
+  { id: "orcamento", rotulo: "Orçamento", texto: `Olá! Quero um orçamento de camisetas estampadas na ${SITE.name}.` },
+  { id: "pedido", rotulo: "Meu pedido", texto: `Olá! Quero falar sobre o meu pedido na ${SITE.name}. O número dele é: ` },
+  { id: "arte", rotulo: "Minha arte", texto: `Olá! Tenho uma arte e quero estampar na ${SITE.name}.` },
+];
 
 const INFO = [
   { rotulo: "Atendimento", texto: "Tudo pelo WhatsApp: dúvidas, orçamento e fechamento do pedido." },
@@ -16,24 +23,13 @@ export default function ContatoPage() {
       <section className="bg-background text-foreground">
         <div className="mx-auto max-w-7xl px-6 pb-12 pt-16 md:pt-24">
           <h1 className="font-[family-name:var(--font-display)] text-[clamp(4rem,14vw,13rem)] uppercase leading-[0.86]">
-            Fala com
-            <br />a gente
+            Escreve
+            <br />pra gente
           </h1>
         </div>
       </section>
 
-      {/* O botão é o bloco inteiro: branco, de ponta a ponta, inverte ao passar o mouse. */}
-      <a
-        href={whatsappLink(`Olá! Vim pelo site da ${SITE.name}.`)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group block bg-foreground text-background transition-colors hover:bg-background hover:text-foreground"
-      >
-        <span className="mx-auto flex max-w-7xl items-center justify-between gap-6 border-y-2 border-foreground px-6 py-14 font-[family-name:var(--font-display)] text-[clamp(2.5rem,8vw,7rem)] uppercase leading-none md:py-20">
-          Chamar no WhatsApp
-          <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-3">→</span>
-        </span>
-      </a>
+      <Compositor assuntos={ASSUNTOS} numero={SITE.whatsappNumber} />
 
       <section className="bg-background text-foreground">
         <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 md:grid-cols-3">
