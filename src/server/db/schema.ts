@@ -5,7 +5,14 @@
 // no banco são as migrações (src/server/db/migrations.ts). Mudou aqui? Crie também uma migração.
 // ============================================================================
 
-import { boolean, index, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, customType, index, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+
+// Coluna de bytes (bytea): o Drizzle não traz pronta. O Neon devolve Buffer e o PGlite devolve
+// Uint8Array; os dois são normalizados para Uint8Array.
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | Buffer }>({
+  dataType: () => "bytea",
+  fromDriver: (v) => new Uint8Array(v),
+});
 
 // Preços sempre em centavos (inteiro), para nunca ter erro de arredondamento com dinheiro.
 
@@ -26,7 +33,8 @@ export const products = pgTable("products", {
   colors: jsonb("colors").$type<string[]>().notNull(),
   // Peças disponíveis. A baixa é feita por pedido, de forma atômica (ver src/server/orders.ts).
   stock: integer("stock").notNull().default(0),
-  // Caminho da foto em /public (ex.: /products/porsche-gt3.webp). Vazio = mostra as iniciais.
+  // Caminho da foto: um arquivo de /public (ex.: /products/porsche-gt3.webp) ou uma foto enviada pelo
+  // painel (/api/images/<id>, ver product_images). Vazio = mostra as iniciais.
   image: text("image"),
   // "light" = peça escura em foto transparente (ganha contorno de luz); "dark" = peça clara.
   photoBg: text("photo_bg"),
@@ -202,3 +210,14 @@ export const payments = pgTable(
   },
   (t) => [index("payments_order_idx").on(t.orderId), index("payments_preference_idx").on(t.preferenceId)],
 );
+
+// ---------------------------------------------------------------------------
+// product_images: as fotos de produto enviadas pelo painel (migração 0006).
+// Cada foto enviada é uma linha nova e nunca é alterada; a rota /api/images/<id> a entrega.
+// ---------------------------------------------------------------------------
+export const productImages = pgTable("product_images", {
+  id: serial("id").primaryKey(),
+  contentType: text("content_type").$type<"image/jpeg" | "image/png" | "image/webp">().notNull(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

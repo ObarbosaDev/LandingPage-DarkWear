@@ -33,6 +33,8 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
   const editing = Boolean(product);
   // Valor inicial de cada campo: o que o dono digitou (se houve erro) ou o produto salvo.
   const v = (name: string, fallback: string) => state.values?.[name] ?? fallback;
+  // A foto que o produto tem agora (ou a que estava no formulário quando houve erro).
+  const currentImage = v("image", product?.image ?? "");
 
   return (
     <form action={formAction} className="flex max-w-3xl flex-col gap-8">
@@ -112,15 +114,28 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
         <textarea id="description" name="description" rows={3} maxLength={600} defaultValue={v("description", product?.description ?? "")} className={field} />
       </div>
 
-      {/* Foto: ainda não há upload pelo painel. O arquivo é colocado na pasta public/products do
-          projeto e aqui se informa o caminho. O seletor ao lado diz como a foto deve ser tratada. */}
+      {/* Foto: o dono escolhe um arquivo (JPG, PNG ou WebP, até 2 MB) e ele é guardado no banco. O
+          campo escondido "image" leva a foto atual de volta ao servidor; se nenhum arquivo novo for
+          escolhido, ela é mantida. "Remover foto" volta a mostrar as iniciais. O seletor ao lado diz
+          como a foto deve ser tratada. */}
       <div className="grid gap-8 sm:grid-cols-2">
         <div className="flex flex-col gap-3">
-          <label htmlFor="image" className={label}>Foto (caminho em /public)</label>
-          <input id="image" name="image" placeholder="/products/arquivo.webp" defaultValue={v("image", product?.image ?? "")} className={field} />
-          <p className="text-base font-medium">
-            Coloque o arquivo na pasta <code>public/products</code> do projeto e informe o caminho aqui.
-          </p>
+          <label htmlFor="photo" className={label}>Foto</label>
+          <input type="hidden" name="image" value={currentImage} />
+          {currentImage ? (
+            // eslint-disable-next-line @next/next/no-img-element -- prévia simples no painel, sem otimização
+            <img src={currentImage} alt="Foto atual" className="h-40 w-40 border-2 border-foreground object-contain" />
+          ) : (
+            <p className="text-base font-medium">Sem foto: a loja mostra as iniciais da peça.</p>
+          )}
+          <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" className={`${field} text-base file:mr-4 file:border-0 file:bg-foreground file:px-4 file:py-2 file:font-mono file:uppercase file:text-background`} />
+          <p className="text-base font-medium">JPG, PNG ou WebP, até 2 MB. Escolher um arquivo novo substitui a foto atual.</p>
+          {currentImage ? (
+            <label className="flex items-center gap-3 text-base font-medium">
+              <input type="checkbox" name="removeImage" className="h-5 w-5 accent-white" />
+              Remover a foto atual
+            </label>
+          ) : null}
         </div>
         <div className="flex flex-col gap-3">
           <label htmlFor="photoBg" className={label}>Peça da foto</label>

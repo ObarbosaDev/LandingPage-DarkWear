@@ -122,11 +122,13 @@ export function parseProductForm(
   const colors = parseList(get("colors"), "Cores");
   if (typeof colors === "string") return { ok: false, error: colors };
 
-  // A foto precisa ser um arquivo dentro de /public/products. A regra impede apontar para outro
-  // site ou subir diretórios (ex.: /products/../segredo).
+  // A foto é a atual do produto (campo escondido "image") e só pode ser de dois tipos: um arquivo de
+  // /public/products ou uma foto enviada pelo painel (/api/images/<número>). A regra impede apontar
+  // para outro site ou subir diretórios (ex.: /products/../segredo). A foto NOVA, se houver, é
+  // tratada pela ação do formulário (src/app/admin/actions.ts) antes desta conferência.
   const image = get("image");
-  if (image && !/^\/products\/[\w.-]+$/.test(image)) {
-    return { ok: false, error: "A foto deve ser um caminho como /products/arquivo.webp." };
+  if (image && !/^\/products\/[\w.-]+$/.test(image) && !/^\/api\/images\/\d{1,9}$/.test(image)) {
+    return { ok: false, error: "Foto inválida. Envie um arquivo JPG, PNG ou WebP." };
   }
 
   const photoBg = get("photoBg");

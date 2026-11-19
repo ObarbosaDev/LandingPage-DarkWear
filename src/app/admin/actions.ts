@@ -29,9 +29,11 @@ import {
   startSession,
 } from "@/server/admin/auth";
 import { setCustomStatus } from "@/server/admin/custom-orders";
+import { checkImageFile, deleteImageByUrl, saveImage } from "@/server/admin/images";
 import { updateOrderStatus } from "@/server/admin/orders";
 import {
   createProduct,
+  getProductRow,
   parseProductForm,
   setProductActive,
   setProductStock,
@@ -125,15 +127,42 @@ export async function changeCustomStatusAction(form: FormData): Promise<void> {
 // ---------- Produtos ----------
 
 /**
+ * Trata a foto do formulário de produto ANTES de conferir os outros campos.
+ *   - arquivo escolhido: confere (tipo pelo conteúdo, até 2 MB), guarda no banco e põe o endereço novo
+ *     no campo "image" do formulário;
+ *   - caixa "Remover foto" marcada: esvazia o campo "image";
+ *   - nada disso: mantém a foto atual (campo escondido).
+ * Devolve o erro (ou null) e o endereço da foto NOVA, para o chamador poder apagá-la se algo falhar.
+ */
+async function processPhoto(form: FormData): Promise<{ error: string | null; created: string | null }> {
+  const file = form.get("photo");
+  if (file instanceof File && file.size > 0) {
+    const checked = await checkImageFile(file);
+    if (!checked.ok) return { error: checked.error, created: null };
+    const url = await saveImage(checked.bytes, checked.type);
+    form.set("image", url);
+    return { error: null, created: url };
+  }
+  if (form.get("removeImage") === "on") form.set("image", "");
+  return { error: null, created: null };
+}
+
+/**
  * Formulário "Novo produto" (/admin/produtos/novo).
  * Em caso de erro, devolve a mensagem + o que foi digitado; em caso de sucesso, volta à lista.
  */
 export async function createProductAction(_prev: FormState, form: FormData): Promise<FormState> {
   await requireAdmin();
+  const photo = await processPhoto(form);
+  if (photo.error) return { error: photo.error, values: typed(form) };
   const parsed = parseProductForm(form, "novo");
-  if (!parsed.ok) return { error: parsed.error, values: typed(form) };
+  if (!parsed.ok) {
+    await deleteImageByUrl(photo.created); // não deixa foto órfã no banco
+    return { error: parsed.error, values: typed(form) };
+  }
 
   if ((await createProduct(parsed.data)) === "existe") {
+    await deleteImageByUrl(photo.created);
     return { error: "Já existe um produto com esse endereço.", values: typed(form) };
   }
   // A loja precisa mostrar o produto novo na hora, e a lista do painel também.
@@ -145,10 +174,22 @@ export async function createProductAction(_prev: FormState, form: FormData): Pro
 /** Formulário de edição (/admin/produtos/[slug]). Mesma lógica do cadastro, mas altera um existente. */
 export async function updateProductAction(_prev: FormState, form: FormData): Promise<FormState> {
   await requireAdmin();
+  // A foto atual, para apagar do banco se for trocada ou removida (sem acumular fotos soltas).
+  const before = await getProductRow(String(form.get("slug") ?? ""));
+  const photo = await processPhoto(form);
+  if (photo.error) return { error: photo.error, values: typed(form) };
   const parsed = parseProductForm(form, "editar");
-  if (!parsed.ok) return { error: parsed.error, values: typed(form) };
+  if (!parsed.ok) {
+    await deleteImageByUrl(photo.created);
+    return { error: parsed.error, values: typed(form) };
+  }
 
-  if (!(await updateProduct(parsed.data))) return { error: "Produto não encontrado.", values: typed(form) };
+  if (!(await updateProduct(parsed.data))) {
+    await deleteImageByUrl(photo.created);
+    return { error: "Produto não encontrado.", values: typed(form) };
+  }
+  // Só depois de salvar é seguro apagar a foto antiga (se a atual é outra).
+  if (before?.image && before.image !== parsed.data.image) await deleteImageByUrl(before.image);
   refreshCatalog();
   revalidatePath("/admin/produtos");
   redirect("/admin/produtos?salvo=1");
