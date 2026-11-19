@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/server/admin/auth";
-import { CUSTOM_STATUS, listCustomOrders } from "@/server/admin/data";
+import { CUSTOM_STATUS, listCustomOrders } from "@/server/admin/custom-orders";
 import { changeCustomStatusAction } from "@/app/admin/actions";
 
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).

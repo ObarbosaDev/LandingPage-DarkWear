@@ -1,96 +1,8 @@
-// Acesso a dados do painel do dono. Só roda no servidor; quem chama precisa ter passado por requireAdmin().
+// Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
-import { and, asc, count, desc, eq, inArray, lte, max } from "drizzle-orm";
+import { asc, eq, max } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { customOrders, orderItems, orders, products, ORDER_STATUS, type OrderStatus, type ProductRow } from "@/server/db/schema";
-import { cancelOrder, orderNumber } from "@/server/orders";
-
-// ---------- Pedidos ----------
-
-// De cada status, para quais o dono pode mover o pedido.
-export const NEXT_STATUS: Record<OrderStatus, OrderStatus[]> = {
-  pendente: ["pago", "cancelado"],
-  pago: ["enviado", "cancelado"],
-  enviado: ["entregue"],
-  entregue: [],
-  cancelado: [],
-};
-
-export type AdminOrder = {
-  id: number;
-  number: string;
-  status: OrderStatus;
-  totalCents: number;
-  createdAt: Date;
-  items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
-};
-
-export async function listOrders(status?: OrderStatus, limit = 100): Promise<AdminOrder[]> {
-  const db = await getDb();
-  const rows = await db
-    .select()
-    .from(orders)
-    .where(status ? eq(orders.status, status) : undefined)
-    .orderBy(desc(orders.createdAt))
-    .limit(limit);
-  if (rows.length === 0) return [];
-
-  const items = await db
-    .select()
-    .from(orderItems)
-    .where(inArray(orderItems.orderId, rows.map((r) => r.id)));
-
-  return rows.map((o) => ({
-    id: o.id,
-    number: orderNumber(o.id),
-    status: o.status,
-    totalCents: o.totalCents,
-    createdAt: o.createdAt,
-    items: items
-      .filter((i) => i.orderId === o.id)
-      .map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
-  }));
-}
-
-export type StatusResult = "ok" | "invalido" | "nao-encontrado";
-
-export async function updateOrderStatus(id: number, next: OrderStatus): Promise<StatusResult> {
-  if (!ORDER_STATUS.includes(next)) return "invalido";
-  const db = await getDb();
-  const [o] = await db.select().from(orders).where(eq(orders.id, id));
-  if (!o) return "nao-encontrado";
-  if (!NEXT_STATUS[o.status].includes(next)) return "invalido";
-
-  // Cancelar devolve as peças ao estoque, tudo na mesma transação.
-  if (next === "cancelado") return (await cancelOrder(id)) ? "ok" : "invalido";
-
-  // Só muda se o status ainda for o que o dono viu (evita duas pessoas mudando ao mesmo tempo).
-  const changed = await db
-    .update(orders)
-    .set({ status: next, updatedAt: new Date() })
-    .where(and(eq(orders.id, id), eq(orders.status, o.status)))
-    .returning({ id: orders.id });
-  return changed.length ? "ok" : "invalido";
-}
-
-// ---------- Encomendas personalizadas ----------
-
-export const CUSTOM_STATUS = ["novo", "em contato", "produzindo", "concluído", "cancelado"] as const;
-export type CustomStatus = (typeof CUSTOM_STATUS)[number];
-
-export async function listCustomOrders(limit = 100) {
-  const db = await getDb();
-  return db.select().from(customOrders).orderBy(desc(customOrders.createdAt)).limit(limit);
-}
-
-export async function setCustomStatus(id: number, status: string): Promise<boolean> {
-  if (!(CUSTOM_STATUS as readonly string[]).includes(status)) return false;
-  const db = await getDb();
-  const done = await db.update(customOrders).set({ status }).where(eq(customOrders.id, id)).returning({ id: customOrders.id });
-  return done.length > 0;
-}
-
-// ---------- Produtos ----------
+import { products, type ProductRow } from "@/server/db/schema";
 
 export async function listAllProducts(): Promise<ProductRow[]> {
   const db = await getDb();
@@ -240,30 +152,6 @@ export async function updateProduct(p: ProductInput): Promise<boolean> {
     .where(eq(products.slug, p.slug))
     .returning({ slug: products.slug });
   return done.length > 0;
-}
-
-// ---------- Painel inicial ----------
-
-export async function dashboardStats() {
-  const db = await getDb();
-  const byStatus = await db.select({ status: orders.status, n: count() }).from(orders).groupBy(orders.status);
-  const [novas] = await db.select({ n: count() }).from(customOrders).where(eq(customOrders.status, "novo"));
-  const lowStock = await db
-    .select({ slug: products.slug, name: products.name, stock: products.stock })
-    .from(products)
-    .where(and(eq(products.active, true), lte(products.stock, 3)))
-    .orderBy(asc(products.stock));
-  const latest = await listOrders(undefined, 5);
-
-  const n = (s: OrderStatus) => byStatus.find((r) => r.status === s)?.n ?? 0;
-  return {
-    pendentes: n("pendente"),
-    pagos: n("pago"),
-    enviados: n("enviado"),
-    novasEncomendas: novas.n,
-    lowStock,
-    latest,
-  };
 }
 
 // Ajustes rápidos, direto da lista de produtos.

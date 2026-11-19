@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { dashboardStats } from "@/server/admin/data";
+import { dashboardStats } from "@/server/admin/dashboard";
 import { formatBRL } from "@/lib/site";
 import { requireAdmin } from "@/server/admin/auth";
 

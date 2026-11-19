@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/server/admin/auth";
-import { listAllProducts } from "@/server/admin/data";
+import { listAllProducts } from "@/server/admin/products";
 import { formatBRL } from "@/lib/site";
 import { setActiveAction, setStockAction } from "@/app/admin/actions";
 

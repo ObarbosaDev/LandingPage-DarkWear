@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildCustomMessage, whatsappLink } from "@/lib/whatsapp";
-import { saveCustomOrder, validateCustom } from "@/server/orders";
+import { saveCustomOrder, validateCustom } from "@/server/custom-orders";
 
 // POST /api/custom-orders  →  valida e registra a encomenda personalizada e devolve o link do WhatsApp.
 // O arquivo da arte não passa por aqui: o cliente anexa no WhatsApp. Só o nome do arquivo é guardado.

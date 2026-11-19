@@ -16,15 +16,15 @@ import {
   requireAdmin,
   startSession,
 } from "@/server/admin/auth";
+import { setCustomStatus } from "@/server/admin/custom-orders";
+import { updateOrderStatus } from "@/server/admin/orders";
 import {
   createProduct,
   parseProductForm,
-  setCustomStatus,
   setProductActive,
   setProductStock,
-  updateOrderStatus,
   updateProduct,
-} from "@/server/admin/data";
+} from "@/server/admin/products";
 import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
 
 // Em erro de validação, devolvemos também o que foi digitado: o React limpa o formulário depois de
