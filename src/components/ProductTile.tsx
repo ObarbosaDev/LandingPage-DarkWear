@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Product } from "@/lib/product";
 import { ProductImage } from "@/components/ProductImage";
-import { formatBRL } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 
 // Bloco do catálogo: alterna branco e preto, bordas coladas e inversão no hover.
 export function ProductTile({ product, index }: { product: Product; index: number }) {
@@ -31,7 +31,7 @@ export function ProductTile({ product, index }: { product: Product; index: numbe
       <div>
         <h3 className="font-display text-4xl uppercase leading-[0.9]">{product.name}</h3>
         <div className="mt-4 flex items-end justify-between">
-          <span className="text-2xl font-semibold">{formatBRL(product.price)}</span>
+          <span className="text-2xl font-semibold">{formatCents(product.priceCents)}</span>
           <span className="text-sm transition-transform duration-200 group-hover:translate-x-1">Ver peça →</span>
         </div>
       </div>

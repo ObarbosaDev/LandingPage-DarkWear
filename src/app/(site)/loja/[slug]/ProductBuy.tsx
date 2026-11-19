@@ -18,7 +18,7 @@ export function ProductBuy({ product }: { product: Product }) {
       id: `${product.slug}|${size}|${color}`,
       slug: product.slug,
       name: product.name,
-      price: product.price,
+      priceCents: product.priceCents,
       size,
       color,
       max: product.stock,

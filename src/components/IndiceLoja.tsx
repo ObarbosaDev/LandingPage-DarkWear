@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import type { Product } from "@/lib/product";
 import { ProductImage } from "@/components/ProductImage";
-import { formatBRL } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 
 const FILTROS = ["Todas", "Pronta entrega", "Coleção"] as const;
 
@@ -71,7 +71,7 @@ export function IndiceLoja({ products }: { products: Product[] }) {
                     {esgotado ? "Esgotado" : p.category}
                   </span>
                   <span className="font-display text-3xl leading-none md:text-right">
-                    {formatBRL(p.price)}
+                    {formatCents(p.priceCents)}
                   </span>
                 </Link>
               </li>

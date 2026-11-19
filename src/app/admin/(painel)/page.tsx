@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { dashboardStats } from "@/server/admin/dashboard";
-import { formatBRL } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 import { requireAdmin } from "@/server/admin/auth";
 
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
@@ -65,7 +65,7 @@ export default async function PainelPage() {
                     {o.number}
                   </Link>
                   <span className="font-mono text-sm uppercase">{o.status}</span>
-                  <span className="font-bold">{formatBRL(o.totalCents / 100)}</span>
+                  <span className="font-bold">{formatCents(o.totalCents)}</span>
                 </li>
               ))}
             </ul>

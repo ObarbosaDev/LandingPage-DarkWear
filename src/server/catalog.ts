@@ -11,7 +11,7 @@ function toProduct(r: ProductRow): Product {
   return {
     slug: r.slug,
     name: r.name,
-    price: r.priceCents / 100,
+    priceCents: r.priceCents,
     description: r.description,
     category: r.category as Product["category"],
     sizes: r.sizes,

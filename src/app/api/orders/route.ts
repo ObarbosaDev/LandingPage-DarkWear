@@ -24,14 +24,14 @@ export async function POST(request: Request) {
         size: i.size,
         color: i.color,
         qty: i.qty,
-        price: i.unitPriceCents / 100,
+        priceCents: i.unitPriceCents,
       })),
     );
 
     return NextResponse.json(
       {
         id: order.number,
-        total: order.totalCents / 100,
+        totalCents: order.totalCents,
         whatsappUrl: whatsappLink(`Pedido ${order.number}\n\n${message}`),
       },
       { status: 201 },

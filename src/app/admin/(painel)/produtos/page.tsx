@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/server/admin/auth";
 import { listAllProducts } from "@/server/admin/products";
-import { formatBRL } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 import { setActiveAction, setStockAction } from "@/app/admin/actions";
 
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
@@ -47,7 +47,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
                   {p.name}
                 </Link>
                 <p className="mt-2 text-lg font-medium">
-                  {formatBRL(p.priceCents / 100)} · {p.category} · {p.active ? "Ativo" : "Oculto na loja"}
+                  {formatCents(p.priceCents)} · {p.category} · {p.active ? "Ativo" : "Oculto na loja"}
                 </p>
               </div>
 

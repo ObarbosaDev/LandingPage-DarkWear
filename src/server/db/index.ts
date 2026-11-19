@@ -61,7 +61,7 @@ async function seedIfEmpty(db: Db) {
     PRODUCTS.map((p, i) => ({
       slug: p.slug,
       name: p.name,
-      priceCents: Math.round(p.price * 100),
+      priceCents: p.priceCents,
       description: p.description,
       category: p.category,
       sizes: p.sizes,

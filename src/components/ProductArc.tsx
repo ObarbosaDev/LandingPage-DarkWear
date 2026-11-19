@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Product } from "@/lib/product";
 import { ProductImage } from "@/components/ProductImage";
-import { formatBRL } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 
 // Arco de cards de vidro: arrastar, rolar, setas ou clique trocam a peça em destaque.
 export function ProductArc({ products }: { products: Product[] }) {
@@ -119,7 +119,7 @@ export function ProductArc({ products }: { products: Product[] }) {
               </div>
               <div className="mt-4 flex items-end justify-between gap-4">
                 <span className="text-lg font-medium text-foreground">{p.name}</span>
-                <span className="text-base text-muted">{formatBRL(p.price)}</span>
+                <span className="text-base text-muted">{formatCents(p.priceCents)}</span>
               </div>
             </Link>
           </div>

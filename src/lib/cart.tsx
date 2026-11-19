@@ -14,7 +14,7 @@ export type CartItem = {
   id: string; // slug + tamanho + cor
   slug: string;
   name: string;
-  price: number;
+  priceCents: number;
   size: string;
   color: string;
   qty: number;
@@ -31,6 +31,21 @@ type Action =
   | { type: "clear" };
 
 const STORAGE_KEY = "darkwear-cart";
+
+// Carrinhos salvos antes da mudança para centavos têm "price" em reais: converte em vez de perder os itens.
+function normalizeStored(raw: unknown): CartItem[] {
+  if (!Array.isArray(raw)) return [];
+  const items: CartItem[] = [];
+  for (const r of raw as Record<string, unknown>[]) {
+    const priceCents =
+      typeof r.priceCents === "number" ? r.priceCents : typeof r.price === "number" ? Math.round(r.price * 100) : NaN;
+    if (!Number.isFinite(priceCents) || typeof r.id !== "string" || typeof r.slug !== "string") continue;
+    const { price: _antigo, ...resto } = r;
+    void _antigo;
+    items.push({ ...(resto as unknown as CartItem), priceCents });
+  }
+  return items;
+}
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -78,7 +93,7 @@ type CartContextValue = {
   items: CartItem[];
   ready: boolean;
   count: number;
-  total: number;
+  totalCents: number;
   add: (item: Omit<CartItem, "qty"> & { qty?: number }) => void;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
@@ -95,7 +110,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     let items: CartItem[] = [];
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) items = JSON.parse(raw) as CartItem[];
+      if (raw) items = normalizeStored(JSON.parse(raw));
     } catch {
       items = [];
     }
@@ -128,7 +143,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       items: state.items,
       ready: state.ready,
       count: state.items.reduce((s, i) => s + i.qty, 0),
-      total: state.items.reduce((s, i) => s + i.price * i.qty, 0),
+      totalCents: state.items.reduce((s, i) => s + i.priceCents * i.qty, 0),
       add,
       setQty,
       remove,

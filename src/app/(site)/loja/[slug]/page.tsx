@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getProduct, getProducts } from "@/server/catalog";
-import { formatBRL } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 import { ProductBuy } from "./ProductBuy";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductZoom } from "@/components/ProductZoom";
@@ -52,7 +52,7 @@ export default async function ProdutoPage({
 
           <div className="flex flex-col gap-8">
             <div className="flex flex-wrap items-end justify-between gap-6 border-b-2 border-foreground pb-6">
-              <p className="font-display text-7xl leading-none">{formatBRL(product.price)}</p>
+              <p className="font-display text-7xl leading-none">{formatCents(product.priceCents)}</p>
               <div className="text-right">
                 <p className="font-mono text-sm uppercase tracking-[0.15em]">{product.category}</p>
                 {esgotado ? (

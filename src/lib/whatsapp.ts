@@ -1,4 +1,5 @@
-import { SITE, formatBRL } from "@/lib/site";
+import { SITE } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 
 export function whatsappLink(message: string) {
   return `https://wa.me/${SITE.whatsappNumber}?text=${encodeURIComponent(message)}`;
@@ -9,23 +10,23 @@ export type OrderLine = {
   size: string;
   color: string;
   qty: number;
-  price: number;
+  priceCents: number;
 };
 
 export function buildCartMessage(lines: OrderLine[]) {
   const itens = lines
     .map(
       (l) =>
-        `• ${l.qty}x ${l.name} (${l.color}, tam. ${l.size}) — ${formatBRL(l.price * l.qty)}`,
+        `• ${l.qty}x ${l.name} (${l.color}, tam. ${l.size}) — ${formatCents(l.priceCents * l.qty)}`,
     )
     .join("\n");
-  const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
+  const total = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
   return [
     `Olá! Quero fechar este pedido na ${SITE.name}:`,
     "",
     itens,
     "",
-    `Total: ${formatBRL(total)}`,
+    `Total: ${formatCents(total)}`,
     "",
     SITE.paymentNote,
   ].join("\n");

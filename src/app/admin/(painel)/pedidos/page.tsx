@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/server/admin/auth";
 import { NEXT_STATUS, listOrders } from "@/server/admin/orders";
 import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
-import { formatBRL } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 import { changeOrderStatusAction } from "@/app/admin/actions";
 import { ConfirmButton } from "../ConfirmButton";
 
@@ -66,13 +66,13 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
                     <span>
                       {i.qty}× {i.name} · {i.color}, {i.size}
                     </span>
-                    <span>{formatBRL((i.unitPriceCents * i.qty) / 100)}</span>
+                    <span>{formatCents(i.unitPriceCents * i.qty)}</span>
                   </li>
                 ))}
               </ul>
 
               <footer className="flex flex-wrap items-center justify-between gap-4 border-t-2 border-foreground p-5">
-                <p className="font-display text-4xl leading-none">{formatBRL(o.totalCents / 100)}</p>
+                <p className="font-display text-4xl leading-none">{formatCents(o.totalCents)}</p>
                 <div className="flex flex-wrap gap-3">
                   {NEXT_STATUS[o.status as OrderStatus].length === 0 ? (
                     <span className="text-lg font-medium">Pedido encerrado.</span>

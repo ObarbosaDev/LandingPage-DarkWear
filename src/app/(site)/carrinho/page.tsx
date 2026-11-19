@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/lib/cart";
-import { formatBRL, SITE } from "@/lib/site";
+import { SITE } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 
 export default function CarrinhoPage() {
-  const { items, total, setQty, remove, clear, ready } = useCart();
+  const { items, totalCents, setQty, remove, clear, ready } = useCart();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
 
@@ -80,10 +81,10 @@ export default function CarrinhoPage() {
                         {i.qty}x {i.name}
                       </span>
                       <span aria-hidden="true" className="mb-1 flex-1 border-b-2 border-dotted border-background" />
-                      <span>{formatBRL(i.price * i.qty)}</span>
+                      <span>{formatCents(i.priceCents * i.qty)}</span>
                     </div>
                     <p className="mt-1 text-sm uppercase tracking-[0.08em]">
-                      {i.color} · tam. {i.size} · {formatBRL(i.price)} cada
+                      {i.color} · tam. {i.size} · {formatCents(i.priceCents)} cada
                     </p>
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -114,7 +115,7 @@ export default function CarrinhoPage() {
               <>
                 <div className="mt-2 flex items-end justify-between border-t-2 border-dashed border-background pt-5">
                   <span className="text-sm font-bold uppercase tracking-[0.15em]">Total</span>
-                  <span className="font-display text-6xl leading-none">{formatBRL(total)}</span>
+                  <span className="font-display text-6xl leading-none">{formatCents(totalCents)}</span>
                 </div>
                 <button
                   type="button"

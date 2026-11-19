@@ -6,7 +6,7 @@ export const PRODUCTS: Product[] = [
   {
     slug: "oversized-gt3-rs",
     name: "Oversized GT3 RS",
-    price: 89.9,
+    priceCents: 8990,
     description:
       "Camiseta preta oversized com estampa grande nas costas, em DTF.",
     category: "Pronta entrega",
@@ -19,7 +19,7 @@ export const PRODUCTS: Product[] = [
   {
     slug: "camisa-mumia",
     name: "Camisa Múmia",
-    price: 99.9,
+    priceCents: 9990,
     description:
       "Camisa branca com a ilustração da múmia nas costas, com campo de nome e número.",
     category: "Coleção",
@@ -32,7 +32,7 @@ export const PRODUCTS: Product[] = [
   {
     slug: "eu-faco-programa",
     name: "Eu Faço Programa",
-    price: 79.9,
+    priceCents: 7990,
     description: "Camiseta preta com estampa grande na frente, em DTF.",
     category: "Pronta entrega",
     sizes: ["P", "M", "G", "GG"],

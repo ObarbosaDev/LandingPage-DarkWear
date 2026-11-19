@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ShirtPlacer } from "@/components/ShirtPlacer";
 import { COLORS, MODELS, SIZES, type PlacementId } from "@/lib/custom-order-options";
-import { formatBRL } from "@/lib/site";
+import { formatCents } from "@/lib/money";
 
 const ACCEPT = ".png,.jpg,.jpeg,.svg,.pdf";
 const MAX_MB = 25;
-const PRICE_FROM = 70; // preço de partida, exemplo: troque pelo valor real da encomenda
+const PRICE_FROM_CENTS = 7000; // preço de partida, exemplo: troque pelo valor real da encomenda
 
 export default function PersonalizarPage() {
   const [name, setName] = useState("");
@@ -213,7 +213,7 @@ export default function PersonalizarPage() {
               {model} · {color} · tamanho {size}
             </p>
             <p className="mt-2 text-lg font-medium">
-              A partir de <span className="font-display text-3xl">{formatBRL(PRICE_FROM)}</span>
+              A partir de <span className="font-display text-3xl">{formatCents(PRICE_FROM_CENTS)}</span>
             </p>
           </aside>
         </div>

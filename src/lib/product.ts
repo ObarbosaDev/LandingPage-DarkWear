@@ -3,7 +3,7 @@
 export type Product = {
   slug: string;
   name: string;
-  price: number;
+  priceCents: number;
   description: string;
   category: "Pronta entrega" | "Coleção";
   sizes: string[];

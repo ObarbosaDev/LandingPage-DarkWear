@@ -10,7 +10,3 @@ export const SITE = {
   // Pix e cartão são combinados no WhatsApp até o gateway ser integrado.
   paymentNote: "Pagamento via Pix ou cartão, combinado no WhatsApp.",
 } as const;
-
-export function formatBRL(value: number) {
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
