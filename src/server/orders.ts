@@ -13,9 +13,16 @@
 // ============================================================================
 
 import "server-only";
-import { and, eq, gte, lt, ne, sql } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { orderItems, orders, products, type OrderStatus } from "@/server/db/schema";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { getDb, type Db } from "@/server/db";
+import {
+  orderItems,
+  orders,
+  orderStatusHistory,
+  products,
+  type OrderStatus,
+  type StatusOrigin,
+} from "@/server/db/schema";
 
 /** Uma linha do carrinho como o navegador envia: só o que identifica a peça e a quantidade. */
 export type OrderItemInput = { slug: string; size: string; color: string; qty: number };
@@ -129,6 +136,9 @@ export async function createOrder(input: unknown): Promise<OrderView> {
       .values({ totalCents: total })
       .returning({ id: orders.id, status: orders.status });
 
+    // Primeira linha do histórico: o pedido nasceu (não veio de nenhum status anterior).
+    await tx.insert(orderStatusHistory).values({ orderId: order.id, fromStatus: null, toStatus: "pendente", origin: "pedido" });
+
     // Linhas do pedido, com nome e preço congelados no momento da compra.
     await tx.insert(orderItems).values(
       lines.map((l, i) => ({
@@ -146,38 +156,57 @@ export async function createOrder(input: unknown): Promise<OrderView> {
   });
 }
 
+/** A "transação" aberta pelo banco: o que as funções recebem para trabalhar dentro dela. */
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
 /**
- * Cancela o pedido e devolve as peças ao estoque.
+ * Cancela um pedido DENTRO de uma transação já aberta e devolve as peças ao estoque.
+ * Existe separada de cancelOrder para o painel poder cancelar na mesma transação em que confere o
+ * status (travar a linha numa transação e cancelar em outra deixaria as duas esperando uma à outra).
+ *
+ * A linha do pedido é TRAVADA ("FOR UPDATE") antes de qualquer decisão: se dois cancelamentos chegam
+ * juntos, o segundo espera o primeiro terminar, enxerga o pedido já cancelado e sai sem repor nada.
+ *
+ * @param somenteSe só cancela se o pedido ainda estiver nesse status (a expiração usa "pendente")
+ * @param origem    quem está cancelando, para o histórico
+ * @returns true se cancelou agora; false se não havia o que cancelar
+ */
+export async function cancelInTx(
+  tx: Tx,
+  id: number,
+  somenteSe: OrderStatus | undefined,
+  origem: StatusOrigin,
+): Promise<boolean> {
+  const [atual] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, id)).for("update");
+  if (!atual || atual.status === "cancelado") return false;
+  if (somenteSe && atual.status !== somenteSe) return false;
+
+  await tx.update(orders).set({ status: "cancelado", updatedAt: new Date() }).where(eq(orders.id, id));
+  await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: atual.status, toStatus: "cancelado", origin: origem });
+
+  // Devolve cada peça do pedido ao estoque (soma, em vez de gravar um número fixo).
+  const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id));
+  for (const it of items) {
+    await tx
+      .update(products)
+      .set({ stock: sql`${products.stock} + ${it.qty}`, updatedAt: new Date() })
+      .where(eq(products.slug, it.productSlug));
+  }
+  return true;
+}
+
+/**
+ * Cancela o pedido e devolve as peças ao estoque (a versão que abre a sua própria transação).
  *
  * @param id        número interno do pedido
  * @param somenteSe se informado, só cancela se o pedido ainda estiver nesse status
+ * @param origem    quem cancelou, para o histórico (padrão: o painel do dono)
  * @returns true se cancelou agora; false se não havia o que cancelar (não existe, já cancelado
  *          ou mudou de status)
  */
-// Cancela o pedido e devolve as peças ao estoque. Com `somenteSe`, só cancela se o pedido ainda estiver
-// nesse status (a expiração usa "pendente": se o dono marcou como pago no meio do caminho, não mexe).
-export async function cancelOrder(id: number, somenteSe?: OrderStatus): Promise<boolean> {
+export async function cancelOrder(id: number, somenteSe?: OrderStatus, origem: StatusOrigin = "painel"): Promise<boolean> {
   const db = await getDb();
-  return db.transaction(async (tx) => {
-    // Só quem de fato muda o status para "cancelado" devolve as peças: o UPDATE condicional trava a
-    // linha, então um segundo cancelamento simultâneo não encontra nada para alterar e sai sem repor.
-    const changed = await tx
-      .update(orders)
-      .set({ status: "cancelado", updatedAt: new Date() })
-      .where(and(eq(orders.id, id), somenteSe ? eq(orders.status, somenteSe) : ne(orders.status, "cancelado")))
-      .returning({ id: orders.id });
-    if (changed.length === 0) return false;
-
-    // Devolve cada peça do pedido ao estoque (soma, em vez de gravar um número fixo).
-    const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id));
-    for (const it of items) {
-      await tx
-        .update(products)
-        .set({ stock: sql`${products.stock} + ${it.qty}`, updatedAt: new Date() })
-        .where(eq(products.slug, it.productSlug));
-    }
-    return true;
-  });
+  return db.transaction((tx) => cancelInTx(tx, id, somenteSe, origem));
 }
 
 /**
@@ -202,7 +231,7 @@ export async function expirePendingOrders(maxAgeHours = 48): Promise<number> {
   let cancelados = 0;
   for (const { id } of velhos) {
     // "pendente" como condição: se o dono marcou como pago entre a consulta e agora, não cancela.
-    if (await cancelOrder(id, "pendente")) cancelados++;
+    if (await cancelOrder(id, "pendente", "expiracao")) cancelados++;
   }
   return cancelados;
 }

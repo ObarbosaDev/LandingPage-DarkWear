@@ -13,7 +13,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdmin } from "@/server/admin/auth";
 import { NEXT_STATUS, listOrders } from "@/server/admin/orders";
-import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
+import { ORDER_STATUS, type OrderStatus, type StatusOrigin } from "@/server/db/schema";
 import { formatCents } from "@/lib/money";
 import { changeOrderStatusAction } from "@/app/admin/actions";
 import { ConfirmButton } from "../ConfirmButton";
@@ -25,6 +25,9 @@ export const metadata: Metadata = { title: "Pedidos" };
 
 // Formata a data/hora no padrão brasileiro e no fuso de São Paulo (o servidor pode estar em outro fuso).
 const dataHora = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+
+// Texto legível de quem fez cada mudança de status (o banco guarda só o código curto).
+const ORIGEM: Record<StatusOrigin, string> = { pedido: "cliente", painel: "painel", expiracao: "prazo" };
 
 // searchParams: os parâmetros do endereço. "status" é o filtro escolhido (?status=pago) e "aviso"
 // aparece quando uma mudança de status não foi aplicada (?aviso=mudou).
@@ -91,6 +94,16 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
                   </li>
                 ))}
               </ul>
+
+              {/* Histórico do pedido: cada mudança de status com a data e quem a fez (cliente, painel ou
+                  prazo de expiração). Responde "quando esse pedido foi pago?". */}
+              <ol className="flex flex-wrap gap-x-6 gap-y-1 border-t-2 border-foreground px-5 py-3 font-mono text-xs uppercase tracking-[0.1em]">
+                {o.history.map((h, k) => (
+                  <li key={k}>
+                    {h.fromStatus ? `${h.fromStatus} → ${h.toStatus}` : `criado`} · {ORIGEM[h.origin]} · {dataHora.format(h.at)}
+                  </li>
+                ))}
+              </ol>
 
               <footer className="flex flex-wrap items-center justify-between gap-4 border-t-2 border-foreground p-5">
                 <p className="font-display text-4xl leading-none">{formatCents(o.totalCents)}</p>

@@ -8,10 +8,10 @@
 // Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
 import "server-only";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { orderItems, orders, ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
-import { cancelOrder, orderNumber } from "@/server/orders";
+import { orderItems, orders, orderStatusHistory, ORDER_STATUS, type OrderStatus, type StatusOrigin } from "@/server/db/schema";
+import { cancelInTx, orderNumber } from "@/server/orders";
 
 // De cada status, para quais o dono pode mover o pedido.
 // Define o fluxo: pendente → pago → enviado → entregue. Só dá para cancelar antes do envio.
@@ -33,6 +33,8 @@ export type AdminOrder = {
   totalCents: number;
   createdAt: Date;
   items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
+  /** Cada mudança de status do pedido, da mais antiga para a mais recente. */
+  history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; origin: StatusOrigin; at: Date }[];
 };
 
 /**
@@ -59,6 +61,13 @@ export async function listOrders(status?: OrderStatus, limit = 100): Promise<Adm
     .from(orderItems)
     .where(inArray(orderItems.orderId, rows.map((r) => r.id)));
 
+  // O histórico de status também vem numa consulta só, e é distribuído a cada pedido.
+  const historico = await db
+    .select()
+    .from(orderStatusHistory)
+    .where(inArray(orderStatusHistory.orderId, rows.map((r) => r.id)))
+    .orderBy(asc(orderStatusHistory.at), asc(orderStatusHistory.id));
+
   return rows.map((o) => ({
     id: o.id,
     number: orderNumber(o.id),
@@ -68,6 +77,9 @@ export async function listOrders(status?: OrderStatus, limit = 100): Promise<Adm
     items: items
       .filter((i) => i.orderId === o.id)
       .map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
+    history: historico
+      .filter((h) => h.orderId === o.id)
+      .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, at: h.at })),
   }));
 }
 
@@ -83,19 +95,20 @@ export type StatusResult = "ok" | "invalido" | "nao-encontrado";
 export async function updateOrderStatus(id: number, next: OrderStatus): Promise<StatusResult> {
   if (!ORDER_STATUS.includes(next)) return "invalido";
   const db = await getDb();
-  const [o] = await db.select().from(orders).where(eq(orders.id, id));
-  if (!o) return "nao-encontrado";
-  // Confere se o fluxo permite ir do status atual para o pedido (ex.: não pula de pendente a enviado).
-  if (!NEXT_STATUS[o.status].includes(next)) return "invalido";
 
-  // Cancelar devolve as peças ao estoque, tudo na mesma transação.
-  if (next === "cancelado") return (await cancelOrder(id)) ? "ok" : "invalido";
+  // Tudo numa transação, com a linha do pedido TRAVADA: se duas pessoas clicam ao mesmo tempo, a
+  // segunda espera a primeira terminar, enxerga o status novo e é recusada ("invalido").
+  return db.transaction(async (tx): Promise<StatusResult> => {
+    const [o] = await tx.select().from(orders).where(eq(orders.id, id)).for("update");
+    if (!o) return "nao-encontrado";
+    // Confere se o fluxo permite ir do status atual para o pedido (ex.: não pula de pendente a enviado).
+    if (!NEXT_STATUS[o.status].includes(next)) return "invalido";
 
-  // Só muda se o status ainda for o que o dono viu (evita duas pessoas mudando ao mesmo tempo).
-  const changed = await db
-    .update(orders)
-    .set({ status: next, updatedAt: new Date() })
-    .where(and(eq(orders.id, id), eq(orders.status, o.status)))
-    .returning({ id: orders.id });
-  return changed.length ? "ok" : "invalido";
+    // Cancelar devolve as peças ao estoque, na mesma transação.
+    if (next === "cancelado") return (await cancelInTx(tx, id, undefined, "painel")) ? "ok" : "invalido";
+
+    await tx.update(orders).set({ status: next, updatedAt: new Date() }).where(eq(orders.id, id));
+    await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: o.status, toStatus: next, origin: "painel" });
+    return "ok";
+  });
 }
