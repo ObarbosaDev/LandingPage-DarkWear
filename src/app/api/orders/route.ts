@@ -2,9 +2,22 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { buildCartMessage, whatsappLink } from "@/lib/whatsapp";
 import { OrderError, createOrder } from "@/server/orders";
+import { clientKey, rateLimit } from "@/server/rate-limit";
+
+function tooMany(retryAfterSeconds: number) {
+  return NextResponse.json(
+    { error: "Muitos pedidos em pouco tempo. Tente de novo em alguns minutos." },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+  );
+}
+
 
 // POST /api/orders  →  registra o pedido, baixa o estoque e devolve o link do WhatsApp para fechar.
 export async function POST(request: Request) {
+  // 10 pedidos a cada 10 minutos por origem: impede esgotar o estoque com pedidos falsos em série.
+  const limite = await rateLimit("orders", await clientKey(), 10, 10 * 60 * 1000);
+  if (!limite.allowed) return tooMany(limite.retryAfterSeconds);
+
   let body: unknown;
   try {
     body = await request.json();

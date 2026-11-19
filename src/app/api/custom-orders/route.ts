@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { buildCustomMessage, whatsappLink } from "@/lib/whatsapp";
 import { saveCustomOrder, validateCustom } from "@/server/custom-orders";
+import { clientKey, rateLimit } from "@/server/rate-limit";
+
+function tooMany(retryAfterSeconds: number) {
+  return NextResponse.json(
+    { error: "Muitos pedidos em pouco tempo. Tente de novo em alguns minutos." },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+  );
+}
+
 
 // POST /api/custom-orders  →  valida e registra a encomenda personalizada e devolve o link do WhatsApp.
 // O arquivo da arte não passa por aqui: o cliente anexa no WhatsApp. Só o nome do arquivo é guardado.
 export async function POST(request: Request) {
+  const limite = await rateLimit("custom-orders", await clientKey(), 5, 10 * 60 * 1000);
+  if (!limite.allowed) return tooMany(limite.retryAfterSeconds);
+
   let body: unknown;
   try {
     body = await request.json();

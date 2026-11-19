@@ -4,7 +4,7 @@
 
 import "server-only";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { and, count, eq, gt, lt } from "drizzle-orm";
@@ -91,14 +91,6 @@ export async function requireAdmin(): Promise<void> {
 
 const MAX_FAILS = 5;
 const WINDOW_MS = 15 * 60 * 1000;
-
-// Origem do pedido. Só usamos cabeçalhos que a hospedagem define: o x-forwarded-for puro pode ser
-// inventado por quem ataca, e então cada tentativa pareceria vir de um endereço novo.
-export async function clientKey(): Promise<string> {
-  const h = await headers();
-  const ip = h.get("x-vercel-forwarded-for") || h.get("x-real-ip") || "local";
-  return ip.split(",")[0].trim().slice(0, 64);
-}
 
 export async function isLockedOut(key: string): Promise<boolean> {
   const db = await getDb();

@@ -9,7 +9,6 @@ import {
   adminConfigured,
   checkPassword,
   clearFailures,
-  clientKey,
   endSession,
   isLockedOut,
   registerFailure,
@@ -25,6 +24,7 @@ import {
   setProductStock,
   updateProduct,
 } from "@/server/admin/products";
+import { clientKey } from "@/server/rate-limit";
 import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
 
 // Em erro de validação, devolvemos também o que foi digitado: o React limpa o formulário depois de
