@@ -69,7 +69,7 @@ export default async function RetornoPage({ searchParams }: { searchParams: Prom
           </div>
 
           <p className="mt-6 text-sm font-bold uppercase tracking-[0.15em]">Pedido {view.number}</p>
-          <h1 className="mt-2 font-display text-[clamp(4rem,16vw,10rem)] uppercase leading-[0.86]">{l.palavra}</h1>
+          <h1 className="mt-2 font-display text-[clamp(2.75rem,12vw,7.5rem)] uppercase leading-[0.9] [overflow-wrap:anywhere]">{l.palavra}</h1>
 
           <p className="mt-6 border-t-2 border-dashed border-background pt-5 text-lg font-medium">{l.texto}</p>
 
