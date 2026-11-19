@@ -1,3 +1,13 @@
+// ============================================================================
+// Bloco de COMPRA da página de uma peça: escolher cor e tamanho e adicionar à sacola.
+//
+// Quem usa: src/app/(site)/loja/[slug]/page.tsx. É componente de navegador ("use client") porque
+// guarda as escolhas do cliente (cor, tamanho) e conversa com o carrinho (useCart).
+//
+// Regras: o botão fica desabilitado até escolher um tamanho; peça esgotada não oferece compra e
+// sugere a encomenda personalizada; depois de adicionar, aparece o atalho "Ir para a sacola".
+// ============================================================================
+
 "use client";
 
 import Link from "next/link";
@@ -7,25 +17,32 @@ import type { Product } from "@/lib/product";
 
 export function ProductBuy({ product }: { product: Product }) {
   const { add } = useCart();
+  // Tamanho começa SEM escolha (obriga o cliente a escolher). A cor já começa na primeira disponível.
   const [size, setSize] = useState<string | null>(null);
   const [color, setColor] = useState(product.colors[0]);
+  // true depois de adicionar: faz o atalho "Ir para a sacola" aparecer.
   const [added, setAdded] = useState(false);
   const soldOut = product.stock === 0;
 
+  /** Coloca a peça (com o tamanho e a cor escolhidos) na sacola. */
   function handleAdd() {
     if (!size || soldOut) return;
     add({
+      // O id junta peça, tamanho e cor: a mesma combinação cai na MESMA linha da sacola
+      // (e aumenta a quantidade), em vez de criar uma linha repetida.
       id: `${product.slug}|${size}|${color}`,
       slug: product.slug,
       name: product.name,
       priceCents: product.priceCents,
       size,
       color,
+      // O estoque conhecido agora limita a quantidade que o cliente consegue pôr na sacola.
       max: product.stock,
     });
     setAdded(true);
   }
 
+  // Estilo dos botões de escolha (cor/tamanho): o escolhido fica preenchido; os outros invertem ao passar o mouse.
   const chip = (on: boolean) =>
     `min-h-11 border-2 px-4 py-2 text-base font-medium transition-colors ${
       on ? "border-foreground bg-foreground text-background" : "border-foreground text-foreground hover:bg-foreground hover:text-background"
@@ -33,6 +50,7 @@ export function ProductBuy({ product }: { product: Product }) {
 
   return (
     <div className="flex flex-col gap-8">
+      {/* Escolha da cor. aria-pressed avisa leitores de tela qual botão está selecionado. */}
       <fieldset>
         <legend className="mb-3 font-mono text-sm uppercase tracking-[0.15em] text-foreground">Cor</legend>
         <div className="flex flex-wrap gap-2">
@@ -44,6 +62,7 @@ export function ProductBuy({ product }: { product: Product }) {
         </div>
       </fieldset>
 
+      {/* Escolha do tamanho. */}
       <fieldset>
         <legend className="mb-3 font-mono text-sm uppercase tracking-[0.15em] text-foreground">Tamanho</legend>
         <div className="flex flex-wrap gap-2">
@@ -56,6 +75,7 @@ export function ProductBuy({ product }: { product: Product }) {
       </fieldset>
 
       {soldOut ? (
+        // Peça esgotada: em vez do botão de compra, oferece a alternativa da encomenda personalizada.
         <p className="border-2 border-foreground p-5 text-lg font-medium text-foreground">
           Esgotado no momento. Quer uma parecida?{" "}
           <Link href="/personalizar" className="underline underline-offset-4">
@@ -65,6 +85,8 @@ export function ProductBuy({ product }: { product: Product }) {
         </p>
       ) : (
         <div className="flex flex-col gap-4">
+          {/* O texto do botão guia o cliente: "Escolha um tamanho" até ele escolher; depois vira
+              "Adicionar à sacola". Fica desabilitado enquanto não há tamanho. */}
           <button
             type="button"
             onClick={handleAdd}
@@ -73,6 +95,7 @@ export function ProductBuy({ product }: { product: Product }) {
           >
             {size ? "Adicionar à sacola" : "Escolha um tamanho"}
           </button>
+          {/* Confirmação + atalho para a sacola, só depois de adicionar. */}
           {added && (
             <Link href="/carrinho" className="text-lg font-medium text-foreground underline underline-offset-4">
               Ir para a sacola →

@@ -1,3 +1,18 @@
+// ============================================================================
+// Página da SACOLA: /carrinho. Aqui o cliente revisa as peças e fecha o pedido pelo WhatsApp.
+//
+// Visual: a sacola é um "recibo de papel" (fonte de máquina, pontilhado entre o item e o preço, borda
+// serrilhada). À esquerda, o título e um atalho para continuar comprando.
+//
+// Fluxo ao clicar em "Finalizar pelo WhatsApp":
+//   1. envia ao servidor SÓ quais peças, tamanhos, cores e quantidades (POST /api/orders);
+//   2. o servidor confere o estoque, recalcula os preços e registra o pedido;
+//   3. a sacola é esvaziada e o cliente é levado ao WhatsApp, com a mensagem do pedido pronta.
+// Os preços mostrados aqui servem só para exibição: quem manda é o servidor.
+//
+// É componente de navegador ("use client") porque lê o carrinho guardado no navegador (useCart).
+// ============================================================================
+
 "use client";
 
 import Link from "next/link";
@@ -8,9 +23,11 @@ import { formatCents } from "@/lib/money";
 
 export default function CarrinhoPage() {
   const { items, totalCents, setQty, remove, clear, ready } = useCart();
+  // Situação do botão "Finalizar": parado, enviando, ou deu erro (com a mensagem em "error").
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
 
+  /** Registra o pedido no servidor e leva o cliente ao WhatsApp. */
   async function finalizar() {
     setStatus("loading");
     setError("");
@@ -18,12 +35,15 @@ export default function CarrinhoPage() {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Só o essencial: o servidor ignora qualquer preço e busca os valores reais no banco.
         body: JSON.stringify({
           items: items.map((i) => ({ slug: i.slug, size: i.size, color: i.color, qty: i.qty })),
         }),
       });
       const data = (await res.json()) as { whatsappUrl?: string; error?: string };
+      // Falhou (sem estoque, muitas tentativas...): mostra a mensagem que o servidor mandou.
       if (!res.ok || !data.whatsappUrl) throw new Error(data.error ?? "Não foi possível registrar o pedido.");
+      // Pedido registrado: esvazia a sacola e abre a conversa do WhatsApp.
       clear();
       window.location.href = data.whatsappUrl;
     } catch (e) {
@@ -32,13 +52,16 @@ export default function CarrinhoPage() {
     }
   }
 
+  // Total de peças (soma das quantidades), para o texto "3 peças no pedido".
   const pecas = items.reduce((n, i) => n + i.qty, 0);
+  // Estilo dos botões − e + de quantidade.
   const step =
     "h-9 w-9 border-2 border-background text-lg font-bold transition-colors hover:bg-background hover:text-foreground disabled:cursor-not-allowed";
 
   return (
     <section className="bg-background text-foreground">
       <div className="mx-auto grid max-w-7xl gap-12 px-6 pb-24 pt-14 md:grid-cols-[1fr_30rem] md:items-start md:pt-20">
+        {/* Coluna da esquerda: título, resumo em uma frase e atalho de volta à loja. */}
         <div className="flex flex-col gap-8">
           <h1 className="font-display text-[clamp(4rem,12vw,11rem)] uppercase leading-[0.86]">
             Sua
@@ -66,6 +89,7 @@ export default function CarrinhoPage() {
               <span className="text-sm uppercase tracking-[0.12em]">Pedido</span>
             </div>
 
+            {/* Três situações: ainda lendo o navegador, sacola vazia, ou lista de itens. */}
             {!ready ? (
               <p className="py-8 text-base">Carregando…</p>
             ) : items.length === 0 ? (
@@ -76,6 +100,8 @@ export default function CarrinhoPage() {
               <ul className="divide-y-2 divide-dashed divide-background">
                 {items.map((i) => (
                   <li key={i.id} className="py-4">
+                    {/* Linha principal: "2x Peça ........ R$ valor". O pontilhado é uma linha que
+                        ocupa o espaço entre o nome e o preço (flex-1). */}
                     <div className="flex items-end gap-2 text-base font-bold uppercase">
                       <span>
                         {i.qty}x {i.name}
@@ -86,6 +112,8 @@ export default function CarrinhoPage() {
                     <p className="mt-1 text-sm uppercase tracking-[0.08em]">
                       {i.color} · tam. {i.size} · {formatCents(i.priceCents)} cada
                     </p>
+                    {/* Controles da linha: − quantidade + e "Remover". O + é desabilitado ao
+                        atingir o estoque conhecido da peça (i.max). */}
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <button type="button" onClick={() => setQty(i.id, i.qty - 1)} className={step} aria-label="Diminuir">
@@ -111,6 +139,7 @@ export default function CarrinhoPage() {
               </ul>
             )}
 
+            {/* Total e botão de finalizar: só aparecem se há itens. */}
             {ready && items.length > 0 && (
               <>
                 <div className="mt-2 flex items-end justify-between border-t-2 border-dashed border-background pt-5">
@@ -125,12 +154,15 @@ export default function CarrinhoPage() {
                 >
                   {status === "loading" ? "Registrando pedido…" : "Finalizar pelo WhatsApp"}
                 </button>
+                {/* Erro do servidor (ex.: "Estoque insuficiente para ..."). */}
                 {status === "error" && <p role="alert" className="mt-4 border-2 border-background p-3 text-base font-bold">{error}</p>}
                 <p className="mt-4 text-sm">{SITE.paymentNote}</p>
               </>
             )}
           </div>
           {/* Borda serrilhada de recibo */}
+          {/* Faixa de pontas triangulares sob o recibo, feita com dois degradês que se repetem
+              na horizontal (não há imagem). Só enfeite, por isso aria-hidden. */}
           <div
             aria-hidden="true"
             className="h-3 w-full"
