@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ShirtPlacer, type PlacementId } from "@/components/ShirtPlacer";
 import { TeeCard } from "@/components/TeeCard";
+import { PageHero } from "@/components/PageHero";
 
 const MODELS = ["Camiseta", "Moletom", "Oversized"];
 const SIZES = ["P", "M", "G", "GG", "XG"];
@@ -63,112 +64,144 @@ export default function PersonalizarPage() {
   }
 
   const canSend = rights && !!file && status !== "loading";
-  const field = "w-full border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-foreground";
+  const label = "font-mono text-sm uppercase tracking-[0.15em]";
+  const field =
+    "w-full border-2 border-background bg-transparent px-4 py-3 text-lg font-medium text-background outline-none placeholder:text-neutral-600 focus:bg-background focus:text-foreground focus:placeholder:text-neutral-400";
   const chip = (active: boolean) =>
-    `border px-4 py-2 text-sm uppercase tracking-widest ${
-      active ? "border-foreground bg-foreground text-background" : "border-border text-muted hover:text-foreground"
+    `min-h-11 border-2 border-background px-4 py-2 text-base font-medium transition-colors ${
+      active ? "bg-background text-foreground" : "text-background hover:bg-background hover:text-foreground"
     }`;
 
   return (
     <>
-    <section className="mx-auto max-w-6xl px-4 pt-12">
-      <TeeCard placement={placement} />
-    </section>
+      <PageHero
+        word="Estampa"
+        title="Mande a sua arte"
+        lead="Escolhe o modelo, a cor, o tamanho e onde a arte vai. Você fecha tudo no WhatsApp."
+      />
 
-    <section className="mx-auto grid max-w-6xl gap-12 px-4 py-12 lg:grid-cols-2">
-      <div>
-        <p className="eyebrow">Encomenda</p>
-        <h1 className="title-street mb-8 text-[clamp(3.5rem,8vw,6.5rem)]">Sua arte, sua blusa</h1>
+      <section className="bg-background pb-16">
+        <div className="mx-auto max-w-7xl px-6">
+          <TeeCard placement={placement} />
+        </div>
+      </section>
 
-        <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-3">
-            <span className="eyebrow">1. Arte</span>
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-border bg-surface p-8 text-center hover:border-foreground">
-              <span className="font-bold uppercase">{file ? file.name : "Escolher arquivo"}</span>
-              <span className="text-xs text-muted">PNG com fundo transparente, JPG, SVG ou PDF · até {MAX_MB} MB</span>
-              <input type="file" accept={ACCEPT} className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
+      <section className="bg-foreground text-background">
+        <div className="mx-auto grid max-w-7xl gap-14 px-6 py-20 lg:grid-cols-[1.3fr_1fr]">
+          <div className="flex flex-col gap-10">
+            <div className="flex flex-col gap-3">
+              <span className={label}>1. Arte</span>
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 border-2 border-dashed border-background p-10 text-center transition-colors hover:bg-background hover:text-foreground">
+                <span className="font-[family-name:var(--font-display)] text-3xl uppercase">
+                  {file ? file.name : "Escolher arquivo"}
+                </span>
+                <span className="text-base font-medium">PNG com fundo transparente, JPG, SVG ou PDF · até {MAX_MB} MB</span>
+                <input type="file" accept={ACCEPT} className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
+              </label>
+              {fileError && <p className="border-2 border-background p-3 text-lg font-bold">{fileError}</p>}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <span className={label}>2. Modelo</span>
+              <div className="flex flex-wrap gap-2">
+                {MODELS.map((m) => (
+                  <button key={m} type="button" onClick={() => setModel(m)} aria-pressed={model === m} className={chip(model === m)}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <span className={label}>3. Cor</span>
+              <div className="flex flex-wrap gap-2">
+                {COLORS.map((c) => (
+                  <button key={c} type="button" onClick={() => setColor(c)} aria-pressed={color === c} className={chip(color === c)}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <span className={label}>4. Tamanho</span>
+              <div className="flex flex-wrap gap-2">
+                {SIZES.map((s) => (
+                  <button key={s} type="button" onClick={() => setSize(s)} aria-pressed={size === s} className={`${chip(size === s)} min-w-14`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <span className={label}>5. Onde a arte vai</span>
+              <div className="border-2 border-background bg-background p-6 text-foreground">
+                <ShirtPlacer value={placement} onChange={setPlacement} />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <label htmlFor="name" className={label}>6. Nome ou apelido (opcional)</label>
+              <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={field} />
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <label htmlFor="notes" className={label}>7. Detalhes (opcional)</label>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={500}
+                rows={3}
+                className={field}
+                placeholder="Posição da estampa, tamanho da arte, observações"
+              />
+            </div>
+
+            <label className="flex items-start gap-3 text-lg font-medium">
+              <input type="checkbox" checked={rights} onChange={(e) => setRights(e.target.checked)} className="mt-1.5 h-5 w-5 accent-black" />
+              <span>Declaro que tenho direito de uso sobre a arte enviada.</span>
             </label>
-            {fileError && <p className="text-sm text-red-400">{fileError}</p>}
-          </div>
 
-          <div className="flex flex-col gap-3">
-            <span className="eyebrow">2. Modelo</span>
-            <div className="flex flex-wrap gap-2">
-              {MODELS.map((m) => (
-                <button key={m} type="button" onClick={() => setModel(m)} className={chip(model === m)}>{m}</button>
-              ))}
+            <div className="flex flex-col gap-4">
+              <button
+                type="button"
+                onClick={enviar}
+                disabled={!canSend}
+                className="border-2 border-background bg-background px-8 py-5 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-foreground transition-colors enabled:hover:bg-transparent enabled:hover:text-background disabled:cursor-not-allowed disabled:bg-transparent disabled:text-background"
+              >
+                {status === "loading" ? "Abrindo WhatsApp…" : "Finalizar pelo WhatsApp"}
+              </button>
+              {!file && <p className="text-lg font-medium">Escolha a arte para continuar.</p>}
+              {file && !rights && <p className="text-lg font-medium">Confirme o direito de uso da arte para continuar.</p>}
+              {status === "error" && <p className="border-2 border-background p-3 text-lg font-bold">{error}</p>}
+              {file && (
+                <p className="text-lg font-medium">
+                  Depois de abrir o WhatsApp, anexe o arquivo <strong>{file.name}</strong> na conversa. O site não envia a arte automaticamente.
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <span className="eyebrow">3. Cor</span>
-            <div className="flex flex-wrap gap-2">
-              {COLORS.map((c) => (
-                <button key={c} type="button" onClick={() => setColor(c)} className={chip(color === c)}>{c}</button>
-              ))}
+          <aside className="lg:sticky lg:top-28 lg:self-start">
+            <p className={`${label} mb-3`}>Prévia</p>
+            <div className="flex aspect-square items-center justify-center overflow-hidden border-2 border-background bg-background text-foreground">
+              {preview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview} alt="Prévia da arte" className="max-h-full max-w-full object-contain p-6" />
+              ) : (
+                <span className="px-6 text-center font-[family-name:var(--font-display)] text-3xl uppercase">
+                  {file ? "PDF selecionado" : "Sua arte aparece aqui"}
+                </span>
+              )}
             </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <span className="eyebrow">4. Tamanho</span>
-            <div className="flex flex-wrap gap-2">
-              {SIZES.map((s) => (
-                <button key={s} type="button" onClick={() => setSize(s)} className={`h-11 min-w-11 border px-3 text-sm font-bold ${size === s ? "border-foreground bg-foreground text-background" : "border-border text-muted hover:text-foreground"}`}>{s}</button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <span className="eyebrow">5. Onde a arte vai</span>
-            <ShirtPlacer value={placement} onChange={setPlacement} />
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <label htmlFor="name" className="eyebrow">6. Nome ou apelido (opcional)</label>
-            <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={field} />
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <label htmlFor="notes" className="eyebrow">7. Detalhes (opcional)</label>
-            <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={3} className={field} placeholder="Posição da estampa, tamanho da arte, observações" />
-          </div>
-
-          <label className="flex items-start gap-3 text-sm text-muted">
-            <input type="checkbox" checked={rights} onChange={(e) => setRights(e.target.checked)} className="mt-1 accent-white" />
-            <span>Declaro que tenho direito de uso sobre a arte enviada.</span>
-          </label>
-
-          <button
-            type="button"
-            onClick={enviar}
-            disabled={!canSend}
-            className="bg-foreground py-4 text-sm font-bold uppercase tracking-widest text-background hover:opacity-85 disabled:opacity-30"
-          >
-            {status === "loading" ? "Abrindo WhatsApp…" : "Finalizar pelo WhatsApp"}
-          </button>
-          {!file && <p className="text-xs text-muted">Escolha a arte para continuar.</p>}
-          {status === "error" && <p className="text-sm text-red-400">{error}</p>}
-          {file && (
-            <p className="text-xs text-muted">
-              Depois de abrir o WhatsApp, anexe o arquivo <strong>{file.name}</strong> na conversa. O site não envia a arte automaticamente.
+            <p className="mt-3 text-lg font-medium">
+              {model} · {color} · tamanho {size}
             </p>
-          )}
+          </aside>
         </div>
-      </div>
-
-      <aside className="lg:sticky lg:top-24 lg:self-start">
-        <p className="eyebrow mb-3">Prévia</p>
-        <div className="flex aspect-square items-center justify-center overflow-hidden border border-border bg-black">
-          {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt="Prévia da arte" className="max-h-full max-w-full object-contain p-6" />
-          ) : (
-            <span className="eyebrow">{file ? "PDF selecionado" : "sua arte aparece aqui"}</span>
-          )}
-        </div>
-        <p className="mt-3 text-xs text-muted">{model} · {color} · tamanho {size}</p>
-      </aside>
-    </section>
+      </section>
     </>
   );
 }
