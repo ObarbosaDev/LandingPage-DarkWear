@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PageHero } from "@/components/PageHero";
 
 export const metadata: Metadata = { title: "FAQ" };
 
@@ -31,20 +32,27 @@ const PERGUNTAS = [
 
 export default function FaqPage() {
   return (
-    <section className="mx-auto max-w-3xl px-4 py-12">
-      <p className="eyebrow">Dúvidas</p>
-      <h1 className="title-street mb-10">FAQ</h1>
-      <div className="divide-y divide-border border-y border-border">
-        {PERGUNTAS.map((p) => (
-          <details key={p.q} className="group py-5">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-bold uppercase tracking-tight">
-              {p.q}
-              <span className="text-muted ">+</span>
-            </summary>
-            <p className="mt-3 text-muted">{p.a}</p>
-          </details>
-        ))}
-      </div>
-    </section>
+    <>
+      <PageHero
+        word="Dúvidas"
+        title="FAQ"
+        lead="As dúvidas mais comuns sobre pedido, pagamento e produção. Não achou a sua? Chama no WhatsApp."
+      />
+
+      <section className="bg-foreground text-background">
+        <div className="mx-auto max-w-4xl px-6 py-20">
+          {PERGUNTAS.map((p) => (
+            <details key={p.q} className="group border-t-2 border-background py-6 last:border-b-2">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 font-[family-name:var(--font-display)] text-3xl uppercase leading-tight md:text-4xl">
+                {p.q}
+                <span aria-hidden="true" className="shrink-0 text-5xl leading-none group-open:hidden">+</span>
+                <span aria-hidden="true" className="hidden shrink-0 text-5xl leading-none group-open:inline">−</span>
+              </summary>
+              <p className="mt-4 max-w-2xl text-xl font-medium">{p.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
