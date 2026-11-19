@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { PRODUCTS } from "@/data/products";
+import { getProducts } from "@/lib/catalog";
 import { ProductTile } from "@/components/ProductTile";
 import { PageHero } from "@/components/PageHero";
 
@@ -8,15 +8,16 @@ export const metadata: Metadata = { title: "Loja" };
 
 async function Resultados({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
+  const all = await getProducts();
   const term = (q ?? "").trim();
   const list = term
-    ? PRODUCTS.filter((p) => p.name.toLowerCase().includes(term.toLowerCase()))
-    : PRODUCTS;
+    ? all.filter((p) => p.name.toLowerCase().includes(term.toLowerCase()))
+    : all;
 
   return (
     <>
       <p className="mx-auto max-w-7xl px-6 pb-6 text-lg font-medium text-foreground">
-        {term ? `${list.length} resultado(s) para "${term}"` : `${PRODUCTS.length} peças`}
+        {term ? `${list.length} resultado(s) para "${term}"` : `${all.length} peças`}
       </p>
       {list.length === 0 ? (
         <p className="mx-auto max-w-7xl px-6 pb-24 text-xl font-medium text-foreground">
