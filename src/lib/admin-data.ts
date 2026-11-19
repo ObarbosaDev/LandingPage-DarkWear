@@ -157,7 +157,9 @@ export function parseProductForm(
   const priceCents = parsePriceToCents(get("price"));
   if (priceCents === null) return { ok: false, error: "Preço inválido. Exemplo: 89,90." };
 
-  const stock = Number(get("stock"));
+  // Na edição o estoque não é lido do formulário: ele muda com as vendas, e gravar o valor que estava
+  // na tela apagaria as vendas feitas enquanto o dono editava. O ajuste fica na lista de produtos.
+  const stock = mode === "novo" ? Number(get("stock")) : 0;
   if (!Number.isInteger(stock) || stock < 0 || stock > 100000) return { ok: false, error: "Estoque deve ser um número inteiro, 0 ou mais." };
 
   const category = get("category");
@@ -230,7 +232,6 @@ export async function updateProduct(p: ProductInput): Promise<boolean> {
       category: p.category,
       sizes: p.sizes,
       colors: p.colors,
-      stock: p.stock,
       image: p.image,
       photoBg: p.photoBg,
       active: p.active,

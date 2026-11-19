@@ -54,7 +54,13 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
         </div>
         <div className="flex flex-col gap-3">
           <label htmlFor="stock" className={label}>Estoque</label>
-          <input id="stock" name="stock" type="number" min={0} step={1} required defaultValue={v("stock", String(product?.stock ?? 0))} className={field} />
+          {editing ? (
+            <p className="text-lg font-medium">
+              {product!.stock} peças. Ajuste na lista de produtos, para não apagar vendas recentes.
+            </p>
+          ) : (
+            <input id="stock" name="stock" type="number" min={0} step={1} required defaultValue={v("stock", "0")} className={field} />
+          )}
         </div>
         <div className="flex flex-col gap-3">
           <label htmlFor="category" className={label}>Categoria</label>
