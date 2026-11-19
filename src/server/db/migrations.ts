@@ -40,6 +40,74 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 CREATE INDEX IF NOT EXISTS rate_limits_idx ON rate_limits (bucket, key, at);
 `,
   },
+  // Integridade: o banco passa a RECUSAR dado inválido, mesmo que um bug ou um script tente gravá-lo.
+  //   - CHECK em status, categoria, endereço (slug), tamanhos/cores (listas de 1 a 12 itens) e foto;
+  //   - chave estrangeira: um item de pedido só pode apontar para uma peça que existe, e uma peça com
+  //     pedidos não pode ser apagada (ON DELETE RESTRICT);
+  //   - gatilho que atualiza updated_at sozinho a cada alteração (não depende do código lembrar);
+  //   - índices para as consultas do painel e do cron, que ficam lentas quando há muitos pedidos.
+  {
+    id: "0003_integridade",
+    sql: `
+ALTER TABLE products
+  ADD CONSTRAINT products_slug_formato CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length(slug) BETWEEN 2 AND 60),
+  ADD CONSTRAINT products_nome_tamanho CHECK (char_length(name) BETWEEN 1 AND 80),
+  ADD CONSTRAINT products_categoria CHECK (category IN ('Pronta entrega', 'Coleção')),
+  ADD CONSTRAINT products_foto_fundo CHECK (photo_bg IS NULL OR photo_bg IN ('light', 'dark')),
+  ADD CONSTRAINT products_tamanhos_lista CHECK (jsonb_typeof(sizes) = 'array' AND jsonb_array_length(sizes) BETWEEN 1 AND 12),
+  ADD CONSTRAINT products_cores_lista CHECK (jsonb_typeof(colors) = 'array' AND jsonb_array_length(colors) BETWEEN 1 AND 12),
+  ADD CONSTRAINT products_foto_caminho CHECK (image IS NULL OR image ~ '^/products/[A-Za-z0-9_.-]+$');
+
+ALTER TABLE orders
+  ADD CONSTRAINT orders_status_valido CHECK (status IN ('pendente', 'pago', 'enviado', 'entregue', 'cancelado'));
+
+ALTER TABLE custom_orders
+  ADD CONSTRAINT custom_orders_status_valido CHECK (status IN ('novo', 'em contato', 'produzindo', 'concluído', 'cancelado'));
+
+ALTER TABLE order_items
+  ADD CONSTRAINT order_items_qty_limite CHECK (qty <= 99),
+  ADD CONSTRAINT order_items_produto_fk FOREIGN KEY (product_slug) REFERENCES products (slug) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER products_set_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER orders_set_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP INDEX IF EXISTS orders_status_idx;
+CREATE INDEX orders_status_created_idx ON orders (status, created_at DESC);
+CREATE INDEX orders_pendentes_idx ON orders (created_at) WHERE status = 'pendente';
+CREATE INDEX products_vitrine_idx ON products (position, created_at) WHERE active;
+CREATE INDEX order_items_produto_idx ON order_items (product_slug);
+CREATE INDEX custom_orders_status_created_idx ON custom_orders (status, created_at DESC);
+`,
+  },
+  // Histórico de status: uma linha a cada mudança de status de um pedido (de, para, quando e por quem).
+  // Responde "quando foi pago?" e "quem cancelou, o painel ou a expiração?". Pedidos que já existiam
+  // ganham um histórico reconstruído a partir do que o banco sabe (criação e status atual).
+  {
+    id: "0004_historico_de_status",
+    sql: `
+CREATE TABLE order_status_history (
+  id serial PRIMARY KEY,
+  order_id integer NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+  from_status text,
+  to_status text NOT NULL CHECK (to_status IN ('pendente', 'pago', 'enviado', 'entregue', 'cancelado')),
+  origin text NOT NULL CHECK (origin IN ('pedido', 'painel', 'expiracao')),
+  at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX order_status_history_order_idx ON order_status_history (order_id, at);
+
+INSERT INTO order_status_history (order_id, from_status, to_status, origin, at)
+  SELECT id, NULL, 'pendente', 'pedido', created_at FROM orders;
+INSERT INTO order_status_history (order_id, from_status, to_status, origin, at)
+  SELECT id, 'pendente', status, 'painel', updated_at FROM orders WHERE status <> 'pendente';
+`,
+  },
 ];
 
 // O que o executor precisa do banco. Os dois drivers (Neon e PGlite) cabem aqui: assim o executor

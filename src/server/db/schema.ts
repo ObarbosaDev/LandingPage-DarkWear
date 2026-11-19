@@ -58,7 +58,9 @@ export const orders = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   // Índices: aceleram a listagem do painel por status e a ordenação por data.
-  (t) => [index("orders_status_idx").on(t.status), index("orders_created_idx").on(t.createdAt)],
+  // Os índices reais (compostos e parciais) são criados nas migrações 0001 e 0003; aqui ficam os
+  // equivalentes para o Drizzle conhecer a estrutura.
+  (t) => [index("orders_status_created_idx").on(t.status, t.createdAt), index("orders_created_idx").on(t.createdAt)],
 );
 
 // ---------------------------------------------------------------------------
@@ -140,3 +142,28 @@ export const rateLimits = pgTable(
   },
   (t) => [index("rate_limits_idx").on(t.bucket, t.key, t.at)],
 );
+
+// ---------------------------------------------------------------------------
+// order_status_history: o histórico de status dos pedidos (migração 0004).
+// Uma linha a cada mudança: de qual status, para qual, quando e por quem (origin):
+//   "pedido" = o cliente criou o pedido; "painel" = o dono mudou; "expiracao" = o cron cancelou por prazo.
+// ---------------------------------------------------------------------------
+export const orderStatusHistory = pgTable(
+  "order_status_history",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    // null na primeira linha de cada pedido (nasceu agora, não veio de nenhum status).
+    fromStatus: text("from_status").$type<OrderStatus>(),
+    toStatus: text("to_status").$type<OrderStatus>().notNull(),
+    origin: text("origin").$type<StatusOrigin>().notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("order_status_history_order_idx").on(t.orderId, t.at)],
+);
+
+// De onde veio uma mudança de status (ver order_status_history).
+export const STATUS_ORIGIN = ["pedido", "painel", "expiracao"] as const;
+export type StatusOrigin = (typeof STATUS_ORIGIN)[number];
