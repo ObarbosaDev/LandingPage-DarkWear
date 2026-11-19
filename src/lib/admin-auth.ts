@@ -6,6 +6,9 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
+import { and, count, eq, gt, lt } from "drizzle-orm";
+import { getDb } from "@/db";
+import { loginAttempts } from "@/db/schema";
 
 export const ADMIN_COOKIE = "dw_admin";
 const SESSION_HOURS = 12;
@@ -83,34 +86,36 @@ export async function requireAdmin(): Promise<void> {
 }
 
 // ---------- Limite de tentativas de login ----------
-// Em memória: vale por instância do servidor. Reduz força bruta, mas em ambiente com várias
-// instâncias o limite é por instância. Para rigor total, guardar as tentativas no banco.
+// As falhas ficam no banco, então o limite vale entre todas as instâncias do servidor.
 
 const MAX_FAILS = 5;
 const WINDOW_MS = 15 * 60 * 1000;
-const attempts = new Map<string, { fails: number; firstAt: number }>();
 
+// Origem do pedido. Só usamos cabeçalhos que a hospedagem define: o x-forwarded-for puro pode ser
+// inventado por quem ataca, e então cada tentativa pareceria vir de um endereço novo.
 export async function clientKey(): Promise<string> {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "local";
+  const ip = h.get("x-vercel-forwarded-for") || h.get("x-real-ip") || "local";
+  return ip.split(",")[0].trim().slice(0, 64);
 }
 
-export function isLockedOut(key: string): boolean {
-  const a = attempts.get(key);
-  if (!a) return false;
-  if (Date.now() - a.firstAt > WINDOW_MS) {
-    attempts.delete(key);
-    return false;
-  }
-  return a.fails >= MAX_FAILS;
+export async function isLockedOut(key: string): Promise<boolean> {
+  const db = await getDb();
+  const [row] = await db
+    .select({ n: count() })
+    .from(loginAttempts)
+    .where(and(eq(loginAttempts.key, key), gt(loginAttempts.failedAt, new Date(Date.now() - WINDOW_MS))));
+  return row.n >= MAX_FAILS;
 }
 
-export function registerFailure(key: string): void {
-  const a = attempts.get(key);
-  if (!a || Date.now() - a.firstAt > WINDOW_MS) attempts.set(key, { fails: 1, firstAt: Date.now() });
-  else a.fails += 1;
+export async function registerFailure(key: string): Promise<void> {
+  const db = await getDb();
+  await db.insert(loginAttempts).values({ key });
+  // Limpa o que já saiu da janela, para a tabela não crescer sem fim.
+  await db.delete(loginAttempts).where(lt(loginAttempts.failedAt, new Date(Date.now() - WINDOW_MS)));
 }
 
-export function clearFailures(key: string): void {
-  attempts.delete(key);
+export async function clearFailures(key: string): Promise<void> {
+  const db = await getDb();
+  await db.delete(loginAttempts).where(eq(loginAttempts.key, key));
 }

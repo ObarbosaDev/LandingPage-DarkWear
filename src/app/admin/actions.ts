@@ -46,15 +46,15 @@ export async function loginAction(_prev: FormState, form: FormData): Promise<For
   }
 
   const key = await clientKey();
-  if (isLockedOut(key)) return { error: "Muitas tentativas. Tente de novo em alguns minutos." };
+  if (await isLockedOut(key)) return { error: "Muitas tentativas. Tente de novo em alguns minutos." };
 
   if (!checkPassword(String(form.get("senha") ?? ""))) {
-    registerFailure(key);
+    await registerFailure(key);
     await new Promise((r) => setTimeout(r, 600)); // atrasa a resposta para desencorajar força bruta
     return { error: "Senha incorreta." };
   }
 
-  clearFailures(key);
+  await clearFailures(key);
   await startSession();
   redirect("/admin");
 }

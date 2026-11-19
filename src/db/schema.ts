@@ -70,3 +70,14 @@ export const customOrders = pgTable(
 );
 
 export type ProductRow = typeof products.$inferSelect;
+
+// Tentativas de login que falharam, por origem. Ficam no banco para valer entre instâncias do servidor.
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull(),
+    failedAt: timestamp("failed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("login_attempts_key_idx").on(t.key, t.failedAt)],
+);

@@ -53,4 +53,11 @@ CREATE TABLE IF NOT EXISTS custom_orders (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS custom_orders_created_idx ON custom_orders (created_at);
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id serial PRIMARY KEY,
+  key text NOT NULL,
+  failed_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS login_attempts_key_idx ON login_attempts (key, failed_at);
 `;
