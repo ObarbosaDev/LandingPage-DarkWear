@@ -110,16 +110,21 @@ Produto sem foto mostra uma camiseta desenhada no lugar. Estoque, ocultar e most
 
 ```
 public/
-  brand/            logo da marca
-  products/         fotos dos produtos
+  brand/              logo da marca
+  products/           fotos dos produtos (WebP)
 src/
-  app/              rotas, layout e estilos globais
-    (site)/         páginas públicas (home, loja, personalizar, carrinho, institucionais)
-    admin/          painel do dono (login, pedidos, encomendas, produtos)
-    api/            rotas de API (produtos, pedidos, encomendas)
-  components/       componentes de interface
-  data/             catálogo de produtos
-  lib/              regras de negócio (carrinho, pedidos, WhatsApp, marca)
+  app/
+    (site)/           páginas públicas: home, loja, personalizar, carrinho, sobre, faq, contato
+    admin/            painel do dono: login, resumo, pedidos, encomendas, produtos
+    api/              rotas de API: produtos, pedidos, encomendas
+  components/         componentes de interface
+  lib/                código que roda no navegador e no servidor: carrinho, WhatsApp, dinheiro, opções
+  server/             só roda no servidor (marcado com server-only)
+    db/               conexão, esquema, DDL e dados iniciais
+    admin/            autenticação e acesso a dados do painel, por domínio
+    catalog.ts        leitura do catálogo, com cache
+    orders.ts         pedidos de peças prontas e cancelamento
+    custom-orders.ts  encomendas com arte do cliente
 ```
 
 ## Rotas
