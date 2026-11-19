@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ShirtPlacer, type PlacementId } from "@/components/ShirtPlacer";
-import { TeeCard } from "@/components/TeeCard";
+import { formatBRL } from "@/lib/site";
 
 const MODELS = ["Camiseta", "Moletom", "Oversized"];
 const SIZES = ["P", "M", "G", "GG", "XG"];
 const COLORS = ["Preta", "Off-white", "Cinza chumbo"];
 const ACCEPT = ".png,.jpg,.jpeg,.svg,.pdf";
 const MAX_MB = 25;
+const PRICE_FROM = 70; // preço de partida, exemplo: troque pelo valor real da encomenda
 
 export default function PersonalizarPage() {
   const [name, setName] = useState("");
@@ -22,6 +23,7 @@ export default function PersonalizarPage() {
   const [fileError, setFileError] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
+  const [arrastando, setArrastando] = useState(false);
 
   // Prévia local da arte (não sobe para o servidor).
   const preview = useMemo(
@@ -37,6 +39,10 @@ export default function PersonalizarPage() {
   function onFile(f: File | undefined) {
     setFileError("");
     if (!f) return setFile(null);
+    if (!/\.(png|jpe?g|svg|pdf)$/i.test(f.name)) {
+      setFileError("Formato não aceito. Envie PNG, JPG, SVG ou PDF.");
+      return setFile(null);
+    }
     if (f.size > MAX_MB * 1024 * 1024) {
       setFileError(`Arquivo acima de ${MAX_MB} MB.`);
       return setFile(null);
@@ -73,51 +79,47 @@ export default function PersonalizarPage() {
 
   return (
     <>
-      {/* Abertura branca: o título à esquerda e o caminho do pedido em quatro passos à direita. */}
-      <section className="bg-foreground text-background">
-        <div className="mx-auto grid max-w-7xl gap-12 px-6 pb-14 pt-16 md:grid-cols-[1.4fr_1fr] md:items-end md:pt-24">
-          <div className="flex flex-col gap-6">
-            <h1 className="font-[family-name:var(--font-display)] text-[clamp(3.5rem,10vw,9rem)] uppercase leading-[0.9]">
-              Mande a sua arte
+      {/* A abertura é a própria área de soltar o arquivo: arrasta a arte para qualquer lugar do bloco. */}
+      <section className="bg-background text-foreground">
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setArrastando(true);
+          }}
+          onDragLeave={() => setArrastando(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setArrastando(false);
+            onFile(e.dataTransfer.files?.[0]);
+          }}
+          className={`block cursor-pointer border-y-2 border-dashed border-foreground transition-colors ${
+            arrastando ? "bg-foreground text-background" : "hover:bg-foreground hover:text-background"
+          }`}
+        >
+          <span className="mx-auto flex min-h-[60vh] max-w-7xl flex-col justify-between gap-10 px-6 py-12 md:py-16">
+            <span className="font-mono text-sm uppercase tracking-[0.15em]">
+              PNG, JPG, SVG ou PDF · até {MAX_MB} MB
+            </span>
+            <h1 className="font-[family-name:var(--font-display)] text-[clamp(4rem,13vw,12.5rem)] uppercase leading-[0.86]">
+              Solte a<br />sua arte aqui
             </h1>
-            <p className="max-w-lg text-xl font-medium">
-              Escolhe o modelo, a cor, o tamanho e onde a arte vai. Você fecha tudo no WhatsApp.
-            </p>
-          </div>
-          <ol className="border-t-2 border-background">
-            {["Envie o arquivo", "Escolha a peça", "Marque onde vai", "Feche no WhatsApp"].map((passo, i) => (
-              <li key={passo} className="flex items-baseline gap-5 border-b-2 border-background py-3">
-                <span className="font-[family-name:var(--font-display)] text-4xl leading-none">{i + 1}</span>
-                <span className="font-[family-name:var(--font-display)] text-2xl uppercase leading-none">{passo}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      <section className="bg-background pb-16">
-        <div className="mx-auto max-w-7xl px-6">
-          <TeeCard placement={placement} />
-        </div>
+            <span className="flex flex-wrap items-center justify-between gap-4 font-[family-name:var(--font-display)] text-3xl uppercase leading-none md:text-4xl">
+              <span>{file ? `✓ ${file.name}` : "Ou toque para escolher o arquivo"}</span>
+              <span aria-hidden="true">↓</span>
+            </span>
+          </span>
+          <input type="file" accept={ACCEPT} className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
+        </label>
+        {fileError && (
+          <p role="alert" className="mx-auto max-w-7xl px-6 py-4 text-lg font-bold">{fileError}</p>
+        )}
       </section>
 
       <section className="bg-foreground text-background">
         <div className="mx-auto grid max-w-7xl gap-14 px-6 py-20 lg:grid-cols-[1.3fr_1fr]">
           <div className="flex flex-col gap-10">
             <div className="flex flex-col gap-3">
-              <span className={label}>1. Arte</span>
-              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 border-2 border-dashed border-background p-10 text-center transition-colors hover:bg-background hover:text-foreground">
-                <span className="font-[family-name:var(--font-display)] text-3xl uppercase">
-                  {file ? file.name : "Escolher arquivo"}
-                </span>
-                <span className="text-base font-medium">PNG com fundo transparente, JPG, SVG ou PDF · até {MAX_MB} MB</span>
-                <input type="file" accept={ACCEPT} className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
-              </label>
-              {fileError && <p className="border-2 border-background p-3 text-lg font-bold">{fileError}</p>}
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <span className={label}>2. Modelo</span>
+              <span className={label}>1. Modelo</span>
               <div className="flex flex-wrap gap-2">
                 {MODELS.map((m) => (
                   <button key={m} type="button" onClick={() => setModel(m)} aria-pressed={model === m} className={chip(model === m)}>
@@ -128,7 +130,7 @@ export default function PersonalizarPage() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <span className={label}>3. Cor</span>
+              <span className={label}>2. Cor</span>
               <div className="flex flex-wrap gap-2">
                 {COLORS.map((c) => (
                   <button key={c} type="button" onClick={() => setColor(c)} aria-pressed={color === c} className={chip(color === c)}>
@@ -139,7 +141,7 @@ export default function PersonalizarPage() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <span className={label}>4. Tamanho</span>
+              <span className={label}>3. Tamanho</span>
               <div className="flex flex-wrap gap-2">
                 {SIZES.map((s) => (
                   <button key={s} type="button" onClick={() => setSize(s)} aria-pressed={size === s} className={`${chip(size === s)} min-w-14`}>
@@ -150,19 +152,17 @@ export default function PersonalizarPage() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <span className={label}>5. Onde a arte vai</span>
-              <div className="border-2 border-background bg-background p-6 text-foreground">
-                <ShirtPlacer value={placement} onChange={setPlacement} />
-              </div>
+              <span className={label}>4. Onde a arte vai</span>
+              <ShirtPlacer value={placement} onChange={setPlacement} />
             </div>
 
             <div className="flex flex-col gap-3">
-              <label htmlFor="name" className={label}>6. Nome ou apelido (opcional)</label>
+              <label htmlFor="name" className={label}>5. Nome ou apelido (opcional)</label>
               <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={field} />
             </div>
 
             <div className="flex flex-col gap-3">
-              <label htmlFor="notes" className={label}>7. Detalhes (opcional)</label>
+              <label htmlFor="notes" className={label}>6. Detalhes (opcional)</label>
               <textarea
                 id="notes"
                 value={notes}
@@ -188,7 +188,7 @@ export default function PersonalizarPage() {
               >
                 {status === "loading" ? "Abrindo WhatsApp…" : "Finalizar pelo WhatsApp"}
               </button>
-              {!file && <p className="text-lg font-medium">Escolha a arte para continuar.</p>}
+              {!file && <p className="text-lg font-medium">Solte a arte no bloco do topo para continuar.</p>}
               {file && !rights && <p className="text-lg font-medium">Confirme o direito de uso da arte para continuar.</p>}
               {status === "error" && <p className="border-2 border-background p-3 text-lg font-bold">{error}</p>}
               {file && (
@@ -213,6 +213,9 @@ export default function PersonalizarPage() {
             </div>
             <p className="mt-3 text-lg font-medium">
               {model} · {color} · tamanho {size}
+            </p>
+            <p className="mt-2 text-lg font-medium">
+              A partir de <span className="font-[family-name:var(--font-display)] text-3xl">{formatBRL(PRICE_FROM)}</span>
             </p>
           </aside>
         </div>
