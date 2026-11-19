@@ -127,13 +127,13 @@ src/
 | Rota | Descrição |
 | --- | --- |
 | `/` | Home: título, arco de produtos, catálogo, como funciona e envio de arte |
-| `/loja` | Catálogo completo, com busca (`?q=termo`) |
-| `/loja/[slug]` | Página de um produto |
-| `/personalizar` | Encomenda com arte própria |
-| `/carrinho` | Carrinho e finalização |
-| `/sobre` | Sobre a marca |
-| `/faq` | Perguntas frequentes |
-| `/contato` | Contato por WhatsApp |
+| `/loja` | Catálogo em índice tipográfico, com filtro por categoria, busca (`?q=termo`) e a foto da peça seguindo o mouse |
+| `/loja/[slug]` | Página de um produto, com lupa para ampliar a estampa |
+| `/personalizar` | Encomenda com arte própria: a abertura é a área de soltar o arquivo |
+| `/carrinho` | Sacola em forma de recibo, com o fechamento pelo WhatsApp |
+| `/sobre` | Sobre a marca, com o processo DTF em quatro etapas |
+| `/faq` | Perguntas frequentes em formato de conversa |
+| `/contato` | Folha para escrever a mensagem que abre pronta no WhatsApp |
 | `/admin` | Painel do dono (exige senha): resumo, pedidos, encomendas e produtos |
 
 ## API
