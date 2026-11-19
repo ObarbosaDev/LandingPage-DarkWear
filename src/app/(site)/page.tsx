@@ -35,7 +35,8 @@ export default async function HomePage() {
         <HeroType />
         <div className="mx-auto max-w-7xl px-6 pt-10">
           <div className="grid items-start gap-8 md:grid-cols-[1fr_19rem]">
-            <h1 className="font-display text-[clamp(3rem,7vw,6.5rem)] uppercase leading-[0.92] text-foreground">
+            {/* Espaço entre linhas um pouco maior que o normal para o cedilha do "Ç" não encostar na linha de baixo. */}
+            <h1 className="font-display text-[clamp(3rem,7vw,6.5rem)] uppercase leading-[1.08] text-foreground">
               Escolhe uma peça.
               <br />
               Ou manda a sua arte.
