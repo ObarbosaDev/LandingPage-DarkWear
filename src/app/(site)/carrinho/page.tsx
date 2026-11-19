@@ -32,7 +32,6 @@ export default function CarrinhoPage() {
   }
 
   const pecas = items.reduce((n, i) => n + i.qty, 0);
-  const hoje = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date());
   const step =
     "h-9 w-9 border-2 border-background text-lg font-bold transition-colors hover:bg-background hover:text-foreground disabled:cursor-not-allowed";
 
@@ -63,7 +62,7 @@ export default function CarrinhoPage() {
           <div className="bg-foreground px-6 pb-8 pt-7 font-mono text-background">
             <div className="flex items-baseline justify-between border-b-2 border-dashed border-background pb-4">
               <span className="font-[family-name:var(--font-display)] text-3xl uppercase leading-none">{SITE.name}</span>
-              <span className="text-sm uppercase tracking-[0.12em]">Pedido · {hoje}</span>
+              <span className="text-sm uppercase tracking-[0.12em]">Pedido</span>
             </div>
 
             {!ready ? (
