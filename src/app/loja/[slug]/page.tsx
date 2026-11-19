@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { PRODUCTS, getProduct } from "@/data/products";
+import { getProduct, getProducts } from "@/lib/catalog";
 import { formatBRL } from "@/lib/site";
 import { ProductBuy } from "./ProductBuy";
 import { ProductImage } from "@/components/ProductImage";
 import { TypeBackdrop } from "@/components/TypeBackdrop";
 
-export function generateStaticParams() {
-  return PRODUCTS.map((p) => ({ slug: p.slug }));
+export async function generateStaticParams() {
+  return (await getProducts()).map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({
@@ -17,7 +17,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProduct(slug);
+  const product = await getProduct(slug);
   return { title: product?.name ?? "Produto" };
 }
 
@@ -27,7 +27,7 @@ export default async function ProdutoPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = getProduct(slug);
+  const product = await getProduct(slug);
   if (!product) notFound();
 
   return (
