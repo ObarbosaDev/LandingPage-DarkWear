@@ -88,19 +88,26 @@ Em desenvolvimento não é preciso configurar nada: sem `DATABASE_URL`, o projet
 | `DATABASE_URL` | Conexão com o Postgres de produção (Neon). Na Vercel, o Marketplace cria o banco e injeta essa variável. |
 | `PGLITE_DIR` | Opcional. Troca a pasta do banco local (padrão `./.data/pglite`). Com `memory://`, o banco vive só na memória (usado nos testes e no CI). |
 
-**Migrações.** O esquema é versionado em `src/server/db/migrations.ts`. Ao conectar, o sistema aplica as migrações que faltam, uma vez cada, cada uma em uma transação, com trava para duas instâncias não migrarem juntas. O histórico fica na tabela `schema_migrations`. Para mudar o banco, **não edite uma migração existente**: acrescente uma nova no fim da lista e atualize `src/server/db/schema.ts`. Um banco criado antes das migrações é adotado sem perder dados.
+**Migrações.** O esquema é versionado em `src/server/db/migrations.ts`. Cada migração tem um `up` (a subida, que aplica a mudança) e um `down` (a descida, que a desfaz). Uma migração que apagaria dados ao ser desfeita (a `0001_baseline`) é marcada como irreversível, e o sistema se recusa a desfazê-la.
 
-### Pedidos pendentes e limites
-
-- **Expiração.** Pedido pendente segura as peças. Todo dia às 9h UTC o cron da Vercel (`vercel.json`) chama `/api/cron/expire-orders`, que cancela pedidos pendentes com mais de 48 horas (ajustável em `PENDING_ORDER_HOURS`) e devolve as peças. A rota só aceita `Authorization: Bearer <CRON_SECRET>`.
-- **Limite de uso.** `POST /api/orders` aceita 10 chamadas a cada 10 minutos por origem, e `POST /api/custom-orders` aceita 5. Acima disso a resposta é `429` com `Retry-After`. A contagem fica no banco e vale entre instâncias.
-- **Conferência na subida.** `src/instrumentation.ts` confere a configuração quando o servidor sobe e escreve avisos no log (prefixo `[config]`). Na produção da Vercel, configuração com erro, como a falta de `DATABASE_URL`, o painel pela metade ou o número de WhatsApp de exemplo, impede a subida.
-
-| Variável | Para que serve |
+| Comando | O que faz |
 | --- | --- |
-| `CRON_SECRET` | Autoriza o cron de expiração. Sem ela a rota fica fechada. |
-| `PENDING_ORDER_HOURS` | Opcional. Horas até o pedido pendente expirar (padrão 48). |
-| `SITE_URL` | Endereço público do site, usado no sitemap e no `robots.txt`. |
+| `npm run db:status` | mostra quais migrações estão aplicadas, quais estão pendentes e quais podem ser desfeitas |
+| `npm run db:migrate` | aplica as migrações pendentes (as subidas) |
+| `npm run db:rollback` | mostra o que seria desfeito; com `-- --confirm`, desfaz a última migração |
+| `npm run db:rollback -- 2 --confirm` | desfaz as duas últimas |
+
+Garantias do executor:
+
+- **Uma por vez, em transação.** Cada migração roda na sua transação: se uma falha, as anteriores continuam valendo e a que falhou não deixa rastro.
+- **Trava contra corrida.** Dois processos (dois servidores, ou o servidor e o `db:migrate`) nunca migram ao mesmo tempo.
+- **Carimbo de cada migração.** Ao aplicar, o sistema guarda um resumo (SHA-256) do `up`. Se alguém **editar uma migração já aplicada**, o sistema recusa seguir e diz qual foi alterada. A regra é: nunca edite uma migração existente, crie uma nova no fim da lista.
+- **Desfazer é tudo ou nada.** Se qualquer uma das migrações a desfazer for irreversível, nada é desfeito.
+- **Desfazer pode apagar dados** (por exemplo, o histórico de status). Por isso `db:rollback` exige `--confirm`.
+
+**Subida do servidor.** Por padrão, o servidor aplica as migrações pendentes ao conectar. Para produção com publicação controlada, defina `DB_AUTO_MIGRATE=false`: o servidor passa a **só conferir** se o banco está em dia (e falha com uma mensagem clara se faltar migração), e as migrações rodam antes, com `npm run db:migrate`. Os comandos `db:*` leem o `.env.local`; com `DATABASE_URL` eles falam com o banco de produção, sem ela, com o banco local (pare o servidor de desenvolvimento antes: dois processos no mesmo banco embutido podem corromper os dados).
+
+Para mudar o banco: crie uma migração nova no fim da lista (com `up` e `down`), atualize `src/server/db/schema.ts` e rode `npm run db:migrate`. Um banco criado antes das migrações é adotado sem perder dados.
 
 **Integridade.** O banco não confia só no código: ele próprio recusa dado inválido.
 
