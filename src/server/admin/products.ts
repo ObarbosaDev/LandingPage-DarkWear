@@ -1,3 +1,14 @@
+// ============================================================================
+// Produtos vistos pelo DONO: listar, validar formulário, criar, editar, ajustar estoque e ocultar.
+//
+// Quem usa: as telas /admin/produtos (lista), /admin/produtos/novo e /admin/produtos/[slug]
+// (formulário) e as ações de src/app/admin/actions.ts.
+// A leitura do catálogo para o CLIENTE (com cache) fica em src/server/catalog.ts.
+//
+// Princípio: tudo que vem do formulário é tratado como não confiável. Cada campo é conferido aqui,
+// no servidor, mesmo que a tela já tenha conferido (a tela pode ser contornada).
+// ============================================================================
+
 // Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
 import "server-only";
@@ -5,17 +16,20 @@ import { asc, eq, max } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { products, type ProductRow } from "@/server/db/schema";
 
+/** Todos os produtos, inclusive os ocultos (o dono precisa ver tudo), na ordem da loja. */
 export async function listAllProducts(): Promise<ProductRow[]> {
   const db = await getDb();
   return db.select().from(products).orderBy(asc(products.position), asc(products.createdAt));
 }
 
+/** Um produto pelo endereço, ativo ou não. Usado para preencher o formulário de edição. */
 export async function getProductRow(slug: string): Promise<ProductRow | undefined> {
   const db = await getDb();
   const [row] = await db.select().from(products).where(eq(products.slug, slug));
   return row;
 }
 
+/** Os dados de um produto já validados e limpos, prontos para gravar. */
 export type ProductInput = {
   slug: string;
   name: string;
@@ -30,8 +44,14 @@ export type ProductInput = {
   active: boolean;
 };
 
+// As duas categorias que a loja oferece como filtro.
 const CATEGORIES = ["Pronta entrega", "Coleção"] as const;
 
+/**
+ * Transforma "P, M, G" em ["P","M","G"], sem repetidos e sem vazios.
+ * Devolve a lista, ou um TEXTO com o motivo da recusa (quem chama distingue pelo tipo).
+ * Usada nos campos Tamanhos e Cores do formulário.
+ */
 function parseList(raw: string, label: string): string[] | string {
   const list = [...new Set(raw.split(",").map((s) => s.trim()).filter(Boolean))];
   if (list.length === 0) return `Informe ao menos um valor em ${label}.`;
@@ -41,23 +61,40 @@ function parseList(raw: string, label: string): string[] | string {
 }
 
 // "89,90", "1.299,90", "1.299" (milhar) ou "89.90" → centavos inteiros.
+/**
+ * Lê o preço digitado pelo dono e devolve CENTAVOS inteiros, ou null se for inválido.
+ * Entende o jeito brasileiro (vírgula decimal e ponto de milhar) e também "89.90".
+ * Trabalhar em centavos evita erro de arredondamento com dinheiro.
+ */
 export function parsePriceToCents(raw: string): number | null {
   const s = raw.trim();
   if (!s) return null;
   // Sem vírgula, só pontos de milhar ("1.299", "1.299.000") são tratados como milhar; "89.90" segue decimal.
   const thousandsOnly = !s.includes(",") && /^\d{1,3}(\.\d{3})+$/.test(s);
+  // Normaliza para o formato que o JavaScript entende: sem pontos de milhar e com ponto decimal.
   const norm = s.includes(",") || thousandsOnly ? s.replace(/\./g, "").replace(",", ".") : s;
   const n = Number(norm);
+  // Recusa lixo, negativo e valores absurdos (acima de R$ 100.000, quase certamente um erro de digitação).
   if (!Number.isFinite(n) || n < 0 || n > 100000) return null;
   return Math.round(n * 100);
 }
 
+/**
+ * Confere o formulário de produto e devolve os dados limpos, ou a mensagem do primeiro problema.
+ *
+ * @param form dados enviados pelo formulário (ProductForm)
+ * @param mode "novo" ao cadastrar, "editar" ao alterar um existente. Muda duas regras: o endereço
+ *             (slug) só é conferido ao criar, e o estoque só é lido ao criar.
+ */
 export function parseProductForm(
   form: FormData,
   mode: "novo" | "editar",
 ): { ok: true; data: ProductInput } | { ok: false; error: string } {
+  // Lê um campo como texto sem espaços nas pontas (campo ausente vira "").
   const get = (k: string) => String(form.get(k) ?? "").trim();
 
+  // Endereço da peça: vira parte do link (/loja/camisa-preta), então só letras minúsculas,
+  // números e hífens, sem hífen sobrando nas pontas.
   const slug = get("slug").toLowerCase();
   if (mode === "novo" && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     return { ok: false, error: "Endereço inválido: use só letras minúsculas, números e hífen (ex.: camisa-preta)." };
@@ -79,11 +116,14 @@ export function parseProductForm(
   const category = get("category");
   if (!(CATEGORIES as readonly string[]).includes(category)) return { ok: false, error: "Categoria inválida." };
 
+  // parseList devolve a lista OU um texto de erro; checar o tipo separa os dois casos.
   const sizes = parseList(get("sizes"), "Tamanhos");
   if (typeof sizes === "string") return { ok: false, error: sizes };
   const colors = parseList(get("colors"), "Cores");
   if (typeof colors === "string") return { ok: false, error: colors };
 
+  // A foto precisa ser um arquivo dentro de /public/products. A regra impede apontar para outro
+  // site ou subir diretórios (ex.: /products/../segredo).
   const image = get("image");
   if (image && !/^\/products\/[\w.-]+$/.test(image)) {
     return { ok: false, error: "A foto deve ser um caminho como /products/arquivo.webp." };
@@ -108,15 +148,21 @@ export function parseProductForm(
       stock,
       image: image || null,
       photoBg: (photoBg as ProductInput["photoBg"]) || null,
+      // Uma caixa de seleção desmarcada simplesmente não é enviada: só "on" significa marcada.
       active: form.get("active") === "on",
     },
   };
 }
 
+/**
+ * Cadastra um produto novo.
+ * @returns "existe" se já há produto com esse endereço; "ok" se cadastrou
+ */
 export async function createProduct(p: ProductInput): Promise<"ok" | "existe"> {
   const db = await getDb();
   const [dup] = await db.select({ slug: products.slug }).from(products).where(eq(products.slug, p.slug));
   if (dup) return "existe";
+  // O produto novo vai para o FIM da loja: posição = maior posição atual + 1.
   const [{ top }] = await db.select({ top: max(products.position) }).from(products);
   await db.insert(products).values({
     slug: p.slug,
@@ -135,6 +181,12 @@ export async function createProduct(p: ProductInput): Promise<"ok" | "existe"> {
   return "ok";
 }
 
+/**
+ * Altera os dados de um produto existente (o endereço não muda).
+ * Repare que o ESTOQUE não é alterado aqui, de propósito: ele só muda pelas vendas e pelo ajuste
+ * rápido da lista (setProductStock), para a edição de um texto nunca apagar vendas recentes.
+ * @returns false se o produto não existe
+ */
 export async function updateProduct(p: ProductInput): Promise<boolean> {
   const db = await getDb();
   const done = await db
@@ -157,6 +209,10 @@ export async function updateProduct(p: ProductInput): Promise<boolean> {
 }
 
 // Ajustes rápidos, direto da lista de produtos.
+/**
+ * Define o estoque de um produto (campo "Estoque" + botão "Salvar" da lista /admin/produtos).
+ * @returns false se o número é inválido ou o produto não existe
+ */
 export async function setProductStock(slug: string, stock: number): Promise<boolean> {
   if (!Number.isInteger(stock) || stock < 0 || stock > 100000) return false;
   const db = await getDb();
@@ -168,6 +224,11 @@ export async function setProductStock(slug: string, stock: number): Promise<bool
   return done.length > 0;
 }
 
+/**
+ * Mostra ou oculta um produto na loja (botão "Ocultar da loja"/"Mostrar na loja").
+ * Ocultar não apaga nada: o pedido antigo continua válido e o dono pode mostrar de novo.
+ * @returns false se o produto não existe
+ */
 export async function setProductActive(slug: string, active: boolean): Promise<boolean> {
   const db = await getDb();
   const done = await db

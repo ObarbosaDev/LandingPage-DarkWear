@@ -1,12 +1,26 @@
-// Regras de pedido, com persistência em banco e estoque protegido por transação.
+// ============================================================================
+// Pedidos de peças prontas: criar, cancelar e expirar.
+//
+// Quem usa:
+//   - POST /api/orders (src/app/api/orders/route.ts)  → createOrder, quando o cliente fecha a sacola
+//     em /carrinho;
+//   - painel /admin/pedidos (via src/server/admin/orders.ts) → cancelOrder;
+//   - cron diário /api/cron/expire-orders → expirePendingOrders.
+//
+// Regra de ouro deste arquivo: o servidor NUNCA confia no que o navegador manda. Preço, nome e
+// disponibilidade são lidos do banco; do cliente só aceitamos "qual peça, tamanho, cor e quantidade".
+// E o estoque é protegido por transação, para dois clientes nunca comprarem a mesma última peça.
+// ============================================================================
 
 import "server-only";
 import { and, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { orderItems, orders, products, type OrderStatus } from "@/server/db/schema";
 
+/** Uma linha do carrinho como o navegador envia: só o que identifica a peça e a quantidade. */
 export type OrderItemInput = { slug: string; size: string; color: string; qty: number };
 
+/** O pedido já registrado, na forma devolvida ao resto do sistema (inclui os valores do servidor). */
 export type OrderView = {
   id: number;
   number: string; // "DW-00042"
@@ -15,8 +29,14 @@ export type OrderView = {
   items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
 };
 
+/** Número do pedido mostrado ao cliente e ao dono: DW- seguido do id com 5 dígitos (DW-00042). */
 export const orderNumber = (id: number) => `DW-${String(id).padStart(5, "0")}`;
 
+/**
+ * Erro de regra de negócio com o status HTTP que a rota deve devolver.
+ * 422 = dado inválido (padrão); 409 = conflito (ex.: estoque insuficiente).
+ * A mensagem é escrita para o cliente ler, então pode ser mostrada na tela.
+ */
 export class OrderError extends Error {
   constructor(
     message: string,
@@ -28,17 +48,25 @@ export class OrderError extends Error {
 
 // ---------- Pedido de peças prontas ----------
 
+/**
+ * Valida e limpa a lista de itens que veio do navegador.
+ * Aceita só o formato esperado e devolve uma lista segura, ou lança OrderError explicando o problema.
+ * Isso protege contra carrinho adulterado (quantidade negativa, texto no lugar de número etc.).
+ */
 function parseItems(input: unknown): OrderItemInput[] {
   if (!Array.isArray(input) || input.length === 0) throw new OrderError("Carrinho vazio.");
+  // Limite de linhas: um carrinho absurdamente grande é abuso, não compra.
   if (input.length > 50) throw new OrderError("Carrinho muito grande.");
 
   // Junta linhas repetidas (mesma peça, tamanho e cor) para o estoque ser conferido pela soma.
+  // Sem isso, duas linhas de "2" passariam cada uma num estoque de 3, vendendo 4.
   const merged = new Map<string, OrderItemInput>();
   for (const raw of input) {
     const r = (raw ?? {}) as Partial<OrderItemInput>;
     const qty = r.qty;
     if (typeof r.slug !== "string" || typeof r.size !== "string" || typeof r.color !== "string")
       throw new OrderError("Item inválido no carrinho.");
+    // A quantidade precisa ser um número inteiro de verdade (o texto "2" é recusado de propósito).
     if (typeof qty !== "number" || !Number.isInteger(qty) || qty < 1 || qty > 99) throw new OrderError("Quantidade inválida.");
     const key = `${r.slug}|${r.size}|${r.color}`;
     const prev = merged.get(key);
@@ -48,10 +76,19 @@ function parseItems(input: unknown): OrderItemInput[] {
   return [...merged.values()];
 }
 
+/**
+ * Registra um pedido: valida, baixa o estoque e grava pedido + itens, tudo numa transação.
+ * Se QUALQUER item falhar (sem estoque, peça oculta, tamanho inexistente...), nada é gravado e o
+ * estoque dos outros itens não é mexido ("tudo ou nada").
+ *
+ * @param input itens do carrinho, como vieram do navegador (ainda não confiáveis)
+ * @throws OrderError com a mensagem a mostrar ao cliente
+ */
 export async function createOrder(input: unknown): Promise<OrderView> {
   const lines = parseItems(input);
   const db = await getDb();
 
+  // db.transaction: se algo lançar erro lá dentro, o banco desfaz tudo o que a transação fez.
   return db.transaction(async (tx) => {
     let total = 0;
     const resolved: OrderView["items"] = [];
@@ -61,30 +98,38 @@ export async function createOrder(input: unknown): Promise<OrderView> {
     const byIndex = lines.map((l, i) => ({ l, i })).sort((a, b) => (a.l.slug < b.l.slug ? -1 : a.l.slug > b.l.slug ? 1 : 0));
 
     for (const { l, i } of byIndex) {
+      // Lê a peça REAL do banco: é de lá que vêm nome, preço e as opções válidas.
       const [p] = await tx.select().from(products).where(eq(products.slug, l.slug));
       if (!p || !p.active) throw new OrderError("Produto indisponível.");
       if (!p.sizes.includes(l.size)) throw new OrderError(`Tamanho inválido para ${p.name}.`);
       if (!p.colors.includes(l.color)) throw new OrderError(`Cor inválida para ${p.name}.`);
 
       // Baixa o estoque em um único UPDATE condicional: se não houver quantidade, nenhuma linha muda.
+      // É isto que impede vender a mesma última peça a dois clientes ao mesmo tempo: a checagem
+      // (gte stock >= qty) e a subtração acontecem juntas, no próprio banco, de forma indivisível.
       const updated = await tx
         .update(products)
         .set({ stock: sql`${products.stock} - ${l.qty}`, updatedAt: new Date() })
         .where(and(eq(products.slug, l.slug), eq(products.active, true), gte(products.stock, l.qty)))
         .returning({ name: products.name, priceCents: products.priceCents });
 
+      // Nenhuma linha atualizada = a condição de estoque falhou. 409 = conflito com o estado atual.
       if (updated.length === 0) throw new OrderError(`Estoque insuficiente para ${p.name}.`, 409);
 
+      // Preço e nome vêm do banco (da linha que acabamos de atualizar), nunca do navegador.
       const { name, priceCents } = updated[0];
       total += priceCents * l.qty;
+      // Guardado na posição ORIGINAL do carrinho, para a resposta manter a ordem que o cliente viu.
       resolved[i] = { name, size: l.size, color: l.color, qty: l.qty, unitPriceCents: priceCents };
     }
 
+    // Cabeçalho do pedido. O status nasce "pendente" (padrão da tabela) até o dono confirmar o pagamento.
     const [order] = await tx
       .insert(orders)
       .values({ totalCents: total })
       .returning({ id: orders.id, status: orders.status });
 
+    // Linhas do pedido, com nome e preço congelados no momento da compra.
     await tx.insert(orderItems).values(
       lines.map((l, i) => ({
         orderId: order.id,
@@ -101,6 +146,14 @@ export async function createOrder(input: unknown): Promise<OrderView> {
   });
 }
 
+/**
+ * Cancela o pedido e devolve as peças ao estoque.
+ *
+ * @param id        número interno do pedido
+ * @param somenteSe se informado, só cancela se o pedido ainda estiver nesse status
+ * @returns true se cancelou agora; false se não havia o que cancelar (não existe, já cancelado
+ *          ou mudou de status)
+ */
 // Cancela o pedido e devolve as peças ao estoque. Com `somenteSe`, só cancela se o pedido ainda estiver
 // nesse status (a expiração usa "pendente": se o dono marcou como pago no meio do caminho, não mexe).
 export async function cancelOrder(id: number, somenteSe?: OrderStatus): Promise<boolean> {
@@ -115,6 +168,7 @@ export async function cancelOrder(id: number, somenteSe?: OrderStatus): Promise<
       .returning({ id: orders.id });
     if (changed.length === 0) return false;
 
+    // Devolve cada peça do pedido ao estoque (soma, em vez de gravar um número fixo).
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id));
     for (const it of items) {
       await tx
@@ -126,11 +180,20 @@ export async function cancelOrder(id: number, somenteSe?: OrderStatus): Promise<
   });
 }
 
+/**
+ * Cancela os pedidos PENDENTES antigos e devolve as peças à venda.
+ * Chamada todo dia pelo cron (/api/cron/expire-orders): sem isso, um pedido que o cliente nunca
+ * pagou seguraria as peças no estoque para sempre.
+ *
+ * @param maxAgeHours idade mínima, em horas, para um pedido pendente expirar (padrão 48)
+ * @returns quantos pedidos foram cancelados
+ */
 // Pedido pendente segura as peças no estoque. Se ninguém fechou depois de `maxAgeHours`, ele é cancelado
 // e as peças voltam à venda. Devolve quantos pedidos foram cancelados.
 export async function expirePendingOrders(maxAgeHours = 48): Promise<number> {
   const db = await getDb();
   const limite = new Date(Date.now() - maxAgeHours * 3600 * 1000);
+  // Candidatos: pendentes criados antes do limite.
   const velhos = await db
     .select({ id: orders.id })
     .from(orders)
@@ -138,6 +201,7 @@ export async function expirePendingOrders(maxAgeHours = 48): Promise<number> {
 
   let cancelados = 0;
   for (const { id } of velhos) {
+    // "pendente" como condição: se o dono marcou como pago entre a consulta e agora, não cancela.
     if (await cancelOrder(id, "pendente")) cancelados++;
   }
   return cancelados;

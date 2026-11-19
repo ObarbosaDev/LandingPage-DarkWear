@@ -1,3 +1,10 @@
+// ============================================================================
+// Pedidos vistos pelo DONO: listar e mudar o status.
+//
+// Quem usa: a tela /admin/pedidos, o resumo /admin e a ação changeOrderStatusAction
+// (src/app/admin/actions.ts). A criação do pedido (cliente) fica em src/server/orders.ts.
+// ============================================================================
+
 // Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
 import "server-only";
@@ -7,6 +14,9 @@ import { orderItems, orders, ORDER_STATUS, type OrderStatus } from "@/server/db/
 import { cancelOrder, orderNumber } from "@/server/orders";
 
 // De cada status, para quais o dono pode mover o pedido.
+// Define o fluxo: pendente → pago → enviado → entregue. Só dá para cancelar antes do envio.
+// "entregue" e "cancelado" são finais (lista vazia): não há como reabrir um pedido encerrado.
+// Esta tabela também decide quais botões a tela /admin/pedidos mostra em cada pedido.
 export const NEXT_STATUS: Record<OrderStatus, OrderStatus[]> = {
   pendente: ["pago", "cancelado"],
   pago: ["enviado", "cancelado"],
@@ -15,6 +25,7 @@ export const NEXT_STATUS: Record<OrderStatus, OrderStatus[]> = {
   cancelado: [],
 };
 
+/** Um pedido completo (cabeçalho + itens), no formato que a tela de pedidos precisa. */
 export type AdminOrder = {
   id: number;
   number: string;
@@ -24,16 +35,25 @@ export type AdminOrder = {
   items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
 };
 
+/**
+ * Lista os pedidos, do mais novo para o mais antigo.
+ *
+ * @param status se informado, só os pedidos desse status (filtro da tela)
+ * @param limit  máximo de pedidos devolvidos
+ */
 export async function listOrders(status?: OrderStatus, limit = 100): Promise<AdminOrder[]> {
   const db = await getDb();
   const rows = await db
     .select()
     .from(orders)
+    // undefined = sem filtro (todos os status).
     .where(status ? eq(orders.status, status) : undefined)
     .orderBy(desc(orders.createdAt))
     .limit(limit);
   if (rows.length === 0) return [];
 
+  // Busca os itens de TODOS os pedidos da página numa consulta só (em vez de uma por pedido),
+  // que é bem mais rápida, e depois distribui cada item ao seu pedido.
   const items = await db
     .select()
     .from(orderItems)
@@ -51,13 +71,21 @@ export async function listOrders(status?: OrderStatus, limit = 100): Promise<Adm
   }));
 }
 
+/** Resultado de uma mudança de status: deu certo, não é permitida, ou o pedido não existe. */
 export type StatusResult = "ok" | "invalido" | "nao-encontrado";
 
+/**
+ * Muda o status de um pedido, obedecendo o fluxo de NEXT_STATUS.
+ * Cancelar também devolve as peças ao estoque.
+ * Devolve "invalido" quando a mudança não é permitida OU quando outra pessoa mudou o pedido
+ * no meio do caminho (a tela então avisa o dono).
+ */
 export async function updateOrderStatus(id: number, next: OrderStatus): Promise<StatusResult> {
   if (!ORDER_STATUS.includes(next)) return "invalido";
   const db = await getDb();
   const [o] = await db.select().from(orders).where(eq(orders.id, id));
   if (!o) return "nao-encontrado";
+  // Confere se o fluxo permite ir do status atual para o pedido (ex.: não pula de pendente a enviado).
   if (!NEXT_STATUS[o.status].includes(next)) return "invalido";
 
   // Cancelar devolve as peças ao estoque, tudo na mesma transação.

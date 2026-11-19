@@ -1,3 +1,16 @@
+// ============================================================================
+// Ações do painel do dono (Server Actions): tudo que o dono FAZ em /admin.
+//
+// O que é uma Server Action: uma função que roda no servidor mas é disparada por um botão ou
+// formulário da tela. É assim que "Marcar como pago", "Salvar produto" etc. funcionam sem
+// precisarmos criar uma rota de API para cada um.
+//
+// Quem usa: as telas de /admin (login, pedidos, encomendas, produtos).
+//
+// SEGURANÇA: toda ação, exceto o login, começa com requireAdmin(). Uma ação pode ser chamada
+// diretamente (sem passar pela tela), então não basta esconder a página: cada ação confere a sessão.
+// ============================================================================
+
 "use server";
 
 // Ações do painel. Toda ação, exceto o login, começa com requireAdmin(): a verificação não pode
@@ -29,8 +42,10 @@ import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
 
 // Em erro de validação, devolvemos também o que foi digitado: o React limpa o formulário depois de
 // cada envio, e o dono não pode perder o que escreveu por causa de um campo errado.
+// "error" é a mensagem a mostrar; "values" são os campos digitados, para repovoar o formulário.
 export type FormState = { error?: string; values?: Record<string, string> };
 
+// Transforma os campos do formulário num objeto simples (só os de texto; arquivos não se aplicam aqui).
 const typed = (form: FormData): Record<string, string> =>
   Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === "string")) as Record<string, string>;
 
@@ -40,11 +55,17 @@ const refreshCatalog = () => updateTag("products");
 
 // ---------- Sessão ----------
 
+/**
+ * Login do dono (formulário de /admin/login).
+ * Passos: confere se o painel está configurado → barra quem errou demais → confere a senha →
+ * abre a sessão e leva ao painel. Devolve uma mensagem de erro, ou redireciona em caso de sucesso.
+ */
 export async function loginAction(_prev: FormState, form: FormData): Promise<FormState> {
   if (!adminConfigured()) {
     return { error: "Painel não configurado. Defina ADMIN_PASSWORD e ADMIN_SESSION_SECRET." };
   }
 
+  // Bloqueio por excesso de tentativas, por origem (5 erros em 15 minutos).
   const key = await clientKey();
   if (await isLockedOut(key)) return { error: "Muitas tentativas. Tente de novo em alguns minutos." };
 
@@ -54,11 +75,13 @@ export async function loginAction(_prev: FormState, form: FormData): Promise<For
     return { error: "Senha incorreta." };
   }
 
+  // Senha certa: zera as falhas desta origem e abre a sessão.
   await clearFailures(key);
   await startSession();
   redirect("/admin");
 }
 
+/** Botão "Sair": encerra a sessão e volta à tela de login. */
 export async function logoutAction(): Promise<void> {
   await endSession();
   redirect("/admin/login");
@@ -66,10 +89,15 @@ export async function logoutAction(): Promise<void> {
 
 // ---------- Pedidos ----------
 
+/**
+ * Botões de pedido em /admin/pedidos ("Marcar como pago", "Cancelar pedido"...).
+ * O formulário envia o número do pedido ("id") e o status desejado ("next").
+ */
 export async function changeOrderStatusAction(form: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(form.get("id"));
   const next = String(form.get("next") ?? "") as OrderStatus;
+  // Dados fora do esperado: ignora sem fazer nada (formulário adulterado).
   if (!Number.isInteger(id) || !ORDER_STATUS.includes(next)) return;
 
   const result = await updateOrderStatus(id, next);
@@ -79,11 +107,13 @@ export async function changeOrderStatusAction(form: FormData): Promise<void> {
     redirect("/admin/pedidos?aviso=mudou");
   }
   if (next === "cancelado") refreshCatalog(); // cancelar devolve peças ao estoque
+  // Atualiza todas as telas do painel (a lista, o resumo e os contadores).
   revalidatePath("/admin", "layout");
 }
 
 // ---------- Encomendas personalizadas ----------
 
+/** Seletor de andamento em /admin/encomendas (botão "Salvar" de cada encomenda). */
 export async function changeCustomStatusAction(form: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(form.get("id"));
@@ -94,6 +124,10 @@ export async function changeCustomStatusAction(form: FormData): Promise<void> {
 
 // ---------- Produtos ----------
 
+/**
+ * Formulário "Novo produto" (/admin/produtos/novo).
+ * Em caso de erro, devolve a mensagem + o que foi digitado; em caso de sucesso, volta à lista.
+ */
 export async function createProductAction(_prev: FormState, form: FormData): Promise<FormState> {
   await requireAdmin();
   const parsed = parseProductForm(form, "novo");
@@ -102,11 +136,13 @@ export async function createProductAction(_prev: FormState, form: FormData): Pro
   if ((await createProduct(parsed.data)) === "existe") {
     return { error: "Já existe um produto com esse endereço.", values: typed(form) };
   }
+  // A loja precisa mostrar o produto novo na hora, e a lista do painel também.
   refreshCatalog();
   revalidatePath("/admin/produtos");
   redirect("/admin/produtos?salvo=1");
 }
 
+/** Formulário de edição (/admin/produtos/[slug]). Mesma lógica do cadastro, mas altera um existente. */
 export async function updateProductAction(_prev: FormState, form: FormData): Promise<FormState> {
   await requireAdmin();
   const parsed = parseProductForm(form, "editar");
@@ -118,6 +154,7 @@ export async function updateProductAction(_prev: FormState, form: FormData): Pro
   redirect("/admin/produtos?salvo=1");
 }
 
+/** Campo "Estoque" + botão "Salvar" de cada linha da lista /admin/produtos. */
 export async function setStockAction(form: FormData): Promise<void> {
   await requireAdmin();
   const slug = String(form.get("slug") ?? "");
@@ -129,9 +166,11 @@ export async function setStockAction(form: FormData): Promise<void> {
   revalidatePath("/admin/produtos");
 }
 
+/** Botão "Ocultar da loja" / "Mostrar na loja" de cada linha da lista /admin/produtos. */
 export async function setActiveAction(form: FormData): Promise<void> {
   await requireAdmin();
   const slug = String(form.get("slug") ?? "");
+  // O botão envia "true" (mostrar) ou "false" (ocultar) num campo escondido.
   await setProductActive(slug, form.get("active") === "true");
   refreshCatalog();
   revalidatePath("/admin/produtos");

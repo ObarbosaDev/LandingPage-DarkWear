@@ -1,5 +1,24 @@
-// Esquema inicial (migração 0001_baseline), em SQL puro e idempotente: roda igual no Postgres embutido
-// (desenvolvimento) e no Neon (produção). NÃO edite: mudanças novas entram como migrações em migrations.ts.
+// ============================================================================
+// Esquema inicial do banco (migração 0001_baseline), em SQL puro.
+//
+// Por que SQL puro e "IF NOT EXISTS": o mesmo texto roda igual no Postgres embutido (desenvolvimento)
+// e no Neon (produção), e pode ser executado várias vezes sem erro (idempotente). Isso também deixa
+// um banco criado ANTES de existirem migrações entrar no histórico sem perder dados.
+//
+// NÃO edite este arquivo. Mudanças novas entram como migrações em migrations.ts.
+//
+// O que cada tabela guarda (o SQL abaixo não pode receber comentários, porque faz parte do texto
+// enviado ao banco; por isso a explicação fica aqui em cima):
+//   products        catálogo da loja. CHECK (stock >= 0) é a ÚLTIMA barreira contra estoque negativo,
+//                   caso algum código futuro tente vender além do que existe.
+//   orders          cabeçalho dos pedidos de peças prontas (status, total, datas).
+//   order_items     linhas de cada pedido; copia nome e preço da época da compra. CHECK (qty > 0)
+//                   impede item com quantidade zero ou negativa.
+//   custom_orders   encomendas com arte do cliente (feitas em /personalizar).
+//   login_attempts  tentativas de login do painel que falharam (bloqueio por excesso de erros).
+// Os índices (CREATE INDEX) aceleram as consultas mais usadas: listar pedidos por status e por data,
+// buscar os itens de um pedido e contar tentativas de login por origem.
+// ============================================================================
 export const DDL = `
 CREATE TABLE IF NOT EXISTS products (
   slug text PRIMARY KEY,

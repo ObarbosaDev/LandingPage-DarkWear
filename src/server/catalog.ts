@@ -1,3 +1,16 @@
+// ============================================================================
+// Leitura do catálogo da loja (o que o CLIENTE vê).
+//
+// Quem usa:
+//   - home (/), loja (/loja) e página de produto (/loja/[slug]);
+//   - GET /api/products e o sitemap.
+// A edição do catálogo (o que o DONO faz) fica em src/server/admin/products.ts.
+//
+// Por que existe uma camada de cache aqui: a vitrine é a parte mais acessada do site e o catálogo
+// muda pouco. Em vez de consultar o banco a cada visita, o resultado fica guardado e é descartado
+// na hora em que algo muda (pedido novo baixou estoque, dono editou um produto...).
+// ============================================================================
+
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { and, asc, eq } from "drizzle-orm";
@@ -8,6 +21,11 @@ import type { Product } from "@/lib/product";
 // O catálogo vem do banco. Fica em cache e é invalidado pela etiqueta "products"
 // sempre que estoque ou produto mudam (ver revalidateTag nas rotas de API).
 
+/**
+ * Converte a linha do banco (ProductRow) no formato que as telas usam (Product).
+ * Existe para a tela receber só o necessário e com tipos mais precisos (ex.: a categoria como uma
+ * das duas opções válidas, e campos vazios como "ausente" em vez de null).
+ */
 function toProduct(r: ProductRow): Product {
   return {
     slug: r.slug,
@@ -23,6 +41,11 @@ function toProduct(r: ProductRow): Product {
   };
 }
 
+/**
+ * Todas as peças ATIVAS (as ocultas pelo dono não aparecem), na ordem definida no painel.
+ * A diretiva "use cache" guarda o resultado; a etiqueta "products" permite descartá-lo de uma vez
+ * (revalidateTag/updateTag), e "hours" é o prazo máximo de validade caso ninguém o descarte antes.
+ */
 export async function getProducts(): Promise<Product[]> {
   "use cache";
   cacheTag("products");
@@ -32,6 +55,10 @@ export async function getProducts(): Promise<Product[]> {
   return rows.map(toProduct);
 }
 
+/**
+ * Uma peça pelo endereço (slug), ou undefined se não existir ou estiver oculta.
+ * Usada pela página /loja/[slug]; quem recebe undefined mostra a página 404.
+ */
 export async function getProduct(slug: string): Promise<Product | undefined> {
   "use cache";
   cacheTag("products");

@@ -1,11 +1,22 @@
-// Catálogo de exemplo. Substitua pelos produtos reais (nomes, preços, fotos e estoque).
+// ============================================================================
+// Catálogo de exemplo (dados iniciais).
+//
+// Quem usa: src/server/db/index.ts (seedIfEmpty) e os testes.
+// Para que serve: o site nunca abre vazio num banco novo. Estes produtos só são gravados quando a
+// tabela de produtos está VAZIA. Depois disso, o catálogo real é editado no painel (/admin/produtos)
+// e alterar este arquivo NÃO muda mais a loja.
+//
+// Substitua pelos produtos reais (nomes, preços, fotos e estoque) quando o dono tiver os dados.
+// ============================================================================
 
 import type { Product } from "@/lib/product";
 
 export const PRODUCTS: Product[] = [
   {
+    // Endereço da peça: vira /loja/oversized-gt3-rs.
     slug: "oversized-gt3-rs",
     name: "Oversized GT3 RS",
+    // Preço em centavos: 8990 = R$ 89,90.
     priceCents: 8990,
     description:
       "Camiseta preta oversized com estampa grande nas costas, em DTF.",
@@ -13,6 +24,7 @@ export const PRODUCTS: Product[] = [
     sizes: ["P", "M", "G", "GG"],
     colors: ["Preta"],
     stock: 12,
+    // Foto em /public/products. "light" = peça escura em foto sem fundo (ganha um contorno de luz).
     image: "/products/porsche-gt3.webp",
     photoBg: "light",
   },
@@ -27,6 +39,7 @@ export const PRODUCTS: Product[] = [
     colors: ["Branca"],
     stock: 5,
     image: "/products/blusa-2.webp",
+    // "dark" = peça clara: aparece bem sobre o fundo escuro sem contorno extra.
     photoBg: "dark",
   },
   {
@@ -43,6 +56,8 @@ export const PRODUCTS: Product[] = [
   },
 ];
 
+// Busca um produto de exemplo pelo endereço. Auxiliar para testes e para conferir o catálogo inicial;
+// a loja de verdade lê do banco (src/server/catalog.ts), não daqui.
 export function getProduct(slug: string) {
   return PRODUCTS.find((p) => p.slug === slug);
 }

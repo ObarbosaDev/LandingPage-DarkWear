@@ -1,43 +1,74 @@
+// ============================================================================
+// Descrição das tabelas do banco (o "mapa" que o Drizzle usa para consultar com tipos).
+//
+// Importante: este arquivo DESCREVE as tabelas para o código; quem de fato cria/altera as tabelas
+// no banco são as migrações (src/server/db/migrations.ts). Mudou aqui? Crie também uma migração.
+// ============================================================================
+
 import { boolean, index, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 // Preços sempre em centavos (inteiro), para nunca ter erro de arredondamento com dinheiro.
 
+// ---------------------------------------------------------------------------
+// products: o catálogo da loja.
+// Lida na vitrine (home, /loja, /loja/[slug]) e editada no painel (/admin/produtos).
+// ---------------------------------------------------------------------------
 export const products = pgTable("products", {
+  // O "slug" é o endereço da peça (/loja/oversized-gt3-rs) e também a chave primária.
   slug: text("slug").primaryKey(),
   name: text("name").notNull(),
   priceCents: integer("price_cents").notNull(),
   description: text("description").notNull().default(""),
+  // "Pronta entrega" ou "Coleção" (filtro da loja).
   category: text("category").notNull(),
+  // Listas guardadas como JSON, ex.: ["P","M","G"]. O $type dá o tipo certo ao código.
   sizes: jsonb("sizes").$type<string[]>().notNull(),
   colors: jsonb("colors").$type<string[]>().notNull(),
+  // Peças disponíveis. A baixa é feita por pedido, de forma atômica (ver src/server/orders.ts).
   stock: integer("stock").notNull().default(0),
+  // Caminho da foto em /public (ex.: /products/porsche-gt3.webp). Vazio = mostra as iniciais.
   image: text("image"),
+  // "light" = peça escura em foto transparente (ganha contorno de luz); "dark" = peça clara.
   photoBg: text("photo_bg"),
+  // false = oculto da loja (o dono pode esconder sem apagar).
   active: boolean("active").notNull().default(true),
+  // Ordem de exibição (menor primeiro).
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Estados possíveis de um pedido, na ordem natural do fluxo. As transições permitidas ficam em
+// src/server/admin/orders.ts (NEXT_STATUS).
 export const ORDER_STATUS = ["pendente", "pago", "enviado", "entregue", "cancelado"] as const;
 export type OrderStatus = (typeof ORDER_STATUS)[number];
 
+// ---------------------------------------------------------------------------
+// orders: o cabeçalho de cada pedido de peças prontas (criado em /carrinho → POST /api/orders).
+// ---------------------------------------------------------------------------
 export const orders = pgTable(
   "orders",
   {
+    // O número do pedido mostrado ao cliente (DW-00001) vem deste id.
     id: serial("id").primaryKey(),
     status: text("status").$type<OrderStatus>().notNull().default("pendente"),
+    // Total já calculado pelo servidor (o cliente não consegue alterar).
     totalCents: integer("total_cents").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  // Índices: aceleram a listagem do painel por status e a ordenação por data.
   (t) => [index("orders_status_idx").on(t.status), index("orders_created_idx").on(t.createdAt)],
 );
 
+// ---------------------------------------------------------------------------
+// order_items: cada linha de um pedido (qual peça, tamanho, cor e quantidade).
+// ---------------------------------------------------------------------------
 export const orderItems = pgTable(
   "order_items",
   {
     id: serial("id").primaryKey(),
+    // Se o pedido for apagado, as linhas dele vão junto (cascade).
     orderId: integer("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
@@ -52,15 +83,21 @@ export const orderItems = pgTable(
   (t) => [index("order_items_order_idx").on(t.orderId)],
 );
 
+// ---------------------------------------------------------------------------
+// custom_orders: encomendas com a arte do cliente (criadas em /personalizar).
+// O arquivo da arte NÃO fica aqui: o cliente o anexa no WhatsApp; guardamos só o nome dele.
+// ---------------------------------------------------------------------------
 export const customOrders = pgTable(
   "custom_orders",
   {
     id: serial("id").primaryKey(),
+    // Fluxo próprio do atendimento: novo, em contato, produzindo, concluído, cancelado.
     status: text("status").notNull().default("novo"),
     name: text("name").notNull().default(""),
     model: text("model").notNull(),
     color: text("color").notNull(),
     size: text("size").notNull(),
+    // Onde a arte vai na peça: peito, frente, costas ou manga.
     placement: text("placement").notNull(),
     notes: text("notes").notNull().default(""),
     fileName: text("file_name"),
@@ -69,9 +106,14 @@ export const customOrders = pgTable(
   (t) => [index("custom_orders_created_idx").on(t.createdAt)],
 );
 
+// Uma linha da tabela de produtos, como o painel a lê (inclui campos que a vitrine não usa).
 export type ProductRow = typeof products.$inferSelect;
 
-// Tentativas de login que falharam, por origem. Ficam no banco para valer entre instâncias do servidor.
+// ---------------------------------------------------------------------------
+// login_attempts: tentativas de login do painel que falharam, por origem.
+// Usada em src/server/admin/auth.ts para bloquear quem erra a senha várias vezes.
+// Ficam no banco (e não na memória) para valer entre todas as instâncias do servidor.
+// ---------------------------------------------------------------------------
 export const loginAttempts = pgTable(
   "login_attempts",
   {
@@ -82,12 +124,17 @@ export const loginAttempts = pgTable(
   (t) => [index("login_attempts_key_idx").on(t.key, t.failedAt)],
 );
 
-// Contador de requisições por origem, para o limite de uso das rotas públicas.
+// ---------------------------------------------------------------------------
+// rate_limits: contador de requisições por origem e por tipo ("bucket").
+// Usada em src/server/rate-limit.ts para limitar quantos pedidos/encomendas uma origem faz.
+// ---------------------------------------------------------------------------
 export const rateLimits = pgTable(
   "rate_limits",
   {
     id: serial("id").primaryKey(),
+    // Tipo da chamada limitada ("orders", "custom-orders"): cada tipo tem a sua conta.
     bucket: text("bucket").notNull(),
+    // Quem fez a chamada (endereço de origem).
     key: text("key").notNull(),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
