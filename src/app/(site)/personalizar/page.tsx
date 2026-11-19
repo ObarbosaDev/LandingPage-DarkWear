@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ShirtPlacer, type PlacementId } from "@/components/ShirtPlacer";
 import { TeeCard } from "@/components/TeeCard";
-import { PageHero } from "@/components/PageHero";
 
 const MODELS = ["Camiseta", "Moletom", "Oversized"];
 const SIZES = ["P", "M", "G", "GG", "XG"];
@@ -74,11 +73,27 @@ export default function PersonalizarPage() {
 
   return (
     <>
-      <PageHero
-        word="Estampa"
-        title="Mande a sua arte"
-        lead="Escolhe o modelo, a cor, o tamanho e onde a arte vai. Você fecha tudo no WhatsApp."
-      />
+      {/* Abertura branca: o título à esquerda e o caminho do pedido em quatro passos à direita. */}
+      <section className="bg-foreground text-background">
+        <div className="mx-auto grid max-w-7xl gap-12 px-6 pb-14 pt-16 md:grid-cols-[1.4fr_1fr] md:items-end md:pt-24">
+          <div className="flex flex-col gap-6">
+            <h1 className="font-[family-name:var(--font-display)] text-[clamp(3.5rem,10vw,9rem)] uppercase leading-[0.9]">
+              Mande a sua arte
+            </h1>
+            <p className="max-w-lg text-xl font-medium">
+              Escolhe o modelo, a cor, o tamanho e onde a arte vai. Você fecha tudo no WhatsApp.
+            </p>
+          </div>
+          <ol className="border-t-2 border-background">
+            {["Envie o arquivo", "Escolha a peça", "Marque onde vai", "Feche no WhatsApp"].map((passo, i) => (
+              <li key={passo} className="flex items-baseline gap-5 border-b-2 border-background py-3">
+                <span className="font-[family-name:var(--font-display)] text-4xl leading-none">{i + 1}</span>
+                <span className="font-[family-name:var(--font-display)] text-2xl uppercase leading-none">{passo}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
 
       <section className="bg-background pb-16">
         <div className="mx-auto max-w-7xl px-6">
