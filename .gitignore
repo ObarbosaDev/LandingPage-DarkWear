@@ -46,3 +46,6 @@ next-env.d.ts
 # banco local de desenvolvimento
 .data/
 .env*.local
+
+# exemplo de variáveis liberado para o git
+!.env.example
