@@ -1,9 +1,17 @@
+// ============================================================================
+// Tela de "NÃO ENCONTRADO" (erro 404): o conteúdo visual compartilhado pelas duas páginas 404 do
+// projeto (src/app/not-found.tsx, para endereços que não existem, e src/app/(site)/not-found.tsx,
+// para peças que não existem ou foram ocultas). Oferece dois caminhos para o cliente não ficar perdido:
+// voltar ao início ou ver a loja.
+// ============================================================================
+
 import Link from "next/link";
 
 // Tela de "não encontrado": usada na página 404 do site e nas peças que não existem ou estão ocultas.
 export function NotFoundView() {
   return (
     <section className="bg-background text-foreground">
+      {/* min-h-[70vh] + centralização vertical: o aviso fica no meio da tela, mesmo sem muito conteúdo. */}
       <div className="mx-auto flex min-h-[70vh] max-w-7xl flex-col justify-center gap-8 px-6 py-16">
         <p className="font-mono text-sm uppercase tracking-[0.15em]">Erro 404</p>
         <h1 className="font-display text-[clamp(5rem,18vw,17rem)] uppercase leading-[1]">Não achei</h1>
@@ -11,6 +19,7 @@ export function NotFoundView() {
           Essa página não existe, ou a peça saiu da loja. Volte para o início ou veja o que está em estoque.
         </p>
         <div className="flex flex-wrap gap-3">
+          {/* Botão cheio = caminho principal; botão vazado = alternativa. */}
           <Link
             href="/"
             className="border-2 border-foreground bg-foreground px-7 py-3 font-display text-xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
