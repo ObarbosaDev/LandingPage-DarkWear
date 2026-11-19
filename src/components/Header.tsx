@@ -25,7 +25,8 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const progressRef = useRef<HTMLSpanElement>(null);
 
-  // Encolhe o cabeçalho quando a página desce.
+  // Marca a borda quando a página desce e atualiza a barra de progresso. A altura do cabeçalho é fixa:
+  // mudar a altura move a página, altera o scrollY e faria a barra tremer.
   useEffect(() => {
     const onScroll = () => {
       setScrolled(window.scrollY > 24);
@@ -47,8 +48,8 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b border-border bg-background backdrop-blur-md transition-[height] duration-300 ${
-        scrolled ? "h-16" : "h-24"
+      className={`sticky top-0 z-50 h-16 border-b bg-background transition-colors duration-300 md:h-20 ${
+        scrolled ? "border-foreground" : "border-border"
       }`}
     >
       <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-6 px-6">
@@ -59,7 +60,7 @@ export function Header() {
             width={240}
             height={120}
             priority
-            className="h-[78%] w-auto mix-blend-screen transition-[height] duration-300"
+            className="h-[78%] w-auto mix-blend-screen"
           />
         </Link>
 

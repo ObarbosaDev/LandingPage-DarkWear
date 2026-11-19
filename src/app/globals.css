@@ -43,6 +43,16 @@
   animation: marquee 28s linear infinite;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
+/* A fonte dos títulos tem área de glifo maior que a altura da linha, então o h1 gigante avança sobre
+   botões e links vizinhos e rouba o clique. Título não é clicável: deixa o clique passar. */
+h1 {
+  pointer-events: none;
+}
+
 html,
 body {
   background: var(--background);
