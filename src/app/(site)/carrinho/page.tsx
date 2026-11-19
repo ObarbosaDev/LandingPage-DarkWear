@@ -31,102 +31,117 @@ export default function CarrinhoPage() {
     }
   }
 
-  const btnPrimary =
-    "border-2 border-background bg-background px-8 py-5 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait";
+  const pecas = items.reduce((n, i) => n + i.qty, 0);
+  const hoje = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date());
+  const step =
+    "h-9 w-9 border-2 border-background text-lg font-bold transition-colors hover:bg-background hover:text-foreground disabled:cursor-not-allowed";
 
   return (
-    <>
-      {/* Tela de trabalho: cabeçalho enxuto, sem abertura gigante. */}
-      <section className="bg-background text-foreground">
-        <div className="mx-auto flex max-w-5xl items-end justify-between gap-6 border-b-2 border-foreground px-6 pb-6 pt-12">
-          <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,7vw,6rem)] uppercase leading-[0.9]">Sacola</h1>
-          {ready && items.length > 0 ? (
-            <p className="pb-1 font-mono text-sm uppercase tracking-[0.15em]">
-              {items.reduce((n, i) => n + i.qty, 0)} peça(s)
-            </p>
-          ) : null}
+    <section className="bg-background text-foreground">
+      <div className="mx-auto grid max-w-7xl gap-12 px-6 pb-24 pt-14 md:grid-cols-[1fr_30rem] md:items-start md:pt-20">
+        <div className="flex flex-col gap-8">
+          <h1 className="font-[family-name:var(--font-display)] text-[clamp(4rem,12vw,11rem)] uppercase leading-[0.86]">
+            Sua
+            <br />
+            sacola
+          </h1>
+          <p className="max-w-sm text-xl font-medium">
+            {ready && pecas > 0
+              ? `${pecas} ${pecas === 1 ? "peça" : "peças"} no pedido. Confira, ajuste as quantidades e feche pelo WhatsApp.`
+              : "Escolha as peças na loja e elas aparecem aqui."}
+          </p>
+          <Link
+            href="/loja"
+            className="self-start border-2 border-foreground px-6 py-3 font-[family-name:var(--font-display)] text-xl uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background"
+          >
+            Continuar comprando
+          </Link>
         </div>
-      </section>
 
-      <section className="bg-foreground text-background">
-        <div className="mx-auto max-w-5xl px-6 py-16">
-          {!ready ? (
-            <p className="text-xl font-medium">Carregando…</p>
-          ) : items.length === 0 ? (
-            <div className="flex flex-col items-start gap-8">
-              <p className="font-[family-name:var(--font-display)] text-5xl uppercase leading-none md:text-7xl">
-                Sua sacola está vazia.
-              </p>
-              <Link href="/loja" className={btnPrimary}>
-                Ver peças
-              </Link>
+        {/* O recibo: papel branco, fonte de máquina, pontilhado entre o item e o preço. */}
+        <div className="md:sticky md:top-24">
+          <div className="bg-foreground px-6 pb-8 pt-7 font-mono text-background">
+            <div className="flex items-baseline justify-between border-b-2 border-dashed border-background pb-4">
+              <span className="font-[family-name:var(--font-display)] text-3xl uppercase leading-none">{SITE.name}</span>
+              <span className="text-sm uppercase tracking-[0.12em]">Pedido · {hoje}</span>
             </div>
-          ) : (
-            <div className="flex flex-col gap-10">
-              <ul className="border-b-2 border-background">
+
+            {!ready ? (
+              <p className="py-8 text-base">Carregando…</p>
+            ) : items.length === 0 ? (
+              <p className="py-10 font-[family-name:var(--font-display)] text-4xl uppercase leading-none">
+                Nenhuma peça ainda.
+              </p>
+            ) : (
+              <ul className="divide-y-2 divide-dashed divide-background">
                 {items.map((i) => (
-                  <li
-                    key={i.id}
-                    className="flex flex-col gap-5 border-t-2 border-background py-6 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="font-[family-name:var(--font-display)] text-4xl uppercase leading-none">{i.name}</p>
-                      <p className="mt-2 text-lg font-medium">
-                        {i.color} · tamanho {i.size} · {formatBRL(i.price)}
-                      </p>
+                  <li key={i.id} className="py-4">
+                    <div className="flex items-end gap-2 text-base font-bold uppercase">
+                      <span>
+                        {i.qty}x {i.name}
+                      </span>
+                      <span aria-hidden="true" className="mb-1 flex-1 border-b-2 border-dotted border-background" />
+                      <span>{formatBRL(i.price * i.qty)}</span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-5">
-                      <div className="flex items-center border-2 border-background">
-                        <button
-                          type="button"
-                          onClick={() => setQty(i.id, i.qty - 1)}
-                          className="h-11 w-11 text-xl transition-colors hover:bg-background hover:text-foreground"
-                          aria-label="Diminuir"
-                        >
+                    <p className="mt-1 text-sm uppercase tracking-[0.08em]">
+                      {i.color} · tam. {i.size} · {formatBRL(i.price)} cada
+                    </p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => setQty(i.id, i.qty - 1)} className={step} aria-label="Diminuir">
                           −
                         </button>
-                        <span className="w-12 text-center text-lg font-bold">{i.qty}</span>
+                        <span className="w-8 text-center text-lg font-bold">{i.qty}</span>
                         <button
                           type="button"
                           onClick={() => setQty(i.id, i.qty + 1)}
                           disabled={i.qty >= i.max}
-                          className="h-11 w-11 text-xl transition-colors hover:bg-background hover:text-foreground disabled:cursor-not-allowed"
+                          className={step}
                           aria-label="Aumentar"
                         >
                           +
                         </button>
                       </div>
-                      <p className="w-28 text-right font-[family-name:var(--font-display)] text-3xl leading-none">
-                        {formatBRL(i.price * i.qty)}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => remove(i.id)}
-                        className="text-lg font-medium underline underline-offset-4"
-                      >
+                      <button type="button" onClick={() => remove(i.id)} className="text-sm font-bold uppercase underline underline-offset-4">
                         Remover
                       </button>
                     </div>
                   </li>
                 ))}
               </ul>
+            )}
 
-              <div className="flex items-end justify-between gap-6">
-                <span className="font-mono text-sm uppercase tracking-[0.15em]">Total</span>
-                <span className="font-[family-name:var(--font-display)] text-6xl leading-none md:text-8xl">{formatBRL(total)}</span>
-              </div>
-
-              <button type="button" onClick={finalizar} disabled={status === "loading"} className={btnPrimary}>
-                {status === "loading" ? "Registrando pedido…" : "Finalizar pelo WhatsApp"}
-              </button>
-              {status === "error" && (
-                <p className="border-2 border-background p-4 text-lg font-bold">{error}</p>
-              )}
-              <p className="text-lg font-medium">{SITE.paymentNote}</p>
-            </div>
-          )}
+            {ready && items.length > 0 && (
+              <>
+                <div className="mt-2 flex items-end justify-between border-t-2 border-dashed border-background pt-5">
+                  <span className="text-sm font-bold uppercase tracking-[0.15em]">Total</span>
+                  <span className="font-[family-name:var(--font-display)] text-6xl leading-none">{formatBRL(total)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={finalizar}
+                  disabled={status === "loading"}
+                  className="mt-6 w-full border-2 border-background bg-background px-6 py-4 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
+                >
+                  {status === "loading" ? "Registrando pedido…" : "Finalizar pelo WhatsApp"}
+                </button>
+                {status === "error" && <p role="alert" className="mt-4 border-2 border-background p-3 text-base font-bold">{error}</p>}
+                <p className="mt-4 text-sm">{SITE.paymentNote}</p>
+              </>
+            )}
+          </div>
+          {/* Borda serrilhada de recibo */}
+          <div
+            aria-hidden="true"
+            className="h-3 w-full"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--foreground) 50%, transparent 50%) 0 0 / 16px 12px, linear-gradient(225deg, var(--foreground) 50%, transparent 50%) 0 0 / 16px 12px",
+              backgroundRepeat: "repeat-x",
+            }}
+          />
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }
