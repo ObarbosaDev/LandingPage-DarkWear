@@ -33,6 +33,8 @@ Loja online de camisetas estampadas em DTF. O cliente escolhe uma peça pronta d
 | UI | React 19 |
 | Estilo | Tailwind CSS 4 + CSS próprio (`globals.css`, `motion.css`) |
 | Linguagem | TypeScript 5 |
+| Banco de dados | Postgres: Neon em produção (Marketplace da Vercel) e PGlite embutido em desenvolvimento |
+| Acesso a dados | Drizzle ORM |
 | Qualidade | ESLint 9 |
 | Fontes | Anton (títulos), Archivo (texto), Geist Mono (rótulos), via `next/font` |
 
@@ -60,13 +62,24 @@ O site abre em `http://localhost:3000`.
 
 ## Configuração
 
-Nenhuma variável de ambiente é necessária hoje. Os pontos que a loja precisa ajustar ficam em poucos arquivos:
+### Banco de dados
+
+Em desenvolvimento não é preciso configurar nada: sem `DATABASE_URL`, o projeto usa um Postgres embutido (PGlite), gravado em `.data/pglite` e ignorado pelo git. Na primeira execução o catálogo é carregado de `src/data/products.ts` para o banco. Para recomeçar do zero em desenvolvimento, apague a pasta `.data`.
+
+| Variável | Para que serve |
+| --- | --- |
+| `DATABASE_URL` | Conexão com o Postgres de produção (Neon). Na Vercel, o Marketplace cria o banco e injeta essa variável. |
+| `PGLITE_DIR` | Opcional. Troca a pasta do banco local (padrão `./.data/pglite`). |
+
+Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez de usar um banco que se perderia a cada execução.
+
+### Outros pontos de ajuste
 
 | O que | Onde |
 | --- | --- |
 | Número do WhatsApp da loja (formato `55` + DDD + número) | `src/lib/site.ts` → `whatsappNumber` |
 | Nome da marca, descrição e observação de pagamento | `src/lib/site.ts` |
-| Produtos, preços, tamanhos, cores e estoque | `src/data/products.ts` |
+| Catálogo inicial (usado só para popular o banco vazio) | `src/data/products.ts` |
 | Fotos dos produtos | `public/products/` (PNG com fundo transparente) |
 | Logo | `public/brand/logo-dark.jpg` |
 
@@ -74,11 +87,13 @@ Nenhuma variável de ambiente é necessária hoje. Os pontos que a loja precisa 
 
 ### Adicionando um produto
 
-1. Coloque a foto em `public/products/`.
-2. Acrescente um item em `src/data/products.ts` com `slug`, `name`, `price`, `description`, `category`, `sizes`, `colors`, `stock` e `image`.
-3. Para peça escura em foto com fundo transparente, use `photoBg: "light"`. Ela ganha um contorno de luz fino e aparece sobre os cards escuros.
+Os produtos ficam na tabela `products` do banco. O arquivo `src/data/products.ts` só popula um banco **vazio**: depois da primeira execução, editá-lo não muda o catálogo.
 
-Produto sem `image` mostra uma camiseta desenhada no lugar da foto.
+1. Coloque a foto em `public/products/`.
+2. Insira a linha em `products` com `slug`, `name`, `price_cents` (preço em centavos), `description`, `category`, `sizes`, `colors`, `stock` e `image`.
+3. Para peça escura em foto com fundo transparente, use `photo_bg = 'light'`. Ela ganha um contorno de luz fino e aparece sobre os cards escuros.
+
+Produto sem `image` mostra uma camiseta desenhada no lugar da foto. Enquanto o painel do dono não existe, essa edição é feita direto no banco.
 
 ## Estrutura do projeto
 
@@ -112,13 +127,15 @@ src/
 
 ## API
 
-As rotas que recebem dados validam a entrada no servidor. No pedido, produto, tamanho, cor e quantidade são conferidos contra o catálogo e o estoque.
+As rotas que recebem dados validam a entrada no servidor. No pedido, produto, tamanho, cor e quantidade são conferidos contra o catálogo e o estoque no banco.
+
+**Estoque:** a baixa é um único `UPDATE` condicional dentro de uma transação, e a coluna tem `CHECK (stock >= 0)`. Se vários clientes disputam a última peça, só os que couberem no estoque passam e os outros recebem `409`. Em teste local, 12 pedidos simultâneos para 8 peças resultaram em 8 aprovados, 4 recusados e estoque final 0. O cancelamento (`cancelOrder`) devolve as peças ao estoque.
 
 | Método e rota | Função |
 | --- | --- |
 | `GET /api/products` | Lista os produtos |
-| `POST /api/orders` | Valida o carrinho, registra o pedido e devolve o link do WhatsApp |
-| `POST /api/custom-orders` | Valida a encomenda personalizada e devolve o link do WhatsApp |
+| `POST /api/orders` | Valida o carrinho, baixa o estoque em transação, registra o pedido e devolve o link do WhatsApp |
+| `POST /api/custom-orders` | Valida e registra a encomenda personalizada e devolve o link do WhatsApp |
 
 Exemplo:
 
@@ -137,22 +154,25 @@ curl -X POST http://localhost:3000/api/orders \
 
 ## Estado atual e limitações
 
-Este projeto é a vitrine e o fluxo de pedido. Ainda **não é** um e-commerce completo:
+O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **persistidos em banco**. Ainda faltam peças para ser um e-commerce completo:
 
-- **Pedidos em memória:** os pedidos registrados em `/api/orders` ficam na memória do servidor e se perdem a cada reinício. Não há banco de dados.
-- **Sem pagamento online:** Pix e cartão são combinados no WhatsApp.
+- **Sem painel administrativo:** produtos e estoque são editados direto no banco. O cancelamento de pedido existe como função, mas ainda não há tela nem rota protegida para usá-lo.
+- **Sem pagamento online:** Pix e cartão são combinados no WhatsApp. O pedido nasce como `pendente`.
+- **Estoque reservado sem prazo:** a baixa acontece quando o pedido é registrado. Pedido que nunca é pago segura a peça até alguém cancelar. Falta expirar pedidos pendentes.
 - **Sem cálculo de frete.**
-- **Sem painel administrativo:** produtos e estoque são editados no código.
 - **Sem contas de cliente:** a compra é sem cadastro.
-- **Catálogo de exemplo:** nomes, preços e estoque em `src/data/products.ts` são de exemplo e devem ser substituídos pelos reais.
+- **Esquema sem migrações versionadas:** o esquema é criado por SQL idempotente (`src/db/ddl.ts`). Antes de mudar tabelas com dados reais em produção, adotar migrações (drizzle-kit).
+- **Neon ainda não testado:** o caminho de produção usa o driver serverless do Neon, mas foi validado apenas contra o Postgres embutido. Teste com um banco Neon real antes de publicar.
+- **Catálogo de exemplo:** nomes, preços e estoque são de exemplo e devem ser substituídos pelos reais.
 
 ## Próximos passos
 
-1. Trocar os dados de exemplo pelos produtos, preços e estoque reais.
-2. Persistir pedidos e estoque (banco de dados ou plataforma de comércio).
-3. Pagamento online com Pix e cartão e cálculo de frete.
-4. Painel para o dono gerenciar produtos e pedidos.
-5. Área "Meus pedidos", opcional e sem cadastro obrigatório.
+1. Painel do dono: login, produtos, estoque, pedidos e cancelamento.
+2. Pagamento online com Pix e cartão, com confirmação automática (webhook) mudando o pedido para `pago`.
+3. Expiração de pedidos pendentes, devolvendo o estoque.
+4. Cálculo de frete.
+5. Migrações versionadas e banco Neon provisionado na Vercel.
+6. Área "Meus pedidos", opcional e sem cadastro obrigatório.
 
 ## Direitos de imagem
 
