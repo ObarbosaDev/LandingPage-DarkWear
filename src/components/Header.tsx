@@ -72,7 +72,7 @@ export function Header() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className="group relative inline-flex items-start gap-1 py-2 font-[family-name:var(--font-display)] text-2xl uppercase text-foreground"
+                className="group relative inline-flex items-start gap-1 py-2 font-display text-2xl uppercase text-foreground"
               >
                 <span className="font-mono text-[10px] text-foreground">{String(i + 1).padStart(2, "0")}</span>
                 {/* A palavra rola para cima e a mesma palavra entra por baixo */}
@@ -164,7 +164,7 @@ export function Header() {
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="border-b border-border py-5 font-[family-name:var(--font-display)] text-4xl uppercase text-foreground"
+              className="border-b border-border py-5 font-display text-4xl uppercase text-foreground"
             >
               {item.label}
             </Link>

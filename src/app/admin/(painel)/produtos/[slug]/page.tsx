@@ -18,7 +18,7 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">{product.name}</h1>
+      <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">{product.name}</h1>
       <ProductForm action={updateProductAction} product={product} />
     </div>
   );

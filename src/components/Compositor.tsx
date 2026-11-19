@@ -30,7 +30,7 @@ export function Compositor({ assuntos, numero }: { assuntos: Assunto[]; numero: 
                 type="button"
                 onClick={() => escolher(a)}
                 aria-pressed={ativo === a.id}
-                className={`border-2 border-background px-4 py-3 text-left font-[family-name:var(--font-display)] text-2xl uppercase leading-none transition-colors ${
+                className={`border-2 border-background px-4 py-3 text-left font-display text-2xl uppercase leading-none transition-colors ${
                   ativo === a.id ? "bg-background text-foreground" : "hover:bg-background hover:text-foreground"
                 }`}
               >
@@ -49,7 +49,7 @@ export function Compositor({ assuntos, numero }: { assuntos: Assunto[]; numero: 
             value={texto}
             onChange={(e) => setTexto(e.target.value.slice(0, MAX))}
             rows={5}
-            className="w-full resize-none border-0 border-b-4 border-background bg-transparent pb-4 font-[family-name:var(--font-display)] text-[clamp(2rem,5.5vw,5rem)] uppercase leading-[1.02] text-background outline-none"
+            className="w-full resize-none border-0 border-b-4 border-background bg-transparent pb-4 font-display text-[clamp(2rem,5.5vw,5rem)] uppercase leading-[1.02] text-background outline-none"
           />
           <p className="self-end font-mono text-sm uppercase tracking-[0.15em]">
             {texto.length}/{MAX}
@@ -66,7 +66,7 @@ export function Compositor({ assuntos, numero }: { assuntos: Assunto[]; numero: 
           vazio ? "cursor-not-allowed" : "hover:bg-foreground hover:text-background"
         }`}
       >
-        <span className="mx-auto flex max-w-7xl items-center justify-between gap-6 border-y-2 border-foreground px-6 py-10 font-[family-name:var(--font-display)] text-[clamp(2.5rem,8vw,7rem)] uppercase leading-none md:py-14">
+        <span className="mx-auto flex max-w-7xl items-center justify-between gap-6 border-y-2 border-foreground px-6 py-10 font-display text-[clamp(2.5rem,8vw,7rem)] uppercase leading-none md:py-14">
           {vazio ? "Escreva algo" : "Enviar no WhatsApp"}
           <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-3">→</span>
         </span>

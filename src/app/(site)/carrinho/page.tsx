@@ -39,7 +39,7 @@ export default function CarrinhoPage() {
     <section className="bg-background text-foreground">
       <div className="mx-auto grid max-w-7xl gap-12 px-6 pb-24 pt-14 md:grid-cols-[1fr_30rem] md:items-start md:pt-20">
         <div className="flex flex-col gap-8">
-          <h1 className="font-[family-name:var(--font-display)] text-[clamp(4rem,12vw,11rem)] uppercase leading-[0.86]">
+          <h1 className="font-display text-[clamp(4rem,12vw,11rem)] uppercase leading-[0.86]">
             Sua
             <br />
             sacola
@@ -51,7 +51,7 @@ export default function CarrinhoPage() {
           </p>
           <Link
             href="/loja"
-            className="self-start border-2 border-foreground px-6 py-3 font-[family-name:var(--font-display)] text-xl uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background"
+            className="self-start border-2 border-foreground px-6 py-3 font-display text-xl uppercase tracking-wide transition-colors hover:bg-foreground hover:text-background"
           >
             Continuar comprando
           </Link>
@@ -61,14 +61,14 @@ export default function CarrinhoPage() {
         <div className="md:sticky md:top-24">
           <div className="bg-foreground px-6 pb-8 pt-7 font-mono text-background">
             <div className="flex items-baseline justify-between border-b-2 border-dashed border-background pb-4">
-              <span className="font-[family-name:var(--font-display)] text-3xl uppercase leading-none">{SITE.name}</span>
+              <span className="font-display text-3xl uppercase leading-none">{SITE.name}</span>
               <span className="text-sm uppercase tracking-[0.12em]">Pedido</span>
             </div>
 
             {!ready ? (
               <p className="py-8 text-base">Carregando…</p>
             ) : items.length === 0 ? (
-              <p className="py-10 font-[family-name:var(--font-display)] text-4xl uppercase leading-none">
+              <p className="py-10 font-display text-4xl uppercase leading-none">
                 Nenhuma peça ainda.
               </p>
             ) : (
@@ -114,13 +114,13 @@ export default function CarrinhoPage() {
               <>
                 <div className="mt-2 flex items-end justify-between border-t-2 border-dashed border-background pt-5">
                   <span className="text-sm font-bold uppercase tracking-[0.15em]">Total</span>
-                  <span className="font-[family-name:var(--font-display)] text-6xl leading-none">{formatBRL(total)}</span>
+                  <span className="font-display text-6xl leading-none">{formatBRL(total)}</span>
                 </div>
                 <button
                   type="button"
                   onClick={finalizar}
                   disabled={status === "loading"}
-                  className="mt-6 w-full border-2 border-background bg-background px-6 py-4 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
+                  className="mt-6 w-full border-2 border-background bg-background px-6 py-4 font-display text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
                 >
                   {status === "loading" ? "Registrando pedido…" : "Finalizar pelo WhatsApp"}
                 </button>

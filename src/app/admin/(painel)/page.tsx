@@ -19,7 +19,7 @@ export default async function PainelPage() {
 
   return (
     <div className="flex flex-col gap-14">
-      <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Painel</h1>
+      <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Painel</h1>
 
       <section aria-label="Resumo" className="grid border-l-2 border-t-2 border-foreground sm:grid-cols-2 lg:grid-cols-4">
         {blocos.map((b) => (
@@ -28,7 +28,7 @@ export default async function PainelPage() {
             href={b.href}
             className="flex flex-col gap-3 border-b-2 border-r-2 border-foreground p-6 transition-colors hover:bg-foreground hover:text-background"
           >
-            <span className="font-[family-name:var(--font-display)] text-7xl leading-none">{b.valor}</span>
+            <span className="font-display text-7xl leading-none">{b.valor}</span>
             <span className="text-lg font-medium">{b.rotulo}</span>
           </Link>
         ))}
@@ -36,7 +36,7 @@ export default async function PainelPage() {
 
       <section className="grid gap-12 lg:grid-cols-2">
         <div>
-          <h2 className="mb-4 font-[family-name:var(--font-display)] text-4xl uppercase">Estoque baixo</h2>
+          <h2 className="mb-4 font-display text-4xl uppercase">Estoque baixo</h2>
           {s.lowStock.length === 0 ? (
             <p className="text-lg font-medium">Nenhum produto com 3 peças ou menos.</p>
           ) : (
@@ -54,7 +54,7 @@ export default async function PainelPage() {
         </div>
 
         <div>
-          <h2 className="mb-4 font-[family-name:var(--font-display)] text-4xl uppercase">Últimos pedidos</h2>
+          <h2 className="mb-4 font-display text-4xl uppercase">Últimos pedidos</h2>
           {s.latest.length === 0 ? (
             <p className="text-lg font-medium">Nenhum pedido ainda.</p>
           ) : (

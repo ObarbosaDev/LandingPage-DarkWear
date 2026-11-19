@@ -29,7 +29,7 @@ export function ProductTile({ product, index }: { product: Product; index: numbe
       </div>
 
       <div>
-        <h3 className="font-[family-name:var(--font-display)] text-4xl uppercase leading-[0.9]">{product.name}</h3>
+        <h3 className="font-display text-4xl uppercase leading-[0.9]">{product.name}</h3>
         <div className="mt-4 flex items-end justify-between">
           <span className="text-2xl font-semibold">{formatBRL(product.price)}</span>
           <span className="text-sm transition-transform duration-200 group-hover:translate-x-1">Ver peça →</span>

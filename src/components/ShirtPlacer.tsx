@@ -31,7 +31,7 @@ export function ShirtPlacer({
               on ? "bg-background text-foreground" : "hover:bg-background hover:text-foreground"
             }`}
           >
-            <span className="font-[family-name:var(--font-display)] text-4xl uppercase leading-none">{p.label}</span>
+            <span className="font-display text-4xl uppercase leading-none">{p.label}</span>
             <span className="text-base font-medium">{p.note}</span>
           </button>
         );

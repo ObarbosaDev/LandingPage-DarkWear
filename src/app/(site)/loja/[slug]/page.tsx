@@ -41,7 +41,7 @@ export default async function ProdutoPage({
         </Link>
 
         {/* O nome ocupa a largura toda: a peça é a manchete. */}
-        <h1 className="mt-6 font-[family-name:var(--font-display)] text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[1.14]">
+        <h1 className="mt-6 font-display text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[1.14]">
           {product.name}
         </h1>
 
@@ -52,13 +52,13 @@ export default async function ProdutoPage({
 
           <div className="flex flex-col gap-8">
             <div className="flex flex-wrap items-end justify-between gap-6 border-b-2 border-foreground pb-6">
-              <p className="font-[family-name:var(--font-display)] text-7xl leading-none">{formatBRL(product.price)}</p>
+              <p className="font-display text-7xl leading-none">{formatBRL(product.price)}</p>
               <div className="text-right">
                 <p className="font-mono text-sm uppercase tracking-[0.15em]">{product.category}</p>
                 {esgotado ? (
-                  <p className="font-[family-name:var(--font-display)] text-3xl uppercase leading-none">Esgotado</p>
+                  <p className="font-display text-3xl uppercase leading-none">Esgotado</p>
                 ) : (
-                  <p className="font-[family-name:var(--font-display)] text-3xl uppercase leading-none">
+                  <p className="font-display text-3xl uppercase leading-none">
                     {poucas ? `Só restam ${product.stock}` : "Pronta entrega"}
                   </p>
                 )}

@@ -45,7 +45,7 @@ export function ConversaFaq({ perguntas, whatsappHref }: { perguntas: Item[]; wh
                 onClick={() => perguntar(i)}
                 disabled={digitando && !feita}
                 aria-pressed={feita}
-                className={`grid w-full grid-cols-[3rem_1fr_auto] items-baseline gap-4 px-2 py-5 text-left font-[family-name:var(--font-display)] text-2xl uppercase leading-tight transition-colors md:text-3xl ${
+                className={`grid w-full grid-cols-[3rem_1fr_auto] items-baseline gap-4 px-2 py-5 text-left font-display text-2xl uppercase leading-tight transition-colors md:text-3xl ${
                   feita ? "bg-foreground text-background" : "hover:bg-foreground hover:text-background"
                 }`}
               >
@@ -60,7 +60,7 @@ export function ConversaFaq({ perguntas, whatsappHref }: { perguntas: Item[]; wh
 
       <div className="md:sticky md:top-24 md:self-start">
         <div className="flex items-center justify-between border-2 border-foreground bg-foreground px-5 py-3 text-background">
-          <span className="font-[family-name:var(--font-display)] text-2xl uppercase leading-none">DarkWear</span>
+          <span className="font-display text-2xl uppercase leading-none">DarkWear</span>
           <span className="font-mono text-xs uppercase tracking-[0.15em]">Respondemos aqui</span>
         </div>
         <div
@@ -96,7 +96,7 @@ export function ConversaFaq({ perguntas, whatsappHref }: { perguntas: Item[]; wh
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-between border-2 border-foreground px-5 py-4 font-[family-name:var(--font-display)] text-2xl uppercase transition-colors hover:bg-foreground hover:text-background"
+          className="mt-4 flex items-center justify-between border-2 border-foreground px-5 py-4 font-display text-2xl uppercase transition-colors hover:bg-foreground hover:text-background"
         >
           Não achou? Chama no WhatsApp
           <span aria-hidden="true">→</span>

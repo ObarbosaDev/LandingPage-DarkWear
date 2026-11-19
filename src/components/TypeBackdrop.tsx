@@ -34,7 +34,7 @@ export function TypeBackdrop({ text, rows = 3, tone = "dark", fade = "none", siz
                 {[0, 1].map((k) => (
                   <span
                     key={k}
-                    className="font-[family-name:var(--font-display)] uppercase"
+                    className="font-display uppercase"
                     style={{
                       fontSize: size,
                       paddingRight: "0.4em",

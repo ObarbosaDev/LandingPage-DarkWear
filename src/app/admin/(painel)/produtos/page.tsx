@@ -18,10 +18,10 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-wrap items-end justify-between gap-6">
-        <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Produtos</h1>
+        <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Produtos</h1>
         <Link
           href="/admin/produtos/novo"
-          className="border-2 border-foreground bg-foreground px-6 py-3 font-[family-name:var(--font-display)] text-xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
+          className="border-2 border-foreground bg-foreground px-6 py-3 font-display text-xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
         >
           Novo produto
         </Link>
@@ -42,7 +42,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
               <div>
                 <Link
                   href={`/admin/produtos/${p.slug}`}
-                  className="font-[family-name:var(--font-display)] text-3xl uppercase leading-none underline-offset-4 hover:underline"
+                  className="font-display text-3xl uppercase leading-none underline-offset-4 hover:underline"
                 >
                   {p.name}
                 </Link>

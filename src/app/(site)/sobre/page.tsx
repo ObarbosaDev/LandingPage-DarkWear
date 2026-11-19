@@ -26,7 +26,7 @@ export default function SobrePage() {
       <section className="bg-background text-foreground">
         <div className="mx-auto max-w-7xl px-6 pb-16 pt-16 md:pb-24 md:pt-24">
           <p className="font-mono text-sm uppercase tracking-[0.15em]">Sobre a {SITE.name}</p>
-          <h1 className="mt-6 font-[family-name:var(--font-display)] text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[1.14]">
+          <h1 className="mt-6 font-display text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[1.14]">
             Do arquivo
             <br />à camiseta
           </h1>
@@ -44,14 +44,14 @@ export default function SobrePage() {
         <div className="mx-auto grid max-w-7xl gap-12 px-6 py-20 md:grid-cols-3">
           {PONTOS.map((p) => (
             <div key={p.titulo} className="border-t-2 border-background pt-6">
-              <h2 className="font-[family-name:var(--font-display)] text-5xl uppercase leading-none">{p.titulo}</h2>
+              <h2 className="font-display text-5xl uppercase leading-none">{p.titulo}</h2>
               <p className="mt-5 max-w-xs text-lg font-medium">{p.texto}</p>
             </div>
           ))}
         </div>
         <Link
           href="/personalizar"
-          className="group mx-auto flex max-w-7xl items-center justify-between gap-6 border-t-2 border-background px-6 py-12 font-[family-name:var(--font-display)] text-[clamp(2.5rem,7vw,6rem)] uppercase leading-none"
+          className="group mx-auto flex max-w-7xl items-center justify-between gap-6 border-t-2 border-background px-6 py-12 font-display text-[clamp(2.5rem,7vw,6rem)] uppercase leading-none"
         >
           Manda a sua arte
           <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-3">→</span>

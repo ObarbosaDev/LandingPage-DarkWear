@@ -27,7 +27,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Pedidos</h1>
+      <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Pedidos</h1>
 
       {aviso === "mudou" ? (
         <p role="alert" className="border-2 border-foreground p-4 text-lg font-bold">
@@ -54,7 +54,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
             <article key={o.id} className="border-2 border-foreground">
               <header className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-foreground p-5">
                 <div>
-                  <h2 className="font-[family-name:var(--font-display)] text-4xl uppercase leading-none">{o.number}</h2>
+                  <h2 className="font-display text-4xl uppercase leading-none">{o.number}</h2>
                   <p className="mt-1 text-base font-medium">{dataHora.format(o.createdAt)}</p>
                 </div>
                 <span className="border-2 border-foreground px-3 py-1 font-mono text-sm uppercase">{o.status}</span>
@@ -72,7 +72,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
               </ul>
 
               <footer className="flex flex-wrap items-center justify-between gap-4 border-t-2 border-foreground p-5">
-                <p className="font-[family-name:var(--font-display)] text-4xl leading-none">{formatBRL(o.totalCents / 100)}</p>
+                <p className="font-display text-4xl leading-none">{formatBRL(o.totalCents / 100)}</p>
                 <div className="flex flex-wrap gap-3">
                   {NEXT_STATUS[o.status as OrderStatus].length === 0 ? (
                     <span className="text-lg font-medium">Pedido encerrado.</span>

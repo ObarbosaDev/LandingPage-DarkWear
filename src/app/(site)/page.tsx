@@ -17,7 +17,7 @@ export default async function HomePage() {
         <HeroType />
         <div className="mx-auto max-w-7xl px-6 pt-10">
           <div className="grid items-start gap-8 md:grid-cols-[1fr_19rem]">
-            <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,7vw,6.5rem)] uppercase leading-[0.92] text-foreground">
+            <h1 className="font-display text-[clamp(3rem,7vw,6.5rem)] uppercase leading-[0.92] text-foreground">
               Escolhe uma peça.
               <br />
               Ou manda a sua arte.
@@ -30,13 +30,13 @@ export default async function HomePage() {
               <div className="flex flex-wrap gap-3">
                 <Link
                   href="/loja"
-                  className="border-2 border-foreground bg-foreground px-7 py-3 font-[family-name:var(--font-display)] text-lg uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
+                  className="border-2 border-foreground bg-foreground px-7 py-3 font-display text-lg uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
                 >
                   Ver peças
                 </Link>
                 <Link
                   href="/personalizar"
-                  className="border-2 border-foreground px-7 py-3 font-[family-name:var(--font-display)] text-lg uppercase tracking-wide text-foreground transition-colors hover:bg-foreground hover:text-background"
+                  className="border-2 border-foreground px-7 py-3 font-display text-lg uppercase tracking-wide text-foreground transition-colors hover:bg-foreground hover:text-background"
                 >
                   Mandar minha arte
                 </Link>
@@ -54,7 +54,7 @@ export default async function HomePage() {
       <section id="catalogo" className="relative isolate overflow-hidden">
         <TypeBackdrop text="Catálogo" rows={2} tone="dark" fade="bottom" />
         <div className="mx-auto max-w-7xl px-6 py-24">
-        <h2 className="mb-10 font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">
+        <h2 className="mb-10 font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">
           Catálogo
         </h2>
         <CatalogGrid products={products} />
@@ -64,7 +64,7 @@ export default async function HomePage() {
       <section className="relative isolate overflow-hidden bg-foreground text-background">
         <TypeBackdrop text="Como funciona" rows={3} tone="light" fade="none" />
         <div className="mx-auto max-w-7xl px-6 pb-24 pt-12">
-          <h2 className="font-[family-name:var(--font-display)] text-[clamp(3.5rem,9vw,8rem)] uppercase leading-[0.85]">
+          <h2 className="font-display text-[clamp(3.5rem,9vw,8rem)] uppercase leading-[0.85]">
             Como funciona
           </h2>
           <div className="relative mt-16">
@@ -88,10 +88,10 @@ export default async function HomePage() {
                         {tag as string}
                       </span>
                     </div>
-                    <p className="font-[family-name:var(--font-display)] text-7xl leading-none text-background">
+                    <p className="font-display text-7xl leading-none text-background">
                       <CountUp to={Number(n)} />
                     </p>
-                    <h3 className="font-[family-name:var(--font-display)] text-5xl uppercase leading-none">{t as string}</h3>
+                    <h3 className="font-display text-5xl uppercase leading-none">{t as string}</h3>
                     <p className="max-w-xs text-lg font-medium text-background">{d as string}</p>
                   </div>
                 </Reveal>
@@ -105,7 +105,7 @@ export default async function HomePage() {
         <TypeBackdrop text="Manda a arte" rows={3} tone="dark" fade="top" />
         <div className="mx-auto grid max-w-7xl items-center gap-16 px-6 py-28 md:grid-cols-[1.2fr_1fr]">
         <div>
-          <h2 className="font-[family-name:var(--font-display)] text-[clamp(3.5rem,9vw,8.5rem)] uppercase leading-[0.95]">
+          <h2 className="font-display text-[clamp(3.5rem,9vw,8.5rem)] uppercase leading-[0.95]">
             Manda a arte.
           </h2>
           <p className="mt-8 max-w-lg text-xl font-medium text-foreground">
@@ -113,7 +113,7 @@ export default async function HomePage() {
           </p>
           <Link
             href="/personalizar"
-            className="mt-10 inline-block border-2 border-foreground bg-foreground px-10 py-5 font-[family-name:var(--font-display)] text-xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
+            className="mt-10 inline-block border-2 border-foreground bg-foreground px-10 py-5 font-display text-xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
           >
             Mandar minha arte
           </Link>
@@ -124,10 +124,10 @@ export default async function HomePage() {
           href="/personalizar"
           className="group flex aspect-square flex-col items-center justify-center gap-4 border-2 border-dashed border-foreground p-8 text-center transition-colors hover:bg-foreground hover:text-background"
         >
-          <span className="font-[family-name:var(--font-display)] text-8xl leading-none transition-transform duration-300 group-hover:rotate-90" aria-hidden="true">
+          <span className="font-display text-8xl leading-none transition-transform duration-300 group-hover:rotate-90" aria-hidden="true">
             +
           </span>
-          <span className="font-[family-name:var(--font-display)] text-3xl uppercase">Solte a sua arte aqui</span>
+          <span className="font-display text-3xl uppercase">Solte a sua arte aqui</span>
           <span className="font-mono text-xs uppercase tracking-[0.15em]">PNG, JPG, SVG ou PDF · até 25 MB</span>
         </Link>
       </div>

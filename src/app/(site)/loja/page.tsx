@@ -10,7 +10,7 @@ async function Contagem() {
   const all = await getProducts();
   return (
     <div className="flex items-end gap-4 md:flex-col md:items-end md:gap-0 md:text-right">
-      <span className="font-[family-name:var(--font-display)] text-[clamp(6rem,16vw,15rem)] leading-[0.8]">
+      <span className="font-display text-[clamp(6rem,16vw,15rem)] leading-[0.8]">
         {String(all.length).padStart(2, "0")}
       </span>
       <span className="pb-2 font-mono text-sm uppercase tracking-[0.15em] md:pb-0 md:pt-4">peças no estoque</span>
@@ -50,7 +50,7 @@ export default function LojaPage({ searchParams }: { searchParams: Promise<{ q?:
       <section className="bg-background text-foreground">
         <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-8 border-b-2 border-foreground px-6 pb-10 pt-16 md:pt-24">
           <div className="flex flex-col gap-5">
-            <h1 className="font-[family-name:var(--font-display)] text-[clamp(4.5rem,13vw,12rem)] uppercase leading-[0.88]">Loja</h1>
+            <h1 className="font-display text-[clamp(4.5rem,13vw,12rem)] uppercase leading-[0.88]">Loja</h1>
             <p className="max-w-md text-xl font-medium">Peça pronta do estoque. Escolhe o tamanho e fecha no WhatsApp.</p>
           </div>
           <Suspense fallback={null}>

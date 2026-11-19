@@ -34,7 +34,7 @@ export function IndiceLoja({ products }: { products: Product[] }) {
             type="button"
             onClick={() => setFiltro(f)}
             aria-pressed={filtro === f}
-            className={`border-2 border-foreground px-5 py-2 font-[family-name:var(--font-display)] text-xl uppercase leading-none transition-colors ${
+            className={`border-2 border-foreground px-5 py-2 font-display text-xl uppercase leading-none transition-colors ${
               filtro === f ? "bg-foreground text-background" : "hover:bg-foreground hover:text-background"
             }`}
           >
@@ -64,13 +64,13 @@ export function IndiceLoja({ products }: { products: Product[] }) {
                   <span className="hidden font-mono text-sm uppercase tracking-[0.15em] md:block">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span className="font-[family-name:var(--font-display)] text-[clamp(2.25rem,7.5vw,6.5rem)] uppercase leading-[1.08]">
+                  <span className="font-display text-[clamp(2.25rem,7.5vw,6.5rem)] uppercase leading-[1.08]">
                     {p.name}
                   </span>
                   <span className="font-mono text-sm uppercase tracking-[0.15em] md:text-right">
                     {esgotado ? "Esgotado" : p.category}
                   </span>
-                  <span className="font-[family-name:var(--font-display)] text-3xl leading-none md:text-right">
+                  <span className="font-display text-3xl leading-none md:text-right">
                     {formatBRL(p.price)}
                   </span>
                 </Link>

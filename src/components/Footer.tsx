@@ -29,7 +29,7 @@ export function Footer() {
                 className="origin-top-left -translate-x-[19%] scale-110 object-contain object-left-top mix-blend-screen"
               />
             </div>
-            <p className="max-w-sm pb-3 font-[family-name:var(--font-display)] text-3xl uppercase leading-[1.05] text-foreground">Camisetas DTF. Pronta entrega e sob encomenda.</p>
+            <p className="max-w-sm pb-3 font-display text-3xl uppercase leading-[1.05] text-foreground">Camisetas DTF. Pronta entrega e sob encomenda.</p>
           </div>
 
           <nav aria-label="Rodapé" className="flex flex-col">
@@ -37,7 +37,7 @@ export function Footer() {
               <Link
                 key={l.href}
                 href={l.href}
-                className="group flex items-baseline justify-between gap-10 border-t border-border py-3 font-[family-name:var(--font-display)] text-5xl uppercase leading-none text-foreground transition-colors hover:text-muted md:text-6xl"
+                className="group flex items-baseline justify-between gap-10 border-t border-border py-3 font-display text-5xl uppercase leading-none text-foreground transition-colors hover:text-muted md:text-6xl"
               >
                 {l.label}
                 <span aria-hidden="true" className="text-2xl transition-transform group-hover:translate-x-2">→</span>
@@ -54,7 +54,7 @@ export function Footer() {
       <div className="overflow-hidden bg-foreground text-background">
         <p
           aria-hidden="true"
-          className="pt-6 whitespace-nowrap text-center font-[family-name:var(--font-display)] uppercase leading-[0.76] text-background"
+          className="pt-6 whitespace-nowrap text-center font-display uppercase leading-[0.76] text-background"
           style={{ fontSize: "clamp(5rem, 25vw, 24rem)", marginBottom: "-0.12em" }}
         >
           DarkWear

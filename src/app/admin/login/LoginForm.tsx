@@ -28,7 +28,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="border-2 border-foreground bg-foreground px-8 py-4 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground disabled:cursor-wait"
+        className="border-2 border-foreground bg-foreground px-8 py-4 font-display text-2xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground disabled:cursor-wait"
       >
         {pending ? "Entrando…" : "Entrar"}
       </button>

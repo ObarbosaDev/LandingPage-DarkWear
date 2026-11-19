@@ -12,7 +12,7 @@ export default async function NovoProdutoPage() {
   await requireAdmin();
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Novo produto</h1>
+      <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Novo produto</h1>
       <ProductForm action={createProductAction} />
     </div>
   );

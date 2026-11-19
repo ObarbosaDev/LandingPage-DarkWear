@@ -100,10 +100,10 @@ export default function PersonalizarPage() {
             <span className="font-mono text-sm uppercase tracking-[0.15em]">
               PNG, JPG, SVG ou PDF · até {MAX_MB} MB
             </span>
-            <h1 className="font-[family-name:var(--font-display)] text-[clamp(4rem,13vw,12.5rem)] uppercase leading-[0.86]">
+            <h1 className="font-display text-[clamp(4rem,13vw,12.5rem)] uppercase leading-[0.86]">
               Solte a<br />sua arte aqui
             </h1>
-            <span className="flex flex-wrap items-center justify-between gap-4 font-[family-name:var(--font-display)] text-3xl uppercase leading-none md:text-4xl">
+            <span className="flex flex-wrap items-center justify-between gap-4 font-display text-3xl uppercase leading-none md:text-4xl">
               <span>{file ? `✓ ${file.name}` : "Ou toque para escolher o arquivo"}</span>
               <span aria-hidden="true">↓</span>
             </span>
@@ -184,7 +184,7 @@ export default function PersonalizarPage() {
                 type="button"
                 onClick={enviar}
                 disabled={!canSend}
-                className="border-2 border-background bg-background px-8 py-5 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-foreground transition-colors enabled:hover:bg-transparent enabled:hover:text-background disabled:cursor-not-allowed disabled:bg-transparent disabled:text-background"
+                className="border-2 border-background bg-background px-8 py-5 font-display text-2xl uppercase tracking-wide text-foreground transition-colors enabled:hover:bg-transparent enabled:hover:text-background disabled:cursor-not-allowed disabled:bg-transparent disabled:text-background"
               >
                 {status === "loading" ? "Abrindo WhatsApp…" : "Finalizar pelo WhatsApp"}
               </button>
@@ -206,7 +206,7 @@ export default function PersonalizarPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={preview} alt="Prévia da arte" className="max-h-full max-w-full object-contain p-6" />
               ) : (
-                <span className="px-6 text-center font-[family-name:var(--font-display)] text-3xl uppercase">
+                <span className="px-6 text-center font-display text-3xl uppercase">
                   {file ? "PDF selecionado" : "Sua arte aparece aqui"}
                 </span>
               )}
@@ -215,7 +215,7 @@ export default function PersonalizarPage() {
               {model} · {color} · tamanho {size}
             </p>
             <p className="mt-2 text-lg font-medium">
-              A partir de <span className="font-[family-name:var(--font-display)] text-3xl">{formatBRL(PRICE_FROM)}</span>
+              A partir de <span className="font-display text-3xl">{formatBRL(PRICE_FROM)}</span>
             </p>
           </aside>
         </div>

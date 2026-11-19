@@ -69,7 +69,7 @@ export function ProductBuy({ product }: { product: Product }) {
             type="button"
             onClick={handleAdd}
             disabled={!size}
-            className="border-2 border-foreground bg-foreground px-8 py-5 font-[family-name:var(--font-display)] text-2xl uppercase tracking-wide text-background transition-colors enabled:hover:bg-transparent enabled:hover:text-foreground disabled:cursor-not-allowed disabled:bg-transparent disabled:text-foreground"
+            className="border-2 border-foreground bg-foreground px-8 py-5 font-display text-2xl uppercase tracking-wide text-background transition-colors enabled:hover:bg-transparent enabled:hover:text-foreground disabled:cursor-not-allowed disabled:bg-transparent disabled:text-foreground"
           >
             {size ? "Adicionar à sacola" : "Escolha um tamanho"}
           </button>

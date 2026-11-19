@@ -18,7 +18,7 @@ export function AdminNav() {
     <header className="border-b-2 border-foreground">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
         <nav aria-label="Painel" className="flex flex-wrap items-center gap-x-8 gap-y-2">
-          <span className="font-[family-name:var(--font-display)] text-2xl uppercase">DarkWear</span>
+          <span className="font-display text-2xl uppercase">DarkWear</span>
           {LINKS.map((l) => {
             const active = l.href === "/admin" ? pathname === "/admin" : pathname.startsWith(l.href);
             return (

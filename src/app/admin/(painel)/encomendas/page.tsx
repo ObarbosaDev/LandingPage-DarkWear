@@ -17,7 +17,7 @@ export default async function EncomendasPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Encomendas</h1>
+      <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Encomendas</h1>
       <p className="max-w-2xl text-xl font-medium">
         Pedidos de camiseta com arte do cliente. O arquivo da arte chega pelo WhatsApp, aqui fica o registro do pedido.
       </p>
@@ -30,7 +30,7 @@ export default async function EncomendasPage() {
             <article key={c.id} className="border-2 border-foreground">
               <header className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-foreground p-5">
                 <div>
-                  <h2 className="font-[family-name:var(--font-display)] text-4xl uppercase leading-none">
+                  <h2 className="font-display text-4xl uppercase leading-none">
                     EP-{String(c.id).padStart(5, "0")}
                   </h2>
                   <p className="mt-1 text-base font-medium">{dataHora.format(c.createdAt)}</p>
