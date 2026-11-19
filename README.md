@@ -80,7 +80,7 @@ O painel fica em `/admin` e protege tudo com uma senha única.
 | `ADMIN_PASSWORD` | Senha de entrada do painel. |
 | `ADMIN_SESSION_SECRET` | Segredo que assina o cookie de sessão (mínimo de 32 caracteres, aleatório). |
 
-Copie `.env.example` para `.env.local` e preencha as duas. Sem elas, o painel não abre. A sessão dura 12 horas, o cookie é `httpOnly` e `sameSite=strict`, e cada página e cada ação conferem a sessão. O login tem limite de 5 erros em 15 minutos por IP.
+Copie `.env.example` para `.env.local` e preencha as duas. Sem elas, o painel não abre. A sessão dura 12 horas, o cookie é `httpOnly` e `sameSite=strict`, e cada página e cada ação conferem a sessão. O login tem limite de 5 erros em 15 minutos por origem, guardado no banco (vale entre instâncias). A origem vem do cabeçalho que a hospedagem define (`x-vercel-forwarded-for` ou `x-real-ip`); fora de uma hospedagem assim, todos compartilham a mesma origem.
 
 Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez de usar um banco que se perderia a cada execução.
 
@@ -167,7 +167,7 @@ curl -X POST http://localhost:3000/api/orders \
 
 O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **persistidos em banco**. Ainda faltam peças para ser um e-commerce completo:
 
-- **Painel simples:** senha única, sem vários usuários nem recuperação de senha (para isso, migrar para um provedor como o Clerk). O limite de tentativas de login fica na memória de cada instância.
+- **Painel simples:** senha única, sem vários usuários nem recuperação de senha (para isso, migrar para um provedor como o Clerk).
 - **Sem upload de foto no painel:** a foto é um arquivo em `public/products/` e o painel recebe só o caminho. Upload direto exigiria um armazenamento como o Vercel Blob.
 - **Sem pagamento online:** Pix e cartão são combinados no WhatsApp. O pedido nasce como `pendente`.
 - **Estoque reservado sem prazo:** a baixa acontece quando o pedido é registrado. Pedido que nunca é pago segura a peça até alguém cancelar. Falta expirar pedidos pendentes.
