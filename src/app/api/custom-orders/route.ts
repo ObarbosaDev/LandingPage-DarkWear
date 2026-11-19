@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { buildCustomMessage, whatsappLink } from "@/lib/whatsapp";
-import { validateCustom } from "@/lib/orders";
+import { saveCustomOrder, validateCustom } from "@/lib/orders";
 
-// POST /api/custom-orders  →  valida a encomenda personalizada e devolve o link do WhatsApp.
-// O arquivo da arte não passa por aqui: o cliente anexa no WhatsApp.
+// POST /api/custom-orders  →  valida e registra a encomenda personalizada e devolve o link do WhatsApp.
+// O arquivo da arte não passa por aqui: o cliente anexa no WhatsApp. Só o nome do arquivo é guardado.
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -15,8 +15,17 @@ export async function POST(request: Request) {
   const checked = validateCustom(body);
   if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 422 });
 
-  return NextResponse.json(
-    { whatsappUrl: whatsappLink(buildCustomMessage(checked.order)) },
-    { status: 201 },
-  );
+  try {
+    const saved = await saveCustomOrder(checked.order);
+    return NextResponse.json(
+      {
+        id: saved.number,
+        whatsappUrl: whatsappLink(`Encomenda ${saved.number}\n\n${buildCustomMessage(checked.order)}`),
+      },
+      { status: 201 },
+    );
+  } catch (e) {
+    console.error("Falha ao registrar encomenda:", e);
+    return NextResponse.json({ error: "Não foi possível registrar a encomenda." }, { status: 500 });
+  }
 }
