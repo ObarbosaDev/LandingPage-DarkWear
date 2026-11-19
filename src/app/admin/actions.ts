@@ -116,7 +116,10 @@ export async function updateProductAction(_prev: FormState, form: FormData): Pro
 export async function setStockAction(form: FormData): Promise<void> {
   await requireAdmin();
   const slug = String(form.get("slug") ?? "");
-  await setProductStock(slug, Number(form.get("stock")));
+  // Campo vazio não pode virar 0 (Number("") é 0): sem número digitado, não muda nada.
+  const raw = String(form.get("stock") ?? "").trim();
+  if (!raw) return;
+  await setProductStock(slug, Number(raw));
   refreshCatalog();
   revalidatePath("/admin/produtos");
 }
