@@ -5,7 +5,7 @@ import { getProduct, getProducts } from "@/lib/catalog";
 import { formatBRL } from "@/lib/site";
 import { ProductBuy } from "./ProductBuy";
 import { ProductImage } from "@/components/ProductImage";
-import { TypeBackdrop } from "@/components/TypeBackdrop";
+import { ProductZoom } from "@/components/ProductZoom";
 
 export async function generateStaticParams() {
   return (await getProducts()).map((p) => ({ slug: p.slug }));
@@ -30,25 +30,43 @@ export default async function ProdutoPage({
   const product = await getProduct(slug);
   if (!product) notFound();
 
-  return (
-    <section className="relative isolate overflow-hidden bg-background">
-      <TypeBackdrop text={product.category} rows={3} tone="dark" fade="bottom" size="clamp(6rem, 14vw, 14rem)" />
-      <div className="mx-auto grid max-w-7xl gap-12 px-6 py-12 md:grid-cols-2 md:py-20">
-        <div className="relative aspect-[4/5] border-2 border-foreground bg-background/80">
-          <ProductImage product={product} sizes="(min-width: 768px) 50vw, 100vw" priority />
-        </div>
+  const esgotado = product.stock === 0;
+  const poucas = !esgotado && product.stock <= 3;
 
-        <div className="flex flex-col gap-6">
-          <Link href="/loja" className="w-fit text-lg font-medium text-foreground underline-offset-4 hover:underline">
-            ← Voltar para a loja
-          </Link>
-          <p className="font-mono text-sm uppercase tracking-[0.15em] text-foreground">{product.category}</p>
-          <h1 className="font-[family-name:var(--font-display)] text-[clamp(3rem,6vw,5.5rem)] uppercase leading-[0.92] text-foreground">
-            {product.name}
-          </h1>
-          <p className="font-[family-name:var(--font-display)] text-5xl leading-none text-foreground">{formatBRL(product.price)}</p>
-          <p className="max-w-lg text-xl font-medium text-foreground">{product.description}</p>
-          <ProductBuy product={product} />
+  return (
+    <section className="bg-background text-foreground">
+      <div className="mx-auto max-w-7xl px-6 pb-20 pt-10 md:pt-14">
+        <Link href="/loja" className="w-fit text-lg font-medium underline-offset-4 hover:underline">
+          ← Voltar para a loja
+        </Link>
+
+        {/* O nome ocupa a largura toda: a peça é a manchete. */}
+        <h1 className="mt-6 font-[family-name:var(--font-display)] text-[clamp(3.5rem,11vw,10.5rem)] uppercase leading-[0.88]">
+          {product.name}
+        </h1>
+
+        <div className="mt-10 grid gap-12 md:grid-cols-[1.1fr_1fr]">
+          <ProductZoom>
+            <ProductImage product={product} sizes="(min-width: 768px) 55vw, 100vw" priority />
+          </ProductZoom>
+
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-wrap items-end justify-between gap-6 border-b-2 border-foreground pb-6">
+              <p className="font-[family-name:var(--font-display)] text-7xl leading-none">{formatBRL(product.price)}</p>
+              <div className="text-right">
+                <p className="font-mono text-sm uppercase tracking-[0.15em]">{product.category}</p>
+                {esgotado ? (
+                  <p className="font-[family-name:var(--font-display)] text-3xl uppercase leading-none">Esgotado</p>
+                ) : (
+                  <p className="font-[family-name:var(--font-display)] text-3xl uppercase leading-none">
+                    {poucas ? `Só restam ${product.stock}` : "Pronta entrega"}
+                  </p>
+                )}
+              </div>
+            </div>
+            <p className="max-w-lg text-xl font-medium">{product.description}</p>
+            <ProductBuy product={product} />
+          </div>
         </div>
       </div>
     </section>
