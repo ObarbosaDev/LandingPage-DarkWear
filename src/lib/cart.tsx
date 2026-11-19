@@ -33,10 +33,11 @@ type Action =
 const STORAGE_KEY = "darkwear-cart";
 
 // Carrinhos salvos antes da mudança para centavos têm "price" em reais: converte em vez de perder os itens.
-function normalizeStored(raw: unknown): CartItem[] {
+export function normalizeStored(raw: unknown): CartItem[] {
   if (!Array.isArray(raw)) return [];
   const items: CartItem[] = [];
   for (const r of raw as Record<string, unknown>[]) {
+    if (typeof r !== "object" || r === null) continue;
     const priceCents =
       typeof r.priceCents === "number" ? r.priceCents : typeof r.price === "number" ? Math.round(r.price * 100) : NaN;
     if (!Number.isFinite(priceCents) || typeof r.id !== "string" || typeof r.slug !== "string") continue;
