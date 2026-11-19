@@ -21,7 +21,7 @@ Loja online de camisetas estampadas em DTF. O cliente escolhe uma peça pronta d
 - **Catálogo:** vitrine na home com filtro por categoria (Todos, Pronta entrega, Coleção) e busca por nome na loja.
 - **Arco de produtos:** carrossel 3D de cards na home. Arrasta com o mouse, rola com a roda, usa as setas ou clica no card.
 - **Página de produto:** foto, descrição, escolha de tamanho e cor, com controle pelo estoque disponível.
-- **Carrinho:** persiste no navegador (`localStorage`) e fecha o pedido pelo WhatsApp com uma mensagem já montada.
+- **Carrinho:** persiste no navegador (`localStorage`) e fecha o pedido pelo WhatsApp com uma mensagem já montada, ou paga online com cartão (crédito e débito) e Pix pelo Mercado Pago, quando configurado.
 - **Encomenda personalizada:** o cliente escolhe modelo, cor, tamanho e a posição da arte (frente, costas, peito ou manga), envia o arquivo (PNG, JPG, SVG ou PDF, até 25 MB) e confirma pelo WhatsApp. O arquivo da arte é anexado na própria conversa.
 - **Páginas institucionais:** Sobre, FAQ e Contato.
 - **Acessibilidade de movimento:** as animações respeitam a preferência de reduzir movimento do sistema.
@@ -137,6 +137,33 @@ Copie `.env.example` para `.env.local` e preencha as duas. Sem elas, o painel n�
 
 Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez de usar um banco que se perderia a cada execução.
 
+### Pagamento online (Mercado Pago)
+
+O pagamento online é **opcional**: sem `MERCADOPAGO_ACCESS_TOKEN`, o site fecha pedidos só pelo WhatsApp, como antes. Com ele, a sacola ganha o botão "Pagar com cartão ou Pix".
+
+**O cartão nunca passa por este site.** O cliente é levado à página de pagamento do próprio Mercado Pago (Checkout Pro) e digita o cartão lá. O site só cria a cobrança e recebe o aviso do resultado, então não há dado de cartão para proteger nem certificação PCI a cumprir. Crédito, débito e Pix ficam disponíveis; o boleto fica de fora de propósito, porque leva dias para compensar e seguraria as peças no estoque.
+
+| Variável | Para que serve |
+| --- | --- |
+| `MERCADOPAGO_ACCESS_TOKEN` | Liga o pagamento online. Vem do painel de desenvolvedores do Mercado Pago. Nunca vai ao navegador. |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Assinatura secreta dos avisos (Suas integrações > Webhooks). Sem ela, os avisos não têm a assinatura conferida. |
+| `MERCADOPAGO_MAX_INSTALLMENTS` | Máximo de parcelas no cartão, de 1 a 12. Padrão 1 (à vista), porque parcelar tem custo para a loja. |
+| `MERCADOPAGO_SANDBOX` | `true` usa a página de teste (com as credenciais de teste). |
+| `SITE_URL` | Endereço público com `https://`. É para lá que o Mercado Pago avisa e devolve o cliente. |
+
+No painel do Mercado Pago, cadastre o aviso em `<SITE_URL>/api/webhooks/mercadopago`, com o evento "Pagamentos".
+
+Como o pedido é pago:
+
+1. O cliente clica em "Pagar com cartão ou Pix": o servidor cria o pedido (baixando o estoque), abre a cobrança e leva o cliente ao Mercado Pago. Se a cobrança não abrir, o pedido é cancelado na hora e as peças voltam ao estoque.
+2. O Mercado Pago avisa o servidor (`POST /api/webhooks/mercadopago`). O aviso só diz "olhe o pagamento número X": o servidor **consulta o pagamento na API com o token** e só acredita nessa resposta. Um aviso forjado não paga nada.
+3. O pedido vira `pago` (histórico com origem "pagamento") somente se o pagamento está `approved` **e o valor é exatamente o total do pedido**. Avisos repetidos ou simultâneos pagam uma vez só (linha do pedido travada e `provider_payment_id` único).
+4. A página `/pagamento/retorno` mostra a situação **do banco**, nunca o que vem na URL, e se atualiza sozinha enquanto espera (o Pix leva alguns segundos).
+
+Casos que pedem a atenção do dono, e que aparecem no log do servidor: pagamento aprovado com **valor diferente** do pedido (o pedido não é marcado como pago) e pagamento aprovado em pedido **já cancelado** por prazo (as peças já voltaram ao estoque; decida entre reativar à mão ou estornar no Mercado Pago). O estorno é feito no painel do Mercado Pago.
+
+Para testar sem cobrar ninguém: use as credenciais de teste, `MERCADOPAGO_SANDBOX=true` e os cartões de teste da documentação do Mercado Pago. O aviso precisa de um endereço público com https (use um túnel como o do `ngrok` em desenvolvimento).
+
 ### Outros pontos de ajuste
 
 | O que | Onde |
@@ -144,7 +171,7 @@ Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez
 | Número do WhatsApp da loja (formato `55` + DDD + número) | `src/lib/site.ts` → `whatsappNumber` |
 | Nome da marca, descrição e observação de pagamento | `src/lib/site.ts` |
 | Catálogo inicial (usado só para popular o banco vazio) | `src/data/products.ts` |
-| Fotos dos produtos | `public/products/` (WebP com fundo transparente, até uns 1600 px) |
+| Fotos dos produtos | pelo painel (`/admin/produtos`); as do catálogo de exemplo ficam em `public/products/` (WebP com fundo transparente, até uns 1600 px) |
 | Logo | `public/brand/logo-dark.jpg` |
 
 > O número do WhatsApp atual é um valor de exemplo (`5500000000000`). Troque pelo número real antes de publicar.
@@ -153,11 +180,10 @@ Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez
 
 Os produtos ficam na tabela `products` do banco. O arquivo `src/data/products.ts` só popula um banco **vazio**: depois da primeira execução, editá-lo não muda o catálogo.
 
-1. Coloque a foto em `public/products/`.
-2. Em `/admin/produtos/novo`, preencha os campos e informe o caminho da foto (por exemplo `/products/arquivo.webp`).
-3. Para peça escura em foto com fundo transparente, escolha "Escura" em "Peça da foto". Ela ganha um contorno de luz fino e aparece sobre os cards escuros.
+1. Em `/admin/produtos/novo`, preencha os campos e **escolha a foto** (JPG, PNG ou WebP, até 2 MB). Ela é guardada no banco e entregue por `/api/images/<id>`: não precisa mexer no projeto nem publicar de novo. Para trocar ou remover a foto depois, edite o produto.
+2. Para peça escura em foto com fundo transparente, escolha "Escura" em "Peça da foto". Ela ganha um contorno de luz fino e aparece sobre os cards escuros.
 
-Produto sem foto mostra uma camiseta desenhada no lugar. Estoque, ocultar e mostrar na loja são feitos na lista de produtos do painel.
+Produto sem foto mostra as iniciais da peça no lugar. As fotos do catálogo de exemplo continuam sendo arquivos de `public/products/`; os dois jeitos convivem. Estoque, ocultar e mostrar na loja são feitos na lista de produtos do painel.
 
 ## Estrutura do projeto
 
@@ -238,8 +264,9 @@ curl -X POST http://localhost:3000/api/orders \
 O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **persistidos em banco**. Ainda faltam peças para ser um e-commerce completo:
 
 - **Painel simples:** senha única, sem vários usuários nem recuperação de senha (para isso, migrar para um provedor como o Clerk).
-- **Sem upload de foto no painel:** a foto é um arquivo em `public/products/` e o painel recebe só o caminho. Upload direto exigiria um armazenamento como o Vercel Blob.
-- **Sem pagamento online:** Pix e cartão são combinados no WhatsApp. O pedido nasce como `pendente`.
+- **Fotos no banco:** o upload do painel guarda a imagem no Postgres (até 2 MB, sem redimensionar). Serve bem para um catálogo pequeno; se o volume crescer, migrar para um armazenamento de arquivos como o Vercel Blob. Prefira fotos já otimizadas (WebP).
+- **Pagamento online ainda não testado contra o Mercado Pago real:** a integração foi validada com a API simulada. O formato da assinatura do aviso (`x-signature`) precisa ser conferido com o botão "Simular" do painel deles antes de publicar. Sem `MERCADOPAGO_ACCESS_TOKEN`, Pix e cartão seguem combinados no WhatsApp e o pedido nasce `pendente`.
+- **Sem estorno pelo painel:** estornos e disputas são feitos no painel do Mercado Pago.
 - **Pedido pendente expira só por prazo fixo:** a baixa acontece quando o pedido é registrado, e o cron cancela os pendentes depois de 48 horas. Não há aviso ao cliente nem prazo por pedido.
 - **Sem cálculo de frete.**
 - **Sem contas de cliente:** a compra é sem cadastro.
@@ -250,8 +277,8 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 
 1. Provisionar o Neon na Vercel (precisa da conta do dono) e testar contra o banco real.
 2. Trocar o número de WhatsApp de exemplo em `src/lib/site.ts` pelo número da loja.
-3. Pagamento online com Pix e cartão, com confirmação automática (webhook) mudando o pedido para `pago`.
-4. Upload de fotos pelo painel.
+3. Criar a conta e a aplicação no Mercado Pago, cadastrar o aviso e testar o pagamento com as credenciais de teste.
+4. Mostrar o pagamento (forma, parcelas) em cada pedido do painel.
 5. Cálculo de frete.
 6. Área "Meus pedidos", opcional e sem cadastro obrigatório.
 

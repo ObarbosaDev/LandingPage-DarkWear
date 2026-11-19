@@ -85,3 +85,38 @@ describe("checkEnv", () => {
     expect(local.warnings.join(" ")).toMatch(/WhatsApp/);
   });
 });
+
+// Mercado Pago: pagamento online só pode ir ao ar completo (token + segredo do aviso + site com https).
+describe("checkEnv: Mercado Pago", () => {
+  const mp = { ...completo, MERCADOPAGO_ACCESS_TOKEN: "APP_USR-x", MERCADOPAGO_WEBHOOK_SECRET: "segredo" };
+
+  it("configuração completa não tem erro nem aviso", () => {
+    expect(checkEnv(mp, REAL)).toEqual({ errors: [], warnings: [] });
+  });
+
+  it("sem Mercado Pago, nada muda (só WhatsApp)", () => {
+    expect(checkEnv(completo, REAL)).toEqual({ errors: [], warnings: [] });
+  });
+
+  it("sem segredo do aviso: aviso (a assinatura não será conferida)", () => {
+    const r = checkEnv({ ...mp, MERCADOPAGO_WEBHOOK_SECRET: undefined }, REAL);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings.join(" ")).toMatch(/WEBHOOK_SECRET/);
+  });
+
+  it.each([undefined, "", "http://exemplo.com.br", "exemplo.com.br"])("SITE_URL %j com Mercado Pago ativo é erro em produção", (url) => {
+    expect(checkEnv({ ...mp, SITE_URL: url }, REAL).errors.join(" ")).toMatch(/https/);
+  });
+
+  it("em desenvolvimento, SITE_URL sem https não é erro", () => {
+    expect(checkEnv({ ...mp, NODE_ENV: "development", SITE_URL: undefined }, REAL).errors).toEqual([]);
+  });
+
+  it("modo de teste em produção avisa que ninguém é cobrado de verdade", () => {
+    expect(checkEnv({ ...mp, MERCADOPAGO_SANDBOX: "true" }, REAL).warnings.join(" ")).toMatch(/TESTE/);
+  });
+
+  it("segredo do aviso sem token avisa que o pagamento continua desligado", () => {
+    expect(checkEnv({ ...completo, MERCADOPAGO_WEBHOOK_SECRET: "x" }, REAL).warnings.join(" ")).toMatch(/desligado/);
+  });
+});

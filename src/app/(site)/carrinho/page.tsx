@@ -4,10 +4,14 @@
 // Visual: a sacola é um "recibo de papel" (fonte de máquina, pontilhado entre o item e o preço, borda
 // serrilhada). À esquerda, o título e um atalho para continuar comprando.
 //
-// Fluxo ao clicar em "Finalizar pelo WhatsApp":
+// Dois jeitos de fechar:
+//   - "Pagar com cartão ou Pix" (só aparece se o Mercado Pago estiver configurado): o cliente é levado
+//     à página de pagamento do Mercado Pago. Os dados do cartão NUNCA passam por este site;
+//   - "Finalizar pelo WhatsApp": o pedido vai para a conversa, como antes.
+// Nos dois, o fluxo é o mesmo até o fim:
 //   1. envia ao servidor SÓ quais peças, tamanhos, cores e quantidades (POST /api/orders);
 //   2. o servidor confere o estoque, recalcula os preços e registra o pedido;
-//   3. a sacola é esvaziada e o cliente é levado ao WhatsApp, com a mensagem do pedido pronta.
+//   3. a sacola é esvaziada e o cliente é levado ao destino (pagamento ou WhatsApp).
 // Os preços mostrados aqui servem só para exibição: quem manda é o servidor.
 //
 // É componente de navegador ("use client") porque lê o carrinho guardado no navegador (useCart).
@@ -16,7 +20,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCart } from "@/lib/cart";
 import { SITE } from "@/lib/site";
 import { formatCents } from "@/lib/money";
@@ -26,9 +30,17 @@ export default function CarrinhoPage() {
   // Situação do botão "Finalizar": parado, enviando, ou deu erro (com a mensagem em "error").
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
+  // Se o pagamento online está disponível (o servidor diz). Começa falso: o botão só aparece depois.
+  const [online, setOnline] = useState(false);
+  useEffect(() => {
+    fetch("/api/payments/config")
+      .then((r) => r.json())
+      .then((d: { online?: boolean }) => setOnline(d.online === true))
+      .catch(() => setOnline(false)); // sem resposta, fica só o WhatsApp
+  }, []);
 
-  /** Registra o pedido no servidor e leva o cliente ao WhatsApp. */
-  async function finalizar() {
+  /** Registra o pedido no servidor e leva o cliente ao pagamento (modo "online") ou ao WhatsApp. */
+  async function finalizar(modo: "whatsapp" | "online") {
     setStatus("loading");
     setError("");
     try {
@@ -38,14 +50,16 @@ export default function CarrinhoPage() {
         // Só o essencial: o servidor ignora qualquer preço e busca os valores reais no banco.
         body: JSON.stringify({
           items: items.map((i) => ({ slug: i.slug, size: i.size, color: i.color, qty: i.qty })),
+          payment: modo,
         }),
       });
-      const data = (await res.json()) as { whatsappUrl?: string; error?: string };
+      const data = (await res.json()) as { whatsappUrl?: string; paymentUrl?: string; error?: string };
+      const destino = modo === "online" ? data.paymentUrl : data.whatsappUrl;
       // Falhou (sem estoque, muitas tentativas...): mostra a mensagem que o servidor mandou.
-      if (!res.ok || !data.whatsappUrl) throw new Error(data.error ?? "Não foi possível registrar o pedido.");
-      // Pedido registrado: esvazia a sacola e abre a conversa do WhatsApp.
+      if (!res.ok || !destino) throw new Error(data.error ?? "Não foi possível registrar o pedido.");
+      // Pedido registrado: esvazia a sacola e leva o cliente ao destino.
       clear();
-      window.location.href = data.whatsappUrl;
+      window.location.href = destino;
     } catch (e) {
       setStatus("error");
       setError(e instanceof Error ? e.message : "Erro inesperado.");
@@ -146,11 +160,27 @@ export default function CarrinhoPage() {
                   <span className="text-sm font-bold uppercase tracking-[0.15em]">Total</span>
                   <span className="font-display text-6xl leading-none">{formatCents(totalCents)}</span>
                 </div>
+                {/* Pagar online: cartão de crédito, débito ou Pix, na página do Mercado Pago. */}
+                {online && (
+                  <button
+                    type="button"
+                    onClick={() => finalizar("online")}
+                    disabled={status === "loading"}
+                    className="mt-6 w-full border-2 border-background bg-background px-6 py-4 font-display text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
+                  >
+                    {status === "loading" ? "Registrando pedido…" : "Pagar com cartão ou Pix"}
+                  </button>
+                )}
+                {/* O WhatsApp é o botão principal quando não há pagamento online; com ele, vira a alternativa. */}
                 <button
                   type="button"
-                  onClick={finalizar}
+                  onClick={() => finalizar("whatsapp")}
                   disabled={status === "loading"}
-                  className="mt-6 w-full border-2 border-background bg-background px-6 py-4 font-display text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
+                  className={
+                    online
+                      ? "mt-3 w-full border-2 border-background px-6 py-3 font-display text-xl uppercase tracking-wide transition-colors hover:bg-background hover:text-foreground disabled:cursor-wait"
+                      : "mt-6 w-full border-2 border-background bg-background px-6 py-4 font-display text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
+                  }
                 >
                   {status === "loading" ? "Registrando pedido…" : "Finalizar pelo WhatsApp"}
                 </button>

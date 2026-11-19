@@ -14,3 +14,9 @@ process.env.PGLITE_DIR = "memory://";
 // Senha e segredo FALSOS, só para testar o login do painel. Não têm relação com os valores reais.
 process.env.ADMIN_PASSWORD = "senha-de-teste";
 process.env.ADMIN_SESSION_SECRET = "segredo-de-teste-com-mais-de-32-caracteres";
+// Mercado Pago: nunca herdar credenciais reais da máquina. Cada teste de pagamento define as suas (falsas).
+delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+delete process.env.MERCADOPAGO_SANDBOX;
+delete process.env.MERCADOPAGO_MAX_INSTALLMENTS;
+delete process.env.SITE_URL;

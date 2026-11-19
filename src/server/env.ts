@@ -64,6 +64,23 @@ export function checkEnv(env: Env = process.env, whatsapp: string = SITE.whatsap
     if (!Number.isFinite(h) || h <= 0) warnings.push("PENDING_ORDER_HOURS inválida: usando o padrão de 48 horas.");
   }
 
+  // Mercado Pago (pagamento online): token e segredo do aviso andam juntos. Sem o segredo, o aviso
+  // não tem assinatura conferida (a consulta ao Mercado Pago ainda protege o pedido, mas o endpoint
+  // ficaria aberto a chamadas falsas). Sem https no SITE_URL, o Mercado Pago não consegue avisar.
+  if (env.MERCADOPAGO_ACCESS_TOKEN) {
+    if (producao && !env.MERCADOPAGO_WEBHOOK_SECRET) {
+      warnings.push("MERCADOPAGO_WEBHOOK_SECRET não definida: os avisos de pagamento chegam sem conferir a assinatura.");
+    }
+    if (producao && !(env.SITE_URL ?? "").startsWith("https://")) {
+      errors.push("Com o Mercado Pago ativo, SITE_URL precisa ser o endereço público com https:// (é para lá que ele avisa e devolve o cliente).");
+    }
+    if (producao && env.MERCADOPAGO_SANDBOX === "true") {
+      warnings.push("MERCADOPAGO_SANDBOX=true em produção: os pagamentos são de TESTE e ninguém é cobrado de verdade.");
+    }
+  } else if (env.MERCADOPAGO_WEBHOOK_SECRET) {
+    warnings.push("MERCADOPAGO_WEBHOOK_SECRET definida sem MERCADOPAGO_ACCESS_TOKEN: o pagamento online continua desligado.");
+  }
+
   // Endereço do site (sitemap)
   if (producao && !env.SITE_URL) {
     warnings.push("SITE_URL não definida: o sitemap usa o endereço local. Defina, por exemplo, https://seusite.com.br");

@@ -6,14 +6,19 @@
 //   1. confere o limite de uso (anti-abuso);
 //   2. lê os itens enviados;
 //   3. registra o pedido no banco e baixa o estoque (tudo ou nada);
-//   4. devolve o número do pedido e o link do WhatsApp com a mensagem pronta.
-// O navegador então redireciona o cliente para esse link.
+//   4. devolve o número do pedido e o link do WhatsApp com a mensagem pronta;
+//   5. se o cliente escolheu pagar online ("payment": "online"), abre a cobrança no Mercado Pago e
+//      devolve também "paymentUrl". Se a cobrança não abrir, o pedido é cancelado na hora e as
+//      peças voltam ao estoque (o cliente não fica com um pedido "fantasma").
+// O navegador então redireciona o cliente para o link escolhido.
 // ============================================================================
 
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { buildCartMessage, whatsappLink } from "@/lib/whatsapp";
-import { OrderError, createOrder } from "@/server/orders";
+import { OrderError, cancelOrder, createOrder } from "@/server/orders";
+import { startPayment } from "@/server/payments";
+import { mpConfigurado } from "@/server/payments/mercadopago";
 import { clientKey, rateLimit } from "@/server/rate-limit";
 
 /** Resposta padrão de "muitas chamadas": 429 + o cabeçalho Retry-After (em quantos segundos tentar de novo). */
@@ -40,12 +45,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
   }
 
+  // Pagamento online só existe se o Mercado Pago estiver configurado. Conferido ANTES de criar o
+  // pedido, para não baixar estoque à toa.
+  const online = (body as { payment?: unknown })?.payment === "online";
+  if (online && !mpConfigurado()) {
+    return NextResponse.json({ error: "Pagamento online indisponível. Feche pelo WhatsApp." }, { status: 503 });
+  }
+
   try {
     // Só os "items" são usados do que veio: preços e totais enviados pelo navegador são ignorados.
     const order = await createOrder((body as { items?: unknown })?.items);
 
     // O estoque mudou: o catálogo precisa refletir isso já na próxima leitura (sem servir valor antigo).
     revalidateTag("products", { expire: 0 });
+
+    // Pagamento online: abre a cobrança. Se falhar, desfaz o pedido (cancela e devolve o estoque).
+    if (online) {
+      try {
+        const paymentUrl = await startPayment(order.id);
+        return NextResponse.json({ id: order.number, totalCents: order.totalCents, paymentUrl }, { status: 201 });
+      } catch (e) {
+        console.error("Falha ao abrir o pagamento:", e instanceof Error ? e.message : e);
+        await cancelOrder(order.id, "pendente", "pedido");
+        revalidateTag("products", { expire: 0 });
+        return NextResponse.json({ error: "Não foi possível abrir o pagamento. Tente de novo ou feche pelo WhatsApp." }, { status: 502 });
+      }
+    }
 
     // Monta o texto do WhatsApp com os valores calculados pelo servidor.
     const message = buildCartMessage(
