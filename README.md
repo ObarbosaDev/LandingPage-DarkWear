@@ -59,6 +59,22 @@ O site abre em `http://localhost:3000`.
 | `npm run build` | Build de produção, com checagem de tipos |
 | `npm run start` | Serve o build de produção |
 | `npm run lint` | Roda o ESLint |
+| `npm test` | Roda os testes (Vitest), uma vez |
+| `npm run test:watch` | Roda os testes e repete a cada mudança |
+
+### Testes
+
+Os testes ficam em `tests/` e rodam com um Postgres em memória (PGlite), sem configurar nada. Cobrem as regras que mexem com dinheiro e estoque:
+
+- preço e formulário de produto (leitura de "89,90" e "1.299", limites, foto só em `/products/`);
+- criação de pedido (total calculado no servidor, tudo ou nada, estoque insuficiente, produto oculto);
+- cancelamento (devolve o estoque uma vez só, mesmo com vários cancelamentos ao mesmo tempo);
+- fluxo de status do painel, encomenda personalizada e carrinho salvo no navegador;
+- senha, sessão assinada (adulteração, expiração) e limite de tentativas de login.
+
+Limite conhecido: o PGlite atende uma consulta por vez, então os testes de concorrência provam a regra (nunca vender além do estoque), mas não a disputa de linhas de um Postgres real. Isso só se testa contra o Neon.
+
+A cada envio para a `main` e em todo pull request, o GitHub roda lint, testes e build (`.github/workflows/ci.yml`).
 
 ## Configuração
 
