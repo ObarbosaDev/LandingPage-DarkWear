@@ -7,17 +7,14 @@
 //
 // Quem usa: src/app/(site)/conta/entrar/page.tsx. O formulário chama loginAction (src/app/actions-cliente.ts).
 //
-// A DOBRADIÇA: a porta tem três pequenas dobradiças na borda esquerda. A do meio é o acesso escondido ao
-// painel do dono: segurar o clique nela por 2 segundos leva a /admin/login. Não tem texto, nem rótulo, nem
-// aparência de botão (parece uma dobradiça, e é uma). Isto é só DISCRIÇÃO: quem protege o painel é a
-// senha e o limite de tentativas, nunca o segredo de onde fica a porta.
+// Esta tela é a MESMA para clientes e para quem administra a loja: não há botão, link nem gesto para o
+// painel. Quem tem papel de administrador entra aqui, com o seu e-mail e a sua senha, e é levado ao painel.
 // ============================================================================
 
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useActionState, useRef } from "react";
+import { useActionState } from "react";
 import { loginAction, type ClienteFormState } from "@/app/actions-cliente";
 
 // Rótulo pequeno em fonte mono e o campo (só uma linha embaixo, que inverte ao receber o foco).
@@ -25,26 +22,11 @@ const rotulo = "font-mono text-xs font-bold uppercase tracking-[0.18em]";
 const campo =
   "w-full border-0 border-b-2 border-background bg-transparent py-2 font-mono text-lg text-background outline-none transition-colors focus:bg-background focus:px-2 focus:text-foreground";
 
-// Quanto tempo segurar a dobradiça (milissegundos).
-const SEGURAR_MS = 2000;
-
 export function Provador({ next }: { next: string }) {
-  const router = useRouter();
   const [estado, acao, pending] = useActionState<ClienteFormState, FormData>(loginAction, {});
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Começa a contar quando o dedo/mouse aperta a dobradiça; se soltar ou sair antes do tempo, cancela.
-  const apertou = () => {
-    timer.current = setTimeout(() => router.push("/admin/login"), SEGURAR_MS);
-  };
-  const soltou = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-  };
-
-  // Uma dobradiça: uma barrinha preta na borda da porta. O onContextMenu da do meio (abaixo) bloqueia o
-  // menu que celulares abrem ao segurar, só nesta peça.
-  const dobradica = "block h-8 w-2 bg-background touch-none select-none";
+  // Uma dobradiça: uma barrinha preta na borda da porta (só enfeite).
+  const dobradica = "block h-8 w-2 bg-background";
 
   return (
     // O palco: cortina preta com pregas (listras verticais bem sutis). overflow-hidden segura a porta
@@ -59,17 +41,10 @@ export function Provador({ next }: { next: string }) {
           pending ? "motion-safe:[transform:perspective(1100px)_rotateY(-62deg)]" : ""
         }`}
       >
-        {/* Dobradiças na borda esquerda. A do meio é o acesso escondido (ver o topo do arquivo). */}
+        {/* Dobradiças na borda esquerda da porta (enfeite, por isso aria-hidden). */}
         <div aria-hidden="true" className="absolute inset-y-0 left-1.5 flex w-2 flex-col items-center justify-around py-8">
           <span className={dobradica} />
-          <span
-            className={`${dobradica} cursor-default`}
-            onPointerDown={apertou}
-            onPointerUp={soltou}
-            onPointerLeave={soltou}
-            onPointerCancel={soltou}
-            onContextMenu={(e) => e.preventDefault()}
-          />
+          <span className={dobradica} />
           <span className={dobradica} />
         </div>
 
