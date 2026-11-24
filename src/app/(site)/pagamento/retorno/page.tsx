@@ -10,8 +10,8 @@
 // confirmado pelo servidor (webhook) muda o pedido. Enquanto o aviso não chega (o Pix leva alguns
 // segundos), a página se atualiza sozinha.
 //
-// Mostra só a situação: nem itens nem valores, para o número do pedido, que é fácil de adivinhar,
-// não revelar o que ninguém além do cliente deveria ver.
+// Mostra só a situação: nem itens nem valores. E só do PRÓPRIO cliente: o número do pedido é fácil de
+// adivinhar, então pedido de outra pessoa responde "não encontrado", igual a um número que não existe.
 // ============================================================================
 
 import type { Metadata } from "next";
@@ -20,6 +20,7 @@ import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { SITE } from "@/lib/site";
 import { whatsappLink } from "@/lib/whatsapp";
+import { requireCustomer } from "@/server/customers/session";
 import { getPaymentView, type PaymentView } from "@/server/payments";
 
 export const metadata: Metadata = { title: "Pagamento", robots: { index: false } };
@@ -50,8 +51,10 @@ function leitura(v: PaymentView): { palavra: string; texto: string; esperando: b
 export default async function RetornoPage({ searchParams }: { searchParams: Promise<{ pedido?: string | string[] }> }) {
   const { pedido } = await searchParams;
   const numero = Array.isArray(pedido) ? pedido[0] : pedido;
-  const view = numero ? await getPaymentView(numero) : null;
-  // Sem número, número inválido ou pedido inexistente: página não encontrada.
+  // O pedido é de um cliente: só ele vê a situação. Sem sessão, entra e volta para "Meus pedidos".
+  const cliente = await requireCustomer("/conta/pedidos");
+  const view = numero ? await getPaymentView(numero, cliente.id) : null;
+  // Sem número, número inválido, pedido inexistente ou de outro cliente: página não encontrada.
   if (!view) notFound();
 
   const l = leitura(view);

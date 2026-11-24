@@ -16,7 +16,7 @@
 // ============================================================================
 
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { orderItems, orders, orderStatusHistory, payments, type OrderStatus, type PaymentStatus } from "@/server/db/schema";
 import { orderNumber } from "@/server/orders";
@@ -123,15 +123,18 @@ export async function applyPayment(providerPaymentId: string): Promise<ApplyResu
 export type PaymentView = { number: string; status: OrderStatus; payment: PaymentStatus | null };
 
 /**
- * Situação de um pedido pelo número mostrado ao cliente ("DW-00042"), ou null se o número é inválido
- * ou não existe. Devolve só o necessário (status), para o endereço não revelar dados do pedido.
+ * Situação de um pedido DO CLIENTE pelo número mostrado ("DW-00042"), ou null se o número é inválido,
+ * não existe ou é de OUTRO cliente (os três casos são idênticos para quem olha). Devolve só o necessário
+ * (status), para o endereço não revelar dados do pedido.
  */
-export async function getPaymentView(number: string): Promise<PaymentView | null> {
+export async function getPaymentView(number: string, customerId: number): Promise<PaymentView | null> {
+  if (typeof number !== "string" || !Number.isSafeInteger(customerId) || customerId < 1) return null;
   const m = /^DW-(\d{5,9})$/.exec(number);
   if (!m) return null;
   const id = Number(m[1]);
   const db = await getDb();
-  const [o] = await db.select({ id: orders.id, status: orders.status }).from(orders).where(eq(orders.id, id));
+  // O filtro por dono faz parte da MESMA consulta que acha o pedido.
+  const [o] = await db.select({ id: orders.id, status: orders.status }).from(orders).where(and(eq(orders.id, id), eq(orders.customerId, customerId)));
   if (!o) return null;
   // O pagamento mais recente decide a mensagem (ex.: "recusado" deixa o cliente tentar de novo).
   const [p] = await db.select({ status: payments.status }).from(payments).where(eq(payments.orderId, id)).orderBy(desc(payments.id)).limit(1);
