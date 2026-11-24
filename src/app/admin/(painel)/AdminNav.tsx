@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { logoutAction } from "@/app/admin/actions";
+import { logoutAction } from "@/app/actions-cliente";
 
 // As quatro áreas do painel, na ordem em que aparecem na barra.
 const LINKS = [
@@ -50,7 +50,7 @@ export function AdminNav() {
             Ver a loja
           </Link>
           {/* "Sair" é um formulário (e não só um link) porque encerrar a sessão é uma AÇÃO do servidor:
-              apaga o cookie e redireciona ao login. */}
+              apaga o cookie e volta à página inicial da loja. */}
           <form action={logoutAction}>
             <button
               type="submit"

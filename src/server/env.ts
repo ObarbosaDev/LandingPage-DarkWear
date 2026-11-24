@@ -42,17 +42,11 @@ export function checkEnv(env: Env = process.env, whatsapp: string = SITE.whatsap
     warnings.push("Sem DATABASE_URL: usando o banco local embutido, que não serve para hospedagem de verdade.");
   }
 
-  // Painel do dono: as duas variáveis juntas, ou nenhuma (painel desativado).
-  const senha = env.ADMIN_PASSWORD;
-  const segredo = env.ADMIN_SESSION_SECRET;
-  if (!senha && !segredo) {
-    warnings.push("ADMIN_PASSWORD e ADMIN_SESSION_SECRET não definidas: o painel /admin está desativado.");
-  } else {
-    // Configurado pela metade quase sempre é esquecimento: tratado como erro.
-    if (!senha) errors.push("ADMIN_PASSWORD não definida (o painel não abre sem ela).");
-    if (!segredo) errors.push("ADMIN_SESSION_SECRET não definida (o painel não abre sem ela).");
-    else if (segredo.length < 32) errors.push("ADMIN_SESSION_SECRET precisa ter pelo menos 32 caracteres.");
-    if (senha && producao && senha.length < 12) warnings.push("ADMIN_PASSWORD tem menos de 12 caracteres: use uma senha mais longa.");
+  // O painel do dono não tem mais senha própria: quem administra é uma conta com papel "admin", criada por
+  // "npm run admin:criar". As variáveis da senha única viraram lixo, e deixá-las no ambiente confunde (dá a
+  // impressão de que o painel ainda abre com ela). Só avisa; não impede nada.
+  if (env.ADMIN_PASSWORD || env.ADMIN_SESSION_SECRET) {
+    warnings.push("ADMIN_PASSWORD e ADMIN_SESSION_SECRET não são mais usadas: o painel agora abre com contas de administrador (npm run admin:criar). Pode removê-las.");
   }
 
   // Contas de cliente: comprar exige login, e o login depende deste segredo (assina o cookie da sessão).
@@ -62,9 +56,6 @@ export function checkEnv(env: Env = process.env, whatsapp: string = SITE.whatsap
     (producao ? errors : warnings).push(
       "CUSTOMER_SESSION_SECRET não definida ou com menos de 32 caracteres: cadastro e login de clientes (e, portanto, as compras) não funcionam.",
     );
-  } else if (segredoCliente === segredo) {
-    // Funciona (os tokens têm prefixos diferentes), mas uma chave vazada do painel passaria a comprometer as contas.
-    warnings.push("CUSTOMER_SESSION_SECRET é igual ao ADMIN_SESSION_SECRET: use um valor diferente para cada um.");
   }
 
   // Expiração de pedidos pendentes: sem CRON_SECRET a rota do cron fica fechada e nada expira.

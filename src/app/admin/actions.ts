@@ -5,29 +5,19 @@
 // formulário da tela. É assim que "Marcar como pago", "Salvar produto" etc. funcionam sem
 // precisarmos criar uma rota de API para cada um.
 //
-// Quem usa: as telas de /admin (login, pedidos, encomendas, produtos).
+// Quem usa: as telas de /admin (pedidos, encomendas, produtos, clientes).
 //
-// SEGURANÇA: toda ação, exceto o login, começa com requireAdmin(). Uma ação pode ser chamada
-// diretamente (sem passar pela tela), então não basta esconder a página: cada ação confere a sessão.
+// SEGURANÇA: toda ação começa com requireAdmin(). Uma ação pode ser chamada diretamente (sem passar pela
+// tela), então não basta esconder a página: cada ação confere que quem chama é um administrador com login
+// recente (ver src/server/admin/auth.ts). Quem não é administrador recebe "não encontrado".
 // ============================================================================
 
 "use server";
 
-// Ações do painel. Toda ação, exceto o login, começa com requireAdmin(): a verificação não pode
-// depender só de a página estar escondida, porque uma ação pode ser chamada direto.
 
 import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
-import {
-  adminConfigured,
-  checkPassword,
-  clearFailures,
-  endSession,
-  isLockedOut,
-  registerFailure,
-  requireAdmin,
-  startSession,
-} from "@/server/admin/auth";
+import { requireAdmin } from "@/server/admin/auth";
 import { setCustomStatus } from "@/server/admin/custom-orders";
 import { checkImageFile, deleteImageByUrl, saveImage } from "@/server/admin/images";
 import { updateOrderStatus } from "@/server/admin/orders";
@@ -39,7 +29,6 @@ import {
   setProductStock,
   updateProduct,
 } from "@/server/admin/products";
-import { clientKey } from "@/server/rate-limit";
 import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
 
 // Em erro de validação, devolvemos também o que foi digitado: o React limpa o formulário depois de
@@ -54,40 +43,6 @@ const typed = (form: FormData): Record<string, string> =>
 // O catálogo da loja fica em cache: qualquer mudança de produto ou estoque precisa invalidá-lo.
 // updateTag (próprio de Server Actions) expira na hora, então a loja já mostra o valor novo.
 const refreshCatalog = () => updateTag("products");
-
-// ---------- Sessão ----------
-
-/**
- * Login do dono (formulário de /admin/login).
- * Passos: confere se o painel está configurado → barra quem errou demais → confere a senha →
- * abre a sessão e leva ao painel. Devolve uma mensagem de erro, ou redireciona em caso de sucesso.
- */
-export async function loginAction(_prev: FormState, form: FormData): Promise<FormState> {
-  if (!adminConfigured()) {
-    return { error: "Painel não configurado. Defina ADMIN_PASSWORD e ADMIN_SESSION_SECRET." };
-  }
-
-  // Bloqueio por excesso de tentativas, por origem (5 erros em 15 minutos).
-  const key = await clientKey();
-  if (await isLockedOut(key)) return { error: "Muitas tentativas. Tente de novo em alguns minutos." };
-
-  if (!checkPassword(String(form.get("senha") ?? ""))) {
-    await registerFailure(key);
-    await new Promise((r) => setTimeout(r, 600)); // atrasa a resposta para desencorajar força bruta
-    return { error: "Senha incorreta." };
-  }
-
-  // Senha certa: zera as falhas desta origem e abre a sessão.
-  await clearFailures(key);
-  await startSession();
-  redirect("/admin");
-}
-
-/** Botão "Sair": encerra a sessão e volta à tela de login. */
-export async function logoutAction(): Promise<void> {
-  await endSession();
-  redirect("/admin/login");
-}
 
 // ---------- Pedidos ----------
 
