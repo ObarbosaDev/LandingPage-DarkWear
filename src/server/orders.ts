@@ -13,12 +13,15 @@
 // ============================================================================
 
 import "server-only";
-import { and, eq, exists, gte, lt, or, sql } from "drizzle-orm";
+import { and, eq, exists, gte, lt, ne, or, sql } from "drizzle-orm";
+import { calcularDescontos, motivoDeRecusa, normalizarCodigoDoCupom } from "@/lib/discounts";
 import { PRAZO_ONLINE_HORAS, PRAZO_WHATSAPP_HORAS } from "@/lib/prazos";
+import { comoCupom, pixDescontoPercent } from "@/server/coupons";
 import { getDb, type Db } from "@/server/db";
 import type { Address } from "@/server/customers/address";
 import {
   orderItems,
+  coupons,
   orders,
   orderStatusHistory,
   payments,
@@ -36,8 +39,21 @@ export type OrderView = {
   id: number;
   number: string; // "DW-00042"
   status: OrderStatus;
+  /** O que o cliente PAGA, já com os descontos. */
   totalCents: number;
+  /** A soma das peças, antes dos descontos. */
+  subtotalCents: number;
+  couponDiscountCents: number;
+  pixDiscountCents: number;
   items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
+};
+
+/** Escolhas do cliente que mudam o valor do pedido (ambas conferidas no servidor). */
+export type OrderOptions = {
+  /** Código do cupom digitado na sacola (vazio = nenhum). */
+  coupon?: string;
+  /** O cliente vai pagar por Pix e quer o desconto de Pix (só vale se o dono ligou PIX_DISCOUNT_PERCENT). */
+  pix?: boolean;
 };
 
 /** Número do pedido mostrado ao cliente e ao dono: DW- seguido do id com 5 dígitos (DW-00042). */
@@ -96,23 +112,84 @@ function parseItems(input: unknown): OrderItemInput[] {
  * @param customerId cliente que está comprando (vem da sessão, nunca do navegador)
  * @param address    endereço de entrega, copiado da CONTA do cliente pela rota (nunca do navegador). O pedido guarda
  *                   uma CÓPIA: mudar o endereço da conta depois não muda um pedido já feito. Ausente = sem cópia.
+ * @param opcoes     cupom e desconto de Pix escolhidos pelo cliente. O desconto é SEMPRE recalculado aqui, com as
+ *                   regras do banco; nada que o navegador calcule vale.
  * @throws OrderError com a mensagem a mostrar ao cliente
  */
-export async function createOrder(input: unknown, customerId: number, address?: Address | null): Promise<OrderView> {
+export async function createOrder(input: unknown, customerId: number, address?: Address | null, opcoes: OrderOptions = {}): Promise<OrderView> {
   try {
-    return await registrarPedido(input, customerId, address);
+    return await registrarPedido(input, customerId, address, opcoes);
   } catch (e) {
     // Faltou estoque (409): pode haver pedidos pendentes VENCIDOS segurando as peças e esperando o cron do dia.
     // Libera esses (só os vencidos, nunca os que ainda estão no prazo) e tenta uma segunda vez.
     if (e instanceof OrderError && e.status === 409 && (await expirePendingOrders()) > 0) {
-      return registrarPedido(input, customerId, address);
+      return registrarPedido(input, customerId, address, opcoes);
     }
     throw e;
   }
 }
 
+/** O percentual do Pix para este pedido; recusa se o dono não ligou o desconto. */
+function percentualDoPix(): number {
+  const p = pixDescontoPercent();
+  if (p === 0) throw new OrderError("O desconto no Pix não está disponível.");
+  return p;
+}
+
+/**
+ * Confere o cupom que o cliente digitou e devolve-o, ou null se não digitou nenhum. Lança OrderError com o motivo
+ * quando o cupom não vale (inexistente, inativo, vencido, esgotado, abaixo do mínimo, já usado por este cliente).
+ * É a MESMA conferência para o pedido (travar = true: trava a linha do cupom até o fim da transação) e para a
+ * prévia da sacola (travar = false), então o que a sacola promete é o que o pedido cobra.
+ */
+async function conferirCupom(q: Db | Tx, digitado: unknown, subtotal: number, customerId: number, travar: boolean) {
+  const texto = typeof digitado === "string" ? digitado.trim() : "";
+  if (!texto) return null;
+  const codigo = normalizarCodigoDoCupom(texto);
+  if (!codigo) throw new OrderError("Cupom inválido.");
+  const consulta = q.select().from(coupons).where(eq(coupons.code, codigo));
+  const [linha] = travar ? await consulta.for("update") : await consulta;
+  if (!linha) throw new OrderError("Cupom não encontrado.");
+  const cupom = comoCupom(linha);
+  const recusa = motivoDeRecusa(cupom, subtotal);
+  if (recusa) throw new OrderError(recusa);
+  // Um cliente usa o mesmo cupom uma vez (a conferência de verdade é o índice único do banco; esta dá a mensagem).
+  const [jaUsou] = await q
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.customerId, customerId), eq(orders.couponCode, codigo), ne(orders.status, "cancelado")))
+    .limit(1);
+  if (jaUsou) throw new OrderError("Você já usou este cupom.");
+  return cupom;
+}
+
+/** Os valores de um carrinho depois dos descontos, sem registrar nada (a prévia da sacola). */
+export type Previa = { subtotalCents: number; couponDiscountCents: number; pixDiscountCents: number; totalCents: number; couponCode: string | null };
+
+/**
+ * Calcula quanto o cliente pagaria, SEM criar pedido nem mexer em estoque ou cupom. Usa os preços do banco e a mesma
+ * conta e as mesmas regras do pedido; só não confere estoque (isso é na hora de fechar). Pedido real é que vale.
+ * @throws OrderError com o motivo (item inválido, cupom que não vale...)
+ */
+export async function calcularPrevia(input: unknown, customerId: number, opcoes: OrderOptions = {}): Promise<Previa> {
+  const lines = parseItems(input);
+  const db = await getDb();
+  let subtotal = 0;
+  for (const l of lines) {
+    const [p] = await db.select().from(products).where(eq(products.slug, l.slug));
+    if (!p || !p.active) throw new OrderError("Produto indisponível.");
+    if (!p.sizes.includes(l.size)) throw new OrderError(`Tamanho inválido para ${p.name}.`);
+    if (!p.colors.includes(l.color)) throw new OrderError(`Cor inválida para ${p.name}.`);
+    subtotal += p.priceCents * l.qty;
+  }
+  const cupom = await conferirCupom(db, opcoes.coupon, subtotal, customerId, false);
+  const pixPercent = opcoes.pix === true ? percentualDoPix() : 0;
+  const d = calcularDescontos({ subtotalCents: subtotal, cupom, pixPercent });
+  return { subtotalCents: subtotal, couponDiscountCents: d.couponCents, pixDiscountCents: d.pixCents, totalCents: d.totalCents, couponCode: cupom?.code ?? null };
+}
+
 /** Uma tentativa de registrar o pedido (ver createOrder, que tenta de novo depois de liberar pedidos vencidos). */
-async function registrarPedido(input: unknown, customerId: number, address?: Address | null): Promise<OrderView> {
+async function registrarPedido(input: unknown, customerId: number, address: Address | null | undefined, opcoes: OrderOptions): Promise<OrderView> {
   const lines = parseItems(input);
   const db = await getDb();
 
@@ -160,8 +237,20 @@ async function registrarPedido(input: unknown, customerId: number, address?: Add
       resolved[i] = { name, size: l.size, color: l.color, qty: l.qty, unitPriceCents: priceCents };
     }
 
+    // Descontos. O subtotal é a soma das peças; o cupom e o Pix saem dele, com a MESMA conta da prévia da sacola.
+    const subtotal = total;
+    // Trava a linha do cupom (dois pedidos disputando o último uso são atendidos um depois do outro) e conta o uso.
+    const cupom = await conferirCupom(tx, opcoes.coupon, subtotal, customerId, true);
+    const cupomUsado = cupom?.code ?? null;
+    if (cupom) await tx.update(coupons).set({ usedCount: sql`${coupons.usedCount} + 1` }).where(eq(coupons.code, cupom.code));
+    const pixPercent = opcoes.pix === true ? percentualDoPix() : 0;
+    const desc = calcularDescontos({ subtotalCents: subtotal, cupom, pixPercent });
+    total = desc.totalCents;
+
     // Cabeçalho do pedido. O status nasce "pendente" (padrão da tabela) até o dono confirmar o pagamento.
-    const [order] = await tx
+    let order: { id: number; status: OrderStatus };
+    try {
+      [order] = await tx
       .insert(orders)
       // Quem comprou. Obrigatório: comprar exige conta, e o id vem da SESSÃO (ver /api/orders), nunca do navegador.
       .values({
@@ -175,8 +264,16 @@ async function registrarPedido(input: unknown, customerId: number, address?: Add
         shipDistrict: address?.district ?? null,
         shipCity: address?.city ?? null,
         shipState: address?.state ?? null,
+        couponCode: cupomUsado,
+        couponDiscountCents: desc.couponCents,
+        pixDiscountCents: desc.pixCents,
       })
       .returning({ id: orders.id, status: orders.status });
+    } catch (e) {
+      // O índice único do banco barrou um segundo pedido do mesmo cliente com o mesmo cupom (pedidos simultâneos).
+      if (/orders_cupom_por_cliente/.test(String(e) + String((e as { cause?: unknown })?.cause))) throw new OrderError("Você já usou este cupom.");
+      throw e;
+    }
 
     // Primeira linha do histórico: o pedido nasceu (não veio de nenhum status anterior).
     await tx.insert(orderStatusHistory).values({ orderId: order.id, fromStatus: null, toStatus: "pendente", origin: "pedido" });
@@ -194,7 +291,16 @@ async function registrarPedido(input: unknown, customerId: number, address?: Add
       })),
     );
 
-    return { id: order.id, number: orderNumber(order.id), status: order.status, totalCents: total, items: resolved };
+    return {
+      id: order.id,
+      number: orderNumber(order.id),
+      status: order.status,
+      totalCents: total,
+      subtotalCents: subtotal,
+      couponDiscountCents: desc.couponCents,
+      pixDiscountCents: desc.pixCents,
+      items: resolved,
+    };
   });
 }
 
@@ -227,12 +333,17 @@ export async function cancelInTx(
   origem: StatusOrigin,
   ator?: string,
 ): Promise<boolean> {
-  const [atual] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, id)).for("update");
+  const [atual] = await tx.select({ status: orders.status, cupom: orders.couponCode }).from(orders).where(eq(orders.id, id)).for("update");
   if (!atual || atual.status === "cancelado") return false;
   if (somenteSe && atual.status !== somenteSe) return false;
 
   await tx.update(orders).set({ status: "cancelado", updatedAt: new Date() }).where(eq(orders.id, id));
   await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: atual.status, toStatus: "cancelado", origin: origem, actor: ator ?? null });
+
+  // Devolve o uso do cupom (o cliente pode usá-lo de novo e o limite de usos libera uma vaga).
+  if (atual.cupom) {
+    await tx.update(coupons).set({ usedCount: sql`GREATEST(${coupons.usedCount} - 1, 0)` }).where(eq(coupons.code, atual.cupom));
+  }
 
   // Devolve cada peça do pedido ao estoque DA SUA VARIAÇÃO (soma, em vez de gravar um número fixo). Se o dono
   // tirou aquele tamanho ou cor da peça depois da compra, a variação não existe mais e não há onde devolver.

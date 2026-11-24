@@ -105,10 +105,10 @@ afterEach(() => {
 describe("GET /api/payments/config", () => {
   it("diz se o pagamento online está ligado, sem revelar a configuração", async () => {
     const ligado = await config();
-    expect(await ligado.json()).toEqual({ online: true });
+    expect(await ligado.json()).toEqual({ online: true, pixDiscountPercent: 0 });
     expect(ligado.headers.get("cache-control")).toBe("no-store");
     delete process.env.MERCADOPAGO_ACCESS_TOKEN;
-    expect(await (await config()).json()).toEqual({ online: false });
+    expect(await (await config()).json()).toEqual({ online: false, pixDiscountPercent: 0 });
   });
 });
 
@@ -313,7 +313,7 @@ describe("POST /api/orders com pagamento online", () => {
 
   it("valores desconhecidos em 'payment' são tratados como WhatsApp", async () => {
     const spy = fakeMP();
-    for (const v of ["ONLINE", "pix", "1", "true"]) {
+    for (const v of ["ONLINE", "PIX", "1", "true"]) {
       const d = await (await pedir(v)).json();
       expect(d.whatsappUrl, v).toBeDefined();
     }

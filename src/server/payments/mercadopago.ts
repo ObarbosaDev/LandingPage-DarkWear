@@ -104,7 +104,12 @@ export type DadosCobranca = {
   itens: { nome: string; qty: number; precoCents: number }[];
   /** Endereço público do site, com https (ex.: https://seusite.com.br). */
   baseUrl: string;
+  /** Só Pix na página de pagamento (o cliente escolheu o desconto de Pix): cartões, boleto e saldo ficam de fora. */
+  somentePix?: boolean;
 };
+
+// Todos os tipos de pagamento do Mercado Pago, menos o Pix ("bank_transfer"). Usado quando só o Pix deve aparecer.
+const TIPOS_FORA_DO_PIX = ["credit_card", "debit_card", "prepaid_card", "ticket", "atm", "account_money"];
 
 /**
  * Cria a página de pagamento no Mercado Pago e devolve o endereço para onde levar o cliente.
@@ -116,6 +121,7 @@ export type DadosCobranca = {
  *   - boleto fica de fora: leva dias para compensar e seguraria as peças no estoque por esse tempo;
  *   - parcelas: MERCADOPAGO_MAX_INSTALLMENTS (padrão 1, à vista). Parcelar sem juros custa taxa à loja:
  *     essa é uma decisão do dono, por isso o padrão é o mais conservador;
+ *   - somentePix: a página oferece apenas Pix. O Mercado Pago só aceita EXCLUIR tipos, então todos os outros são excluídos;
  *   - a cobrança expira em PRAZO_ONLINE_HORAS, o mesmo prazo em que o pedido com cobrança online é cancelado.
  */
 export async function criarPreferencia(d: DadosCobranca): Promise<{ id: string; url: string }> {
@@ -139,7 +145,7 @@ export async function criarPreferencia(d: DadosCobranca): Promise<{ id: string; 
       notification_url: `${d.baseUrl}/api/webhooks/mercadopago`,
       back_urls: { success: retorno, pending: retorno, failure: retorno },
       auto_return: "approved",
-      payment_methods: { installments: maxParcelas, excluded_payment_types: [{ id: "ticket" }] },
+      payment_methods: { installments: maxParcelas, excluded_payment_types: (d.somentePix ? TIPOS_FORA_DO_PIX : ["ticket"]).map((id) => ({ id })) },
       expires: true,
       expiration_date_to: expira,
     }),

@@ -48,10 +48,13 @@ export type AdminOrder = {
   payments: { status: PaymentStatus; method: string | null; installments: number | null; amountCents: number | null; paidAt: Date | null; createdAt: Date }[];
   /**
    * Pagamento aprovado que NÃO levou o pedido a "pago" e que o dono precisa resolver:
-   * "cancelado" (pagou depois de o pedido expirar) ou "valor" (valor diferente do total).
+   * "cancelado" (pagou depois de o pedido expirar), "valor" (valor diferente do total) ou "metodo" (pagou por cartão
+   * um pedido que teve desconto de Pix).
    * null = nada a resolver.
    */
-  alerta: "cancelado" | "valor" | null;
+  alerta: "cancelado" | "valor" | "metodo" | null;
+  /** Descontos do pedido: o cupom usado e quanto cada desconto tirou, em centavos (0 = nenhum). */
+  desconto: { cupom: string | null; cupomCents: number; pixCents: number };
 };
 
 /**
@@ -59,11 +62,13 @@ export type AdminOrder = {
  * Pedido cancelado com pagamento aprovado: o cliente pagou e não vai receber, é preciso estornar ou
  * reativar à mão. Pedido ainda pendente com pagamento aprovado: o valor não bateu com o total.
  */
-export function alertaDePagamento(status: OrderStatus, totalCents: number, pagamentos: AdminOrder["payments"]): AdminOrder["alerta"] {
+export function alertaDePagamento(status: OrderStatus, totalCents: number, pagamentos: AdminOrder["payments"], pixDescontoCents = 0): AdminOrder["alerta"] {
   const aprovados = pagamentos.filter((p) => p.status === "aprovado");
   if (aprovados.length === 0) return null;
   if (status === "cancelado") return "cancelado";
   if (status === "pendente" && aprovados.some((p) => p.amountCents !== totalCents)) return "valor";
+  // O desconto de Pix só vale para quem pagou por Pix: o pedido não foi marcado como pago (ver applyPayment).
+  if (status === "pendente" && pixDescontoCents > 0 && aprovados.some((p) => p.method !== "bank_transfer")) return "metodo";
   return null;
 }
 
@@ -142,7 +147,8 @@ export async function listOrders(status?: OrderStatus, limit = 100, busca?: stri
         .filter((h) => h.orderId === o.id)
         .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, actor: h.actor, at: h.at })),
       payments: meus,
-      alerta: alertaDePagamento(o.status, o.totalCents, meus),
+      alerta: alertaDePagamento(o.status, o.totalCents, meus, o.pixDiscountCents),
+      desconto: { cupom: o.couponCode, cupomCents: o.couponDiscountCents, pixCents: o.pixDiscountCents },
     };
   });
 }

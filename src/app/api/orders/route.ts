@@ -68,14 +68,22 @@ export async function POST(request: Request) {
 
   // Pagamento online só existe se o Mercado Pago estiver configurado. Conferido ANTES de criar o
   // pedido, para não baixar estoque à toa.
-  const online = (body as { payment?: unknown })?.payment === "online";
+  // "pix" é o pagamento online restrito a Pix, com o desconto de Pix (se o dono ligou). Também é online.
+  const modo = (body as { payment?: unknown })?.payment;
+  const pix = modo === "pix";
+  const online = modo === "online" || pix;
   if (online && !mpConfigurado()) {
     return NextResponse.json({ error: "Pagamento online indisponível. Feche pelo WhatsApp." }, { status: 503 });
   }
 
   try {
     // Só os "items" são usados do que veio: preços e totais enviados pelo navegador são ignorados.
-    const order = await createOrder((body as { items?: unknown })?.items, cliente.id, endereco);
+    // O cupom e o Pix são só ESCOLHAS do cliente: o servidor confere as regras e calcula o desconto.
+    const cupom = (body as { coupon?: unknown })?.coupon;
+    const order = await createOrder((body as { items?: unknown })?.items, cliente.id, endereco, {
+      coupon: typeof cupom === "string" ? cupom : undefined,
+      pix,
+    });
 
     // O estoque mudou: o catálogo precisa refletir isso já na próxima leitura (sem servir valor antigo).
     revalidateTag("products", { expire: 0 });
@@ -83,8 +91,11 @@ export async function POST(request: Request) {
     // Pagamento online: abre a cobrança. Se falhar, desfaz o pedido (cancela e devolve o estoque).
     if (online) {
       try {
-        const paymentUrl = await startPayment(order.id);
-        return NextResponse.json({ id: order.number, totalCents: order.totalCents, paymentUrl }, { status: 201 });
+        const paymentUrl = await startPayment(order.id, { somentePix: pix });
+        return NextResponse.json(
+          { id: order.number, totalCents: order.totalCents, subtotalCents: order.subtotalCents, couponDiscountCents: order.couponDiscountCents, pixDiscountCents: order.pixDiscountCents, paymentUrl },
+          { status: 201 },
+        );
       } catch (e) {
         console.error("Falha ao abrir o pagamento:", e instanceof Error ? e.message : e);
         await cancelOrder(order.id, "pendente", "pedido");
@@ -102,6 +113,7 @@ export async function POST(request: Request) {
         qty: i.qty,
         priceCents: i.unitPriceCents,
       })),
+      { couponCode: cupom && order.couponDiscountCents > 0 && typeof cupom === "string" ? cupom.trim().toUpperCase() : null, couponCents: order.couponDiscountCents, pixCents: order.pixDiscountCents },
     );
 
     // 201 = criado. O navegador usa "whatsappUrl" para abrir a conversa.
@@ -109,6 +121,9 @@ export async function POST(request: Request) {
       {
         id: order.number,
         totalCents: order.totalCents,
+        subtotalCents: order.subtotalCents,
+        couponDiscountCents: order.couponDiscountCents,
+        pixDiscountCents: order.pixDiscountCents,
         whatsappUrl: whatsappLink(`Pedido ${order.number}\n\n${message}`),
       },
       { status: 201 },

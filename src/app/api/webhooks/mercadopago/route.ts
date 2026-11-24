@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   try {
     const resultado = await applyPayment(dataId);
     // Casos que exigem o olho do dono: ficam no log do servidor, com o número do pagamento.
-    if (resultado === "valor-divergente" || resultado === "pedido-cancelado") {
+    if (resultado === "valor-divergente" || resultado === "metodo-divergente" || resultado === "pedido-cancelado") {
       console.warn(`Pagamento ${dataId} aprovado, mas o pedido NÃO foi marcado como pago (${resultado}). Confira no painel e no Mercado Pago.`);
     }
     // O pedido mudou: as telas do painel precisam mostrar o status novo.

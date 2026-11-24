@@ -40,12 +40,15 @@ export type OrderLine = {
   priceCents: number;
 };
 
+/** Descontos já calculados pelo servidor, para a mensagem mostrar de onde veio o total. */
+export type DescontosDaMensagem = { couponCode?: string | null; couponCents?: number; pixCents?: number };
+
 /**
  * Texto do pedido de peças prontas: lista cada item com o valor da linha, o total e a nota de pagamento.
  * Usado por POST /api/orders, que o envia depois de registrar o pedido (por isso os valores aqui já são
- * os do servidor, e não os do navegador).
+ * os do servidor, e não os do navegador). Com cupom ou desconto de Pix, mostra o subtotal e cada desconto.
  */
-export function buildCartMessage(lines: OrderLine[]) {
+export function buildCartMessage(lines: OrderLine[], descontos: DescontosDaMensagem = {}) {
   // Uma linha por item: "• 2x Oversized GT3 RS (Preta, tam. M) — R$ 179,80".
   const itens = lines
     .map(
@@ -53,13 +56,24 @@ export function buildCartMessage(lines: OrderLine[]) {
         `• ${l.qty}x ${l.name} (${l.color}, tam. ${l.size}) — ${formatCents(l.priceCents * l.qty)}`,
     )
     .join("\n");
-  const total = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
+  const subtotal = lines.reduce((s, l) => s + l.priceCents * l.qty, 0);
+  const cupomCents = descontos.couponCents ?? 0;
+  const pixCents = descontos.pixCents ?? 0;
+  const total = subtotal - cupomCents - pixCents;
+  // Só aparecem as linhas de desconto quando há desconto.
+  const linhasDeDesconto: string[] = [];
+  if (cupomCents > 0) linhasDeDesconto.push(`Subtotal: ${formatCents(subtotal)}`, `Cupom ${descontos.couponCode ?? ""}: -${formatCents(cupomCents)}`.replace("  ", " "));
+  if (pixCents > 0) {
+    if (cupomCents === 0) linhasDeDesconto.push(`Subtotal: ${formatCents(subtotal)}`);
+    linhasDeDesconto.push(`Desconto no Pix: -${formatCents(pixCents)}`);
+  }
   // As strings vazias ("") viram linhas em branco entre os blocos da mensagem.
   return [
     `Olá! Quero fechar este pedido na ${SITE.name}:`,
     "",
     itens,
     "",
+    ...linhasDeDesconto,
     `Total: ${formatCents(total)}`,
     "",
     SITE.paymentNote,

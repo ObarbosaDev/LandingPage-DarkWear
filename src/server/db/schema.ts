@@ -128,6 +128,10 @@ export const orders = pgTable(
     shipState: text("ship_state"),
     // Código de rastreio, informado pelo dono ao enviar (migração 0011). Só existe em pedido enviado ou entregue.
     trackingCode: text("tracking_code"),
+    // Descontos (migração 0014). total_cents é o que o cliente PAGA, já com os descontos; subtotal = total + descontos.
+    couponCode: text("coupon_code"),
+    couponDiscountCents: integer("coupon_discount_cents").notNull().default(0),
+    pixDiscountCents: integer("pix_discount_cents").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -136,6 +140,23 @@ export const orders = pgTable(
   // equivalentes para o Drizzle conhecer a estrutura.
   (t) => [index("orders_status_created_idx").on(t.status, t.createdAt), index("orders_created_idx").on(t.createdAt)],
 );
+
+// ---------------------------------------------------------------------------
+// coupons: os cupons de desconto criados no painel (migração 0014). Nunca são apagados: o dono desativa.
+// ---------------------------------------------------------------------------
+export const coupons = pgTable("coupons", {
+  code: text("code").primaryKey(),
+  // "percent" = value é % (1 a 90); "fixed" = value é em centavos.
+  kind: text("kind").$type<"percent" | "fixed">().notNull(),
+  value: integer("value").notNull(),
+  minOrderCents: integer("min_order_cents").notNull().default(0),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").notNull().default(0),
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ---------------------------------------------------------------------------
 // order_items: cada linha de um pedido (qual peça, tamanho, cor e quantidade).

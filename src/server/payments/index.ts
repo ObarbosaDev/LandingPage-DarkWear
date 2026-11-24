@@ -36,19 +36,24 @@ export function siteUrl(): string {
  *
  * @throws PagamentoError se o pedido não existe, não está pendente ou o Mercado Pago falhou
  */
-export async function startPayment(orderId: number): Promise<string> {
+export async function startPayment(orderId: number, opcoes: { somentePix?: boolean } = {}): Promise<string> {
   const db = await getDb();
   const [o] = await db.select().from(orders).where(eq(orders.id, orderId));
   if (!o) throw new PagamentoError("Pedido não encontrado.");
   if (o.status !== "pendente") throw new PagamentoError("Só um pedido pendente pode ser pago.");
 
   const itens = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  const comDesconto = o.couponDiscountCents + o.pixDiscountCents > 0;
   const { id, url } = await criarPreferencia({
     pedidoId: o.id,
     numero: orderNumber(o.id),
-    // O nome mostrado na página do Mercado Pago inclui tamanho e cor, para o cliente conferir.
-    itens: itens.map((i) => ({ nome: `${i.name} (${i.color}, ${i.size})`, qty: i.qty, precoCents: i.unitPriceCents })),
+    // Sem desconto: um item por peça, com tamanho e cor, para o cliente conferir. COM desconto, a soma dos itens não
+    // bateria com o total (o Mercado Pago não aceita preço negativo): vira um item só, pelo valor exato do pedido.
+    itens: comDesconto
+      ? [{ nome: `Pedido ${orderNumber(o.id)} (${itens.reduce((n, i) => n + i.qty, 0)} peças, com desconto)`, qty: 1, precoCents: o.totalCents }]
+      : itens.map((i) => ({ nome: `${i.name} (${i.color}, ${i.size})`, qty: i.qty, precoCents: i.unitPriceCents })),
     baseUrl: siteUrl(),
+    somentePix: opcoes.somentePix === true,
   });
 
   await db.insert(payments).values({
@@ -70,9 +75,11 @@ export async function startPayment(orderId: number): Promise<string> {
  *     e o dono precisa olhar (alguém tentou pagar menos, ou o preço mudou no meio do caminho);
  *   - "pedido-cancelado": aprovado, mas o pedido já tinha sido cancelado (por prazo, por exemplo) e
  *     as peças voltaram ao estoque: o dono precisa decidir entre reativar à mão ou estornar;
+ *   - "metodo-divergente": aprovado com o valor certo, mas por cartão (ou outra forma) em um pedido que teve o desconto
+ *     de Pix: o pedido NÃO é marcado como pago, o dono decide;
  *   - "pedido-desconhecido": o pagamento não aponta para nenhum pedido nosso.
  */
-export type ApplyResult = "pago" | "registrado" | "valor-divergente" | "pedido-cancelado" | "pedido-desconhecido";
+export type ApplyResult = "pago" | "registrado" | "valor-divergente" | "metodo-divergente" | "pedido-cancelado" | "pedido-desconhecido";
 
 /**
  * Consulta o pagamento no Mercado Pago e aplica o resultado ao pedido, numa transação.
@@ -111,6 +118,8 @@ export async function applyPayment(providerPaymentId: string): Promise<ApplyResu
     if (mp.status !== "aprovado") return "registrado";
     if (o.status === "cancelado") return "pedido-cancelado";
     if (mp.valorCents !== o.totalCents) return "valor-divergente";
+    // O desconto de Pix só vale se o pagamento foi MESMO por Pix (a página de pagamento só oferecia Pix, mas conferimos).
+    if (o.pixDiscountCents > 0 && mp.metodo !== "bank_transfer") return "metodo-divergente";
     if (o.status !== "pendente") return "registrado"; // já pago (ou adiante): nada a fazer
 
     await tx.update(orders).set({ status: "pago", updatedAt: new Date() }).where(eq(orders.id, orderId));

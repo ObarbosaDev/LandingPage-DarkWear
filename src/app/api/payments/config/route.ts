@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { NextResponse, connection } from "next/server";
+import { pixDescontoPercent } from "@/server/coupons";
 import { mpConfigurado } from "@/server/payments/mercadopago";
 
 export async function GET() {
@@ -13,5 +14,7 @@ export async function GET() {
   // congelaria o valor da variável daquele momento.
   await connection();
   // Sem cache: depende de variável de ambiente, e o dono pode ligar/desligar a qualquer hora.
-  return NextResponse.json({ online: mpConfigurado() }, { headers: { "Cache-Control": "no-store" } });
+  // pixDiscountPercent: o desconto do Pix em % (0 = sem desconto; o botão de Pix com desconto só aparece com o pagamento online ligado).
+  const online = mpConfigurado();
+  return NextResponse.json({ online, pixDiscountPercent: online ? pixDescontoPercent() : 0 }, { headers: { "Cache-Control": "no-store" } });
 }

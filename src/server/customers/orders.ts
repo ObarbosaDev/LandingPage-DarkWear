@@ -43,6 +43,8 @@ export type CustomerOrderDetail = {
   entrega: Address | null;
   /** Código de rastreio informado pelo dono no envio (null = ainda não há). */
   trackingCode: string | null;
+  /** Descontos do pedido: o cupom usado e quanto cada desconto tirou (0 = nenhum). O total já os inclui. */
+  desconto: { cupom: string | null; cupomCents: number; pixCents: number };
   /** Pagamentos online do pedido (vazio se foi fechado pelo WhatsApp). */
   payments: { status: PaymentStatus; method: string | null; installments: number | null; amountCents: number | null; paidAt: Date | null; createdAt: Date }[];
 };
@@ -105,6 +107,7 @@ export async function getCustomerOrder(customerId: number, number: string): Prom
     createdAt: o.createdAt,
     entrega: addressFromOrder(o),
     trackingCode: o.trackingCode,
+    desconto: { cupom: o.couponCode, cupomCents: o.couponDiscountCents, pixCents: o.pixDiscountCents },
     items: itens.map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
     history: historico.map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, at: h.at })),
     payments: pagamentos.map((p) => ({ status: p.status, method: p.method, installments: p.installments, amountCents: p.amountCents, paidAt: p.paidAt, createdAt: p.createdAt })),
