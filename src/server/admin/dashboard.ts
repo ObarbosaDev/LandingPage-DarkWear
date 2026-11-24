@@ -14,6 +14,17 @@ import { getDb } from "@/server/db";
 import { customOrders, customers, orders, payments, products, type OrderStatus } from "@/server/db/schema";
 import { listOrders } from "@/server/admin/orders";
 
+/**
+ * Os dois números pequenos da barra de navegação do painel: pedidos esperando pagamento e encomendas que ninguém
+ * atendeu. São só duas contagens, porque rodam em TODA tela do painel.
+ */
+export async function contagensDoPainel(): Promise<{ pedidosPendentes: number; encomendasNovas: number }> {
+  const db = await getDb();
+  const [pedidos] = await db.select({ n: count() }).from(orders).where(eq(orders.status, "pendente"));
+  const [encomendas] = await db.select({ n: count() }).from(customOrders).where(eq(customOrders.status, "novo"));
+  return { pedidosPendentes: pedidos.n, encomendasNovas: encomendas.n };
+}
+
 /** Junta todos os números do resumo numa chamada só. */
 export async function dashboardStats() {
   const db = await getDb();

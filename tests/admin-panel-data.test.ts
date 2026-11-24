@@ -13,7 +13,7 @@ import { customers, orders, payments } from "@/server/db/schema";
 import { anonymizeCustomer, authenticate } from "@/server/customers";
 import { createOrder } from "@/server/orders";
 import { listOrders } from "@/server/admin/orders";
-import { dashboardStats } from "@/server/admin/dashboard";
+import { contagensDoPainel, dashboardStats } from "@/server/admin/dashboard";
 import { listCustomers, resetCustomerPassword } from "@/server/admin/customers";
 import { clienteDeTeste, resetDb } from "./helpers/db";
 
@@ -237,5 +237,20 @@ describe("resetCustomerPassword (senha provisória de um cliente, pelo painel)",
     const ana = await clienteDeTeste();
     await anonymizeCustomer(ana);
     for (const id of [ana, 999999, 0, -1, 1.5, NaN]) await expect(resetCustomerPassword(id), String(id)).rejects.toThrow();
+  });
+});
+
+describe("contagensDoPainel (os números pequenos da barra de navegação)", () => {
+  it("conta pedidos pendentes e encomendas novas, e nada mais", async () => {
+    const ana = await clienteDeTeste();
+    const a = await createOrder(item(), ana);
+    await createOrder(item(), ana);
+    await createOrder(item(), ana);
+    await setStatus(a.id, "pago"); // saiu dos pendentes
+    expect(await contagensDoPainel()).toEqual({ pedidosPendentes: 2, encomendasNovas: 0 });
+  });
+
+  it("sem nada, devolve zeros", async () => {
+    expect(await contagensDoPainel()).toEqual({ pedidosPendentes: 0, encomendasNovas: 0 });
   });
 });
