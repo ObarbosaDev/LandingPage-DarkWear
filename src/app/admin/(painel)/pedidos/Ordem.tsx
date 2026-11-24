@@ -51,7 +51,11 @@ export function Ordem({ o }: { o: AdminOrder }) {
         {/* Alerta: o cliente pagou e o pedido não ficou pago. Faixa preta no papel branco, impossível de não ver. */}
         {o.alerta && (
           <p role="alert" className="mt-3 bg-background p-2 text-xs font-bold uppercase leading-snug tracking-[0.06em] text-foreground">
-            {o.alerta === "cancelado" ? "Cliente pagou, mas o pedido está cancelado. Estorne ou refaça." : "Pagamento aprovado com valor diferente do pedido. Confira no Mercado Pago."}
+            {o.alerta === "cancelado"
+              ? "Cliente pagou, mas o pedido está cancelado. Estorne ou refaça."
+              : o.alerta === "metodo"
+                ? "Pagou por cartão um pedido com desconto de Pix. O pedido não foi marcado como pago: confira no Mercado Pago."
+                : "Pagamento aprovado com valor diferente do pedido. Confira no Mercado Pago."}
           </p>
         )}
 
@@ -172,6 +176,15 @@ export function Ordem({ o }: { o: AdminOrder }) {
               </li>
             ))}
           </ul>
+
+          {/* Descontos: o cupom e o desconto de Pix (o total acima já os inclui). */}
+          {o.desconto.cupomCents + o.desconto.pixCents > 0 && (
+            <p className="mt-3 text-xs font-bold uppercase tracking-[0.06em]">
+              {o.desconto.cupomCents > 0 ? `Cupom ${o.desconto.cupom}: -${formatCents(o.desconto.cupomCents)}` : ""}
+              {o.desconto.cupomCents > 0 && o.desconto.pixCents > 0 ? " · " : ""}
+              {o.desconto.pixCents > 0 ? `Desconto no Pix: -${formatCents(o.desconto.pixCents)}` : ""}
+            </p>
+          )}
 
           {/* O endereço completo, como vai na etiqueta de envio. */}
           {o.entrega && (

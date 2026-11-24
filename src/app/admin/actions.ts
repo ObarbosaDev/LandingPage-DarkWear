@@ -23,6 +23,7 @@ import { resetCustomerPassword } from "@/server/admin/customers";
 import { setCustomStatus } from "@/server/admin/custom-orders";
 import { checkImageFile, deleteImageByUrl, saveImage } from "@/server/admin/images";
 import { setTrackingCode, updateOrderStatus } from "@/server/admin/orders";
+import { createCoupon, parseCouponForm, setCouponActive } from "@/server/coupons";
 import {
   createProduct,
   getProductRow,
@@ -205,6 +206,28 @@ export async function setActiveAction(form: FormData): Promise<void> {
   if (await setProductActive(slug, mostrar)) await auditar(adm.email, "produto.visibilidade", slug, mostrar ? "mostrado na loja" : "ocultado da loja");
   refreshCatalog();
   revalidatePath("/admin/produtos");
+}
+
+// ---------- Cupons ----------
+
+/** Formulário "Novo cupom" (/admin/cupons). Em erro devolve a mensagem + o que foi digitado; em sucesso, volta à lista. */
+export async function createCouponAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const adm = await requireAdmin();
+  const lido = parseCouponForm(form);
+  if (!lido.ok) return { error: lido.error, values: typed(form) };
+  if ((await createCoupon(lido.data)) === "existe") return { error: "Já existe um cupom com este código.", values: typed(form) };
+  await auditar(adm.email, "cupom.criar", lido.data.code, lido.data.kind === "percent" ? `${lido.data.value}%` : `R$ ${(lido.data.value / 100).toFixed(2).replace(".", ",")}`);
+  revalidatePath("/admin/cupons");
+  redirect("/admin/cupons?criado=1");
+}
+
+/** Botão "Desativar" / "Ativar" de cada cupom. O botão envia o código e o valor OPOSTO ao atual. */
+export async function setCouponActiveAction(form: FormData): Promise<void> {
+  const adm = await requireAdmin();
+  const code = String(form.get("code") ?? "");
+  const ativar = form.get("active") === "true";
+  if (await setCouponActive(code, ativar)) await auditar(adm.email, "cupom.visibilidade", code.trim().toUpperCase(), ativar ? "ativado" : "desativado");
+  revalidatePath("/admin/cupons");
 }
 
 // ---------- Clientes ----------

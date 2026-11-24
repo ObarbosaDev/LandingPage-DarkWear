@@ -19,9 +19,11 @@ import { hashPassword } from "@/server/customers/password";
 import {
   changeCustomStatusAction,
   changeOrderStatusAction,
+  createCouponAction,
   createProductAction,
   resetCustomerPasswordAction,
   setActiveAction,
+  setCouponActiveAction,
   setStockAction,
   setTrackingAction,
   updateProductAction,
@@ -273,6 +275,8 @@ describe("toda ação do painel recusa quem não é administrador", () => {
     ["ajustar estoque", () => setStockAction(f())],
     ["informar rastreio", () => setTrackingAction(f({ tracking: "AB123456789BR" }))],
     ["mostrar ou ocultar produto", () => setActiveAction(f())],
+    ["criar cupom", () => createCouponAction({}, f({ code: "TESTE10", kind: "percent", value: "10" }))],
+    ["ativar ou desativar cupom", () => setCouponActiveAction(f({ code: "TESTE10", active: "false" }))],
     ["gerar senha provisória de cliente", () => resetCustomerPasswordAction({}, f())],
   ];
 

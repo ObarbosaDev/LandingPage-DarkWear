@@ -67,6 +67,15 @@ export function checkEnv(env: Env = process.env, whatsapp: string = SITE.whatsap
     if (!Number.isFinite(h) || h <= 0) warnings.push("PENDING_ORDER_HOURS inválida: usando o padrão de 48 horas.");
   }
 
+  // Desconto no Pix: inteiro de 1 a 30. Valor inválido deixa o desconto desligado; acima de 30, vale 30.
+  if (env.PIX_DISCOUNT_PERCENT !== undefined && env.PIX_DISCOUNT_PERCENT.trim() !== "") {
+    if (!/^\d{1,3}$/.test(env.PIX_DISCOUNT_PERCENT.trim()) || Number(env.PIX_DISCOUNT_PERCENT) < 1) {
+      warnings.push("PIX_DISCOUNT_PERCENT inválida (use um número inteiro de 1 a 30): o desconto no Pix fica desligado.");
+    } else if (Number(env.PIX_DISCOUNT_PERCENT) > 30) {
+      warnings.push("PIX_DISCOUNT_PERCENT acima do máximo: o desconto no Pix será de 30%.");
+    }
+  }
+
   // Mercado Pago (pagamento online): token e segredo do aviso andam juntos. Sem o segredo, o aviso
   // não tem assinatura conferida (a consulta ao Mercado Pago ainda protege o pedido, mas o endpoint
   // ficaria aberto a chamadas falsas). Sem https no SITE_URL, o Mercado Pago não consegue avisar.

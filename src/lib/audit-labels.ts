@@ -11,6 +11,8 @@ const FRASES: Record<string, string> = {
   "produto.estoque": "ajustou o estoque de",
   "produto.visibilidade": "mudou a visibilidade de",
   "encomenda.status": "mudou o andamento da",
+  "cupom.criar": "criou o cupom",
+  "cupom.visibilidade": "mudou o cupom",
   "cliente.senha-provisoria": "gerou senha provisória para o",
 };
 

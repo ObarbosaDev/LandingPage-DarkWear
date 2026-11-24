@@ -73,6 +73,30 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
               </li>
             ))}
           </ul>
+          {/* Com cupom ou desconto de Pix: o subtotal (as peças) e cada desconto, antes do total pago. */}
+          {pedido.desconto.cupomCents + pedido.desconto.pixCents > 0 && (
+            <dl className="mt-4 flex flex-col gap-1 text-base font-bold uppercase">
+              <div className="flex items-end gap-2">
+                <dt>Subtotal</dt>
+                <span aria-hidden="true" className="mb-1 flex-1 border-b-2 border-dotted border-background" />
+                <dd>{formatCents(pedido.totalCents + pedido.desconto.cupomCents + pedido.desconto.pixCents)}</dd>
+              </div>
+              {pedido.desconto.cupomCents > 0 && (
+                <div className="flex items-end gap-2">
+                  <dt>Cupom {pedido.desconto.cupom}</dt>
+                  <span aria-hidden="true" className="mb-1 flex-1 border-b-2 border-dotted border-background" />
+                  <dd>-{formatCents(pedido.desconto.cupomCents)}</dd>
+                </div>
+              )}
+              {pedido.desconto.pixCents > 0 && (
+                <div className="flex items-end gap-2">
+                  <dt>Desconto no Pix</dt>
+                  <span aria-hidden="true" className="mb-1 flex-1 border-b-2 border-dotted border-background" />
+                  <dd>-{formatCents(pedido.desconto.pixCents)}</dd>
+                </div>
+              )}
+            </dl>
+          )}
           <div className="mt-4 flex items-end justify-between">
             <span className="text-sm font-bold uppercase tracking-[0.15em]">Total</span>
             <span className="font-display text-5xl leading-none">{formatCents(pedido.totalCents)}</span>

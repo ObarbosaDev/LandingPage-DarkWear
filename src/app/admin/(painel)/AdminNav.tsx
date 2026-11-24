@@ -22,6 +22,7 @@ const LINKS = [
   { href: "/admin/pedidos", label: "Esteira", contagem: "pedidos" },
   { href: "/admin/encomendas", label: "Encomendas", contagem: "encomendas" },
   { href: "/admin/produtos", label: "Prateleira", contagem: null },
+  { href: "/admin/cupons", label: "Cupons", contagem: null },
   { href: "/admin/clientes", label: "Caderneta", contagem: null },
   { href: "/admin/diario", label: "Diário", contagem: null },
 ] as const;

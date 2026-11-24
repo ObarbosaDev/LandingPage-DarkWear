@@ -5,10 +5,13 @@
 // serrilhada). À esquerda, o título e um atalho para continuar comprando.
 //
 // Comprar exige conta: sem login, o botão leva a /conta/entrar e volta para cá com a sacola intacta.
-// Dois jeitos de fechar:
+// Três jeitos de fechar:
 //   - "Pagar com cartão ou Pix" (só aparece se o Mercado Pago estiver configurado): o cliente é levado
 //     à página de pagamento do Mercado Pago. Os dados do cartão NUNCA passam por este site;
+//   - "Pagar por Pix com desconto" (só se o dono ligou o desconto de Pix): a página de pagamento oferece só Pix;
 //   - "Finalizar pelo WhatsApp": o pedido vai para a conversa, como antes.
+// Cupom: o cliente digita o código e a sacola pede ao servidor a PRÉVIA do valor (/api/cart/preview). Quem calcula é
+// sempre o servidor; o valor da prévia é o mesmo que o pedido cobra.
 // Nos dois, o fluxo é o mesmo até o fim:
 //   1. envia ao servidor SÓ quais peças, tamanhos, cores e quantidades (POST /api/orders);
 //   2. o servidor confere o estoque, recalcula os preços e registra o pedido;
@@ -27,6 +30,19 @@ import { useCart } from "@/lib/cart";
 import { SITE } from "@/lib/site";
 import { formatCents } from "@/lib/money";
 
+/** Erro da prévia, com o status HTTP (o 401 significa "sem conta"). */
+class PreviaErro extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
+
+/** A prévia do servidor (ver /api/cart/preview). */
+type Previa = { subtotalCents: number; couponDiscountCents: number; pixDiscountCents: number; totalCents: number; couponCode: string | null };
+
 export default function CarrinhoPage() {
   const router = useRouter();
   const { items, totalCents, setQty, remove, clear, ready } = useCart();
@@ -35,15 +51,105 @@ export default function CarrinhoPage() {
   const [error, setError] = useState("");
   // Se o pagamento online está disponível (o servidor diz). Começa falso: o botão só aparece depois.
   const [online, setOnline] = useState(false);
+  // Percentual do desconto de Pix que o dono ligou (0 = sem desconto de Pix).
+  const [pixPercent, setPixPercent] = useState(0);
   useEffect(() => {
     fetch("/api/payments/config")
       .then((r) => r.json())
-      .then((d: { online?: boolean }) => setOnline(d.online === true))
+      .then((d: { online?: boolean; pixDiscountPercent?: number }) => {
+        setOnline(d.online === true);
+        setPixPercent(d.online === true && typeof d.pixDiscountPercent === "number" ? d.pixDiscountPercent : 0);
+      })
       .catch(() => setOnline(false)); // sem resposta, fica só o WhatsApp
   }, []);
 
+  // Cupom: o que o cliente digita, o cupom já aceito pelo servidor, o erro e a prévia do valor.
+  const [cupomTexto, setCupomTexto] = useState("");
+  const [cupom, setCupom] = useState<string | null>(null);
+  const [cupomErro, setCupomErro] = useState("");
+  const [aplicando, setAplicando] = useState(false);
+  const [previa, setPrevia] = useState<Previa | null>(null);
+  const [previaPix, setPreviaPix] = useState<Previa | null>(null);
+  // Assinatura do carrinho: muda quando peças, tamanhos, cores ou quantidades mudam (refaz a prévia).
+  const assinatura = items.map((i) => `${i.slug}|${i.size}|${i.color}|${i.qty}`).join(",");
+
+  /** Pede ao servidor o valor com o cupom (e, se pix, com o desconto de Pix). Devolve a prévia ou lança o motivo. */
+  async function pedirPrevia(codigo: string | null, pix: boolean): Promise<Previa> {
+    const res = await fetch("/api/cart/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: items.map((i) => ({ slug: i.slug, size: i.size, color: i.color, qty: i.qty })), coupon: codigo ?? "", pix }),
+    });
+    const d = (await res.json()) as Previa & { error?: string };
+    if (!res.ok) throw new PreviaErro(d.error ?? "Não foi possível calcular o valor.", res.status);
+    return d;
+  }
+
+  /** Botão "Aplicar": confere o cupom no servidor. */
+  async function aplicarCupom() {
+    if (!cupomTexto.trim()) return;
+    setAplicando(true);
+    setCupomErro("");
+    try {
+      const p = await pedirPrevia(cupomTexto, false);
+      setPrevia(p);
+      setCupom(p.couponCode);
+    } catch (e) {
+      // Sem conta: leva a pessoa a entrar (e ela volta para esta sacola). Só quando ELA pede o cupom: a prévia
+      // automática do Pix, que roda ao abrir a página, nunca redireciona.
+      if (e instanceof PreviaErro && e.status === 401) {
+        router.push("/conta/entrar?next=%2Fcarrinho");
+        return;
+      }
+      setCupom(null);
+      setPrevia(null);
+      setCupomErro(e instanceof Error ? e.message : "Cupom inválido.");
+    } finally {
+      setAplicando(false);
+    }
+  }
+
+  function tirarCupom() {
+    setCupom(null);
+    setPrevia(null);
+    setCupomTexto("");
+    setCupomErro("");
+  }
+
+  // O carrinho mudou: refaz a prévia do cupom (o mínimo ou o valor podem ter mudado) e a do Pix.
+  useEffect(() => {
+    if (!ready || items.length === 0) return;
+    let vivo = true;
+    (async () => {
+      if (cupom) {
+        try {
+          const p = await pedirPrevia(cupom, false);
+          if (vivo) setPrevia(p);
+        } catch (e) {
+          if (vivo) {
+            setCupom(null);
+            setPrevia(null);
+            setCupomErro(e instanceof Error ? e.message : "Cupom inválido.");
+          }
+        }
+      }
+      if (pixPercent > 0) {
+        try {
+          const p = await pedirPrevia(cupom, true);
+          if (vivo) setPreviaPix(p);
+        } catch {
+          if (vivo) setPreviaPix(null);
+        }
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refaz só quando o carrinho, o cupom aceito ou o Pix mudam
+  }, [assinatura, cupom, pixPercent, ready]);
+
   /** Registra o pedido no servidor e leva o cliente ao pagamento (modo "online") ou ao WhatsApp. */
-  async function finalizar(modo: "whatsapp" | "online") {
+  async function finalizar(modo: "whatsapp" | "online" | "pix") {
     setStatus("loading");
     setError("");
     try {
@@ -54,6 +160,8 @@ export default function CarrinhoPage() {
         body: JSON.stringify({
           items: items.map((i) => ({ slug: i.slug, size: i.size, color: i.color, qty: i.qty })),
           payment: modo,
+          // O servidor confere o cupom de novo (e as regras de uso): aqui vai só o código aceito na prévia.
+          coupon: cupom ?? "",
         }),
       });
       // Comprar exige conta: sem sessão o servidor responde 401. Leva a pessoa a entrar (ou cadastrar) e
@@ -70,7 +178,7 @@ export default function CarrinhoPage() {
         router.push("/conta?endereco=1#endereco");
         return;
       }
-      const destino = modo === "online" ? data.paymentUrl : data.whatsappUrl;
+      const destino = modo === "whatsapp" ? data.whatsappUrl : data.paymentUrl;
       // Falhou (sem estoque, muitas tentativas...): mostra a mensagem que o servidor mandou.
       if (!res.ok || !destino) throw new Error(data.error ?? "Não foi possível registrar o pedido.");
       // Pedido registrado: esvazia a sacola e leva o cliente ao destino.
@@ -172,17 +280,94 @@ export default function CarrinhoPage() {
             {/* Total e botão de finalizar: só aparecem se há itens. */}
             {ready && items.length > 0 && (
               <>
+                {/* Cupom: o campo, o botão e o resultado (aceito ou o motivo da recusa). */}
+                <div className="mt-2 border-t-2 border-dashed border-background pt-5">
+                  {cupom ? (
+                    <div className="flex items-center justify-between gap-3 text-base font-bold uppercase">
+                      <span>Cupom {cupom} aplicado</span>
+                      <button type="button" onClick={tirarCupom} className="text-sm underline underline-offset-4">
+                        Tirar
+                      </button>
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void aplicarCupom();
+                      }}
+                      className="flex gap-2"
+                    >
+                      <label htmlFor="cupom" className="sr-only">
+                        Cupom de desconto
+                      </label>
+                      <input
+                        id="cupom"
+                        value={cupomTexto}
+                        onChange={(e) => setCupomTexto(e.target.value)}
+                        maxLength={30}
+                        autoComplete="off"
+                        placeholder="Cupom de desconto"
+                        className="min-w-0 flex-1 border-2 border-background bg-transparent px-3 py-2 text-base font-bold uppercase placeholder:normal-case placeholder:text-background"
+                      />
+                      <button
+                        type="submit"
+                        disabled={aplicando || !cupomTexto.trim()}
+                        className="border-2 border-background px-4 py-2 text-sm font-bold uppercase transition-colors enabled:hover:bg-background enabled:hover:text-foreground disabled:cursor-not-allowed"
+                      >
+                        {aplicando ? "Conferindo…" : "Aplicar"}
+                      </button>
+                    </form>
+                  )}
+                  {cupomErro ? (
+                    <p role="alert" className="mt-2 text-sm font-bold">
+                      {cupomErro}
+                    </p>
+                  ) : null}
+                </div>
+
+                {/* Com cupom aceito, mostra o subtotal e o desconto antes do total. */}
+                {previa && previa.couponDiscountCents > 0 && (
+                  <dl className="mt-4 flex flex-col gap-1 text-base font-bold uppercase">
+                    <div className="flex justify-between">
+                      <dt>Subtotal</dt>
+                      <dd>{formatCents(previa.subtotalCents)}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Cupom {previa.couponCode}</dt>
+                      <dd>-{formatCents(previa.couponDiscountCents)}</dd>
+                    </div>
+                  </dl>
+                )}
                 <div className="mt-2 flex items-end justify-between border-t-2 border-dashed border-background pt-5">
                   <span className="text-sm font-bold uppercase tracking-[0.15em]">Total</span>
-                  <span className="font-display text-6xl leading-none">{formatCents(totalCents)}</span>
+                  <span className="font-display text-6xl leading-none">{formatCents(previa && cupom ? previa.totalCents : totalCents)}</span>
                 </div>
+                {/* Pix com desconto: o valor já descontado vem do servidor (a mesma conta do pedido). */}
+                {online && pixPercent > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => finalizar("pix")}
+                    disabled={status === "loading" || !previaPix}
+                    className="mt-6 w-full border-2 border-background bg-background px-6 py-4 font-display text-2xl uppercase tracking-wide text-foreground transition-colors enabled:hover:bg-transparent enabled:hover:text-background disabled:cursor-wait"
+                  >
+                    {status === "loading"
+                      ? "Registrando pedido…"
+                      : previaPix
+                        ? `Pagar por Pix · ${formatCents(previaPix.totalCents)} (${pixPercent}% off)`
+                        : "Pagar por Pix com desconto"}
+                  </button>
+                )}
                 {/* Pagar online: cartão de crédito, débito ou Pix, na página do Mercado Pago. */}
                 {online && (
                   <button
                     type="button"
                     onClick={() => finalizar("online")}
                     disabled={status === "loading"}
-                    className="mt-6 w-full border-2 border-background bg-background px-6 py-4 font-display text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
+                    className={
+                      pixPercent > 0
+                        ? "mt-3 w-full border-2 border-background px-6 py-3 font-display text-xl uppercase tracking-wide transition-colors hover:bg-background hover:text-foreground disabled:cursor-wait"
+                        : "mt-6 w-full border-2 border-background bg-background px-6 py-4 font-display text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
+                    }
                   >
                     {status === "loading" ? "Registrando pedido…" : "Pagar com cartão ou Pix"}
                   </button>

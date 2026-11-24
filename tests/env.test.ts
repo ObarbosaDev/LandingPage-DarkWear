@@ -140,3 +140,17 @@ describe("checkEnv: sessão do cliente", () => {
   });
 
 });
+
+describe("PIX_DISCOUNT_PERCENT", () => {
+  it("valor válido não gera aviso; ausente ou vazio também não", () => {
+    for (const v of [undefined, "", "  ", "1", "5", "30"]) {
+      expect(checkEnv({ ...completo, PIX_DISCOUNT_PERCENT: v }, REAL).warnings.join(" "), String(v)).not.toMatch(/PIX_DISCOUNT_PERCENT/);
+    }
+  });
+  it("inválido avisa que o desconto fica desligado; acima de 30 avisa o teto", () => {
+    for (const v of ["abc", "0", "-3", "2.5", "1000"]) {
+      expect(checkEnv({ ...completo, PIX_DISCOUNT_PERCENT: v }, REAL).warnings.join(" "), v).toMatch(/PIX_DISCOUNT_PERCENT inválida/);
+    }
+    expect(checkEnv({ ...completo, PIX_DISCOUNT_PERCENT: "80" }, REAL).warnings.join(" ")).toMatch(/máximo/);
+  });
+});

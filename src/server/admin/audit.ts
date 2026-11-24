@@ -23,6 +23,8 @@ export const ACOES_AUDITADAS = [
   "produto.estoque",
   "produto.visibilidade",
   "encomenda.status",
+  "cupom.criar",
+  "cupom.visibilidade",
   "cliente.senha-provisoria",
 ] as const;
 export type AcaoAuditada = (typeof ACOES_AUDITADAS)[number];
