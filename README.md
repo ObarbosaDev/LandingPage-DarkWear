@@ -141,7 +141,9 @@ Cada cliente só vê os próprios pedidos: o de outra pessoa responde "não enco
 | `npm run admin:criar -- --email maria@loja.com --nome "Maria Souza" --celular 11987654321` | cria (ou promove, se a conta já existe) um administrador e mostra uma **senha provisória, uma única vez** |
 | `npm run admin:senha -- --email maria@loja.com` | gera outra senha provisória (esqueceu a senha) |
 | `npm run admin:remover -- --email maria@loja.com` | tira o acesso ao painel e derruba as sessões abertas |
-| `npm run admin:listar` | lista quem administra hoje |
+| `npm run admin:listar` | lista quem administra hoje (e se cada um usa segundo fator) |
+| `npm run admin:2fa -- --email maria@loja.com` | **liga o segundo fator**: mostra a chave para cadastrar no aplicativo autenticador (uma única vez) e passa a exigir o código de 6 dígitos no login |
+| `npm run admin:2fa-remover -- --email maria@loja.com` | desliga o segundo fator (aparelho perdido, por exemplo) |
 
 Para dar acesso a alguém: rode `admin:criar`, copie o e-mail e a senha provisória e passe à pessoa. No primeiro acesso ela é **obrigada a trocar a senha**. Com `DATABASE_URL` os comandos falam com o banco de produção; sem ela, com o banco local (pare o servidor de desenvolvimento antes).
 
@@ -152,6 +154,12 @@ Como o painel é protegido (três camadas):
 3. **Papel inalterável pela web:** nenhuma tela escreve o papel. A senha provisória gerada em `/admin/clientes` recusa contas de administrador (elas só se gerenciam pelo terminal).
 
 O painel é o "bastidores" da loja, com uma ideia por tela: **Painel** (fechamento de caixa em forma de recibo e quadro de avisos), **Esteira** (pedidos em colunas Pendente → Pago → Enviado → Entregue, com o botão do passo seguinte no cartão), **Encomendas** (fila de arte, com a ficha de estampa e o mapa da posição), **Prateleira** (produtos em quadrados com a pilha de estoque) e **Caderneta** (clientes em ordem alfabética, com busca e senha provisória). Um letreiro no topo mostra o que espera pelo dono.
+
+**Segundo fator (opcional, recomendado).** Um administrador com `admin:2fa` ligado, depois de acertar a senha, precisa digitar o código do aplicativo autenticador (Google Authenticator, Authy, 1Password...). Sem o código não há sessão, nem cookie de sessão. Cada código vale uma vez, o relógio tolera 30 segundos para cada lado, 5 erros em 15 minutos bloqueiam a conta e o passo do código só vale por 5 minutos depois da senha. A chave fica **cifrada** no banco (AES-256-GCM, derivada de `CUSTOMER_SESSION_SECRET`): **trocar esse segredo invalida os segundos fatores existentes**, e é preciso refazer `admin:2fa`. Só o terminal liga e desliga, como o papel de administrador.
+
+**Diário (`/admin/diario`).** Cada ação do painel (mudar pedido, rastreio, produto, estoque, visibilidade, encomenda, senha provisória) é anotada com o e-mail de quem fez e a hora; o histórico de cada pedido também mostra quem o mudou. O diário só cresce: nenhuma tela o apaga.
+
+**Rastreio.** Ao marcar um pedido como enviado, o painel pergunta o código de rastreio (opcional; dá para informar ou corrigir depois). O cliente o vê na página do pedido, com link dos Correios quando o código tem esse formato.
 
 A conta de administrador é uma conta como as outras (aparece em `/conta`). `ADMIN_PASSWORD` e `ADMIN_SESSION_SECRET` **não são mais usadas** (o servidor avisa se sobrarem no ambiente).
 
