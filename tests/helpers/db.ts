@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { getDb } from "@/server/db";
-import { customOrders, loginAttempts, orderItems, orders, products } from "@/server/db/schema";
+import { customOrders, customers, loginAttempts, orderItems, orders, products } from "@/server/db/schema";
 import { PRODUCTS } from "@/server/db/seed-data";
 import { eq, notInArray } from "drizzle-orm";
 
@@ -15,6 +15,8 @@ export async function resetDb() {
   // (chave estrangeira), então saem primeiro. O histórico de status some junto com o pedido (cascade).
   await db.delete(orderItems);
   await db.delete(orders);
+  // Os clientes saem depois dos pedidos (o pedido aponta para o cliente).
+  await db.delete(customers);
   await db.delete(customOrders);
   await db.delete(loginAttempts);
   // Apaga produtos que um teste tenha criado (os que não fazem parte do catálogo de exemplo).
