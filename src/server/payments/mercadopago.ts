@@ -20,6 +20,7 @@
 
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { PRAZO_ONLINE_HORAS } from "@/lib/prazos";
 import type { PaymentStatus } from "@/server/db/schema";
 
 const API = "https://api.mercadopago.com";
@@ -115,14 +116,14 @@ export type DadosCobranca = {
  *   - boleto fica de fora: leva dias para compensar e seguraria as peças no estoque por esse tempo;
  *   - parcelas: MERCADOPAGO_MAX_INSTALLMENTS (padrão 1, à vista). Parcelar sem juros custa taxa à loja:
  *     essa é uma decisão do dono, por isso o padrão é o mais conservador;
- *   - a cobrança expira em 48 horas, o mesmo prazo em que o pedido pendente é cancelado.
+ *   - a cobrança expira em PRAZO_ONLINE_HORAS, o mesmo prazo em que o pedido com cobrança online é cancelado.
  */
 export async function criarPreferencia(d: DadosCobranca): Promise<{ id: string; url: string }> {
   const parcelas = Number(process.env.MERCADOPAGO_MAX_INSTALLMENTS);
   const maxParcelas = Number.isInteger(parcelas) && parcelas >= 1 && parcelas <= 12 ? parcelas : 1;
   const retorno = `${d.baseUrl}/pagamento/retorno?pedido=${encodeURIComponent(d.numero)}`;
   // O Mercado Pago pede a data com fuso (ex.: -04:00): "+00:00" é o horário universal.
-  const expira = new Date(Date.now() + 48 * 3600 * 1000).toISOString().replace("Z", "+00:00");
+  const expira = new Date(Date.now() + PRAZO_ONLINE_HORAS * 3600 * 1000).toISOString().replace("Z", "+00:00");
 
   const resposta = await chamar<{ id: string; init_point?: string; sandbox_init_point?: string }>("/checkout/preferences", {
     method: "POST",

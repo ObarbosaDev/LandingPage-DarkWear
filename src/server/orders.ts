@@ -13,13 +13,15 @@
 // ============================================================================
 
 import "server-only";
-import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { and, eq, exists, gte, lt, or, sql } from "drizzle-orm";
+import { PRAZO_ONLINE_HORAS, PRAZO_WHATSAPP_HORAS } from "@/lib/prazos";
 import { getDb, type Db } from "@/server/db";
 import type { Address } from "@/server/customers/address";
 import {
   orderItems,
   orders,
   orderStatusHistory,
+  payments,
   productStock,
   products,
   type OrderStatus,
@@ -97,6 +99,20 @@ function parseItems(input: unknown): OrderItemInput[] {
  * @throws OrderError com a mensagem a mostrar ao cliente
  */
 export async function createOrder(input: unknown, customerId: number, address?: Address | null): Promise<OrderView> {
+  try {
+    return await registrarPedido(input, customerId, address);
+  } catch (e) {
+    // Faltou estoque (409): pode haver pedidos pendentes VENCIDOS segurando as peças e esperando o cron do dia.
+    // Libera esses (só os vencidos, nunca os que ainda estão no prazo) e tenta uma segunda vez.
+    if (e instanceof OrderError && e.status === 409 && (await expirePendingOrders()) > 0) {
+      return registrarPedido(input, customerId, address);
+    }
+    throw e;
+  }
+}
+
+/** Uma tentativa de registrar o pedido (ver createOrder, que tenta de novo depois de liberar pedidos vencidos). */
+async function registrarPedido(input: unknown, customerId: number, address?: Address | null): Promise<OrderView> {
   const lines = parseItems(input);
   const db = await getDb();
 
@@ -182,6 +198,12 @@ export async function createOrder(input: unknown, customerId: number, address?: 
   });
 }
 
+/** Prazo (em horas) dos pedidos combinados pelo WhatsApp: PENDING_ORDER_HOURS, ou 48 se ausente/inválida. */
+function prazoWhatsappHoras(): number {
+  const h = Number(process.env.PENDING_ORDER_HOURS);
+  return Number.isFinite(h) && h > 0 ? h : PRAZO_WHATSAPP_HORAS;
+}
+
 /** A "transação" aberta pelo banco: o que as funções recebem para trabalhar dentro dela. */
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
@@ -241,19 +263,31 @@ export async function cancelOrder(id: number, somenteSe?: OrderStatus, origem: S
  * Chamada todo dia pelo cron (/api/cron/expire-orders): sem isso, um pedido que o cliente nunca
  * pagou seguraria as peças no estoque para sempre.
  *
- * @param maxAgeHours idade mínima, em horas, para um pedido pendente expirar (padrão 48)
+ * @param whatsappHours idade mínima, em horas, para expirar um pedido SEM cobrança online (padrão: a variável
+ *                      PENDING_ORDER_HOURS, ou 48)
+ * @param onlineHours   idade mínima para expirar um pedido COM cobrança online iniciada (padrão: PRAZO_ONLINE_HORAS)
  * @returns quantos pedidos foram cancelados
  */
 // Pedido pendente segura as peças no estoque. Se ninguém fechou depois de `maxAgeHours`, ele é cancelado
 // e as peças voltam à venda. Devolve quantos pedidos foram cancelados.
-export async function expirePendingOrders(maxAgeHours = 48): Promise<number> {
+export async function expirePendingOrders(whatsappHours = prazoWhatsappHoras(), onlineHours = PRAZO_ONLINE_HORAS): Promise<number> {
   const db = await getDb();
-  const limite = new Date(Date.now() - maxAgeHours * 3600 * 1000);
-  // Candidatos: pendentes criados antes do limite.
+  const limiteZap = new Date(Date.now() - whatsappHours * 3600 * 1000);
+  const limiteOnline = new Date(Date.now() - onlineHours * 3600 * 1000);
+  // Candidatos: pendentes vencidos. O prazo é o do WhatsApp para todos, e o prazo curto vale para quem tem cobrança
+  // online (basta existir uma linha em payments: a rota de pedidos a cria junto com a página de pagamento).
   const velhos = await db
     .select({ id: orders.id })
     .from(orders)
-    .where(and(eq(orders.status, "pendente"), lt(orders.createdAt, limite)));
+    .where(
+      and(
+        eq(orders.status, "pendente"),
+        or(
+          lt(orders.createdAt, limiteZap),
+          and(lt(orders.createdAt, limiteOnline), exists(db.select({ um: sql`1` }).from(payments).where(eq(payments.orderId, orders.id)))),
+        ),
+      ),
+    );
 
   let cancelados = 0;
   for (const { id } of velhos) {

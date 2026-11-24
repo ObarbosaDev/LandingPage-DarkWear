@@ -20,7 +20,7 @@ Loja online de camisetas estampadas em DTF. O cliente escolhe uma peça pronta d
 
 - **Catálogo:** vitrine na home com filtro por categoria (Todos, Pronta entrega, Coleção) e busca por nome na loja.
 - **Arco de produtos:** carrossel 3D de cards na home. Arrasta com o mouse, rola com a roda, usa as setas ou clica no card.
-- **Página de produto:** foto, descrição, escolha de tamanho e cor, com controle pelo estoque disponível.
+- **Página de produto:** foto, descrição, escolha de tamanho e cor. O estoque é **por tamanho e cor**: o tamanho sem unidades na cor escolhida aparece riscado e não pode ser comprado.
 - **Carrinho:** persiste no navegador (`localStorage`) e fecha o pedido pelo WhatsApp com uma mensagem já montada, ou paga online com cartão (crédito e débito) e Pix pelo Mercado Pago, quando configurado.
 - **Encomenda personalizada:** o cliente escolhe modelo, cor, tamanho e a posição da arte (frente, costas, peito ou manga), envia o arquivo (PNG, JPG, SVG ou PDF, até 25 MB) e confirma pelo WhatsApp. O arquivo da arte é anexado na própria conversa.
 - **Páginas institucionais:** Sobre, FAQ e Contato.
@@ -260,7 +260,7 @@ Um caminho sugerido para entender o sistema:
 
 As rotas que recebem dados validam a entrada no servidor. No pedido, produto, tamanho, cor e quantidade são conferidos contra o catálogo e o estoque no banco.
 
-**Estoque:** a baixa é um único `UPDATE` condicional dentro de uma transação, e a coluna tem `CHECK (stock >= 0)`. Se vários clientes disputam a última peça, só os que couberem no estoque passam e os outros recebem `409`. Em teste local, 12 pedidos simultâneos para 8 peças resultaram em 8 aprovados, 4 recusados e estoque final 0. O cancelamento (`cancelOrder`) devolve as peças ao estoque.
+**Estoque:** cada tamanho e cor de uma peça tem a sua quantidade (tabela `product_stock`, migração 0010). A baixa é um único `UPDATE` condicional sobre a variação comprada, dentro de uma transação, e a coluna tem `CHECK (stock >= 0)`. O total da peça (`products.stock`) é a soma das variações, mantida por um gatilho do banco: o código nunca o grava, então ele não diverge. No painel, cada peça tem a grade "Estoque por tamanho e cor"; ao tirar um tamanho ou cor da peça, o estoque daquela variação some. Se vários clientes disputam a última peça, só os que couberem no estoque passam e os outros recebem `409`. Em teste local, 12 pedidos simultâneos para 8 peças resultaram em 8 aprovados, 4 recusados e estoque final 0. O cancelamento (`cancelOrder`) devolve as peças ao estoque.
 
 | Método e rota | Função |
 | --- | --- |
@@ -293,7 +293,7 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 - **Fotos no banco:** o upload do painel guarda a imagem no Postgres (até 2 MB, sem redimensionar). Serve bem para um catálogo pequeno; se o volume crescer, migrar para um armazenamento de arquivos como o Vercel Blob. Prefira fotos já otimizadas (WebP).
 - **Pagamento online ainda não testado contra o Mercado Pago real:** a integração foi validada com a API simulada. O formato da assinatura do aviso (`x-signature`) precisa ser conferido com o botão "Simular" do painel deles antes de publicar. Sem `MERCADOPAGO_ACCESS_TOKEN`, Pix e cartão seguem combinados no WhatsApp e o pedido nasce `pendente`.
 - **Sem estorno pelo painel:** estornos e disputas são feitos no painel do Mercado Pago.
-- **Pedido pendente expira só por prazo fixo:** a baixa acontece quando o pedido é registrado, e o cron cancela os pendentes depois de 48 horas. Não há aviso ao cliente nem prazo por pedido.
+- **Pedido pendente segura as peças por tempo limitado:** a baixa acontece quando o pedido é registrado. Pedido com cobrança online (Mercado Pago) segura por 12 horas (`PRAZO_ONLINE_HORAS`, o mesmo prazo de validade da cobrança) e pedido combinado só pelo WhatsApp por 48 horas (`PENDING_ORDER_HOURS`). O cron diário cancela os vencidos e, além disso, uma compra que falha por falta de estoque libera os pedidos vencidos na hora e tenta de novo. Não há aviso ao cliente antes de expirar.
 - **Sem cálculo de frete:** previsto para a etapa 3 (Correios, com plano B no WhatsApp). Precisa de contrato com os Correios.
 - **Um endereço por conta:** quem entrega em mais de um lugar troca o endereço antes de cada compra (cada pedido guarda o seu).
 - **Neon ainda não testado:** o caminho de produção usa o driver serverless do Neon, mas foi validado apenas contra o Postgres embutido. Teste com um banco Neon real antes de publicar.

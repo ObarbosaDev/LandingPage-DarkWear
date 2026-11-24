@@ -18,6 +18,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { PRAZO_ONLINE_HORAS } from "@/lib/prazos";
 import { SITE } from "@/lib/site";
 import { whatsappLink } from "@/lib/whatsapp";
 import { requireCustomer } from "@/server/customers/session";
@@ -42,7 +43,7 @@ function leitura(v: PaymentView): { palavra: string; texto: string; esperando: b
     default:
       // Pendente: depende do último pagamento tentado.
       if (v.payment === "recusado" || v.payment === "cancelado") {
-        return { palavra: "Recusado", texto: "O pagamento não passou. O pedido segue reservado por 48 horas: chame no WhatsApp para tentar outro cartão ou pagar por Pix.", esperando: false, tentarDeNovo: true };
+        return { palavra: "Recusado", texto: `O pagamento não passou. O pedido segue reservado por ${PRAZO_ONLINE_HORAS} horas: chame no WhatsApp para tentar outro cartão ou pagar por Pix.`, esperando: false, tentarDeNovo: true };
       }
       return { palavra: "Aguardando", texto: "Ainda não recebemos a confirmação do pagamento. Pode levar alguns instantes (o Pix é quase na hora). Esta página se atualiza sozinha.", esperando: true, tentarDeNovo: false };
   }

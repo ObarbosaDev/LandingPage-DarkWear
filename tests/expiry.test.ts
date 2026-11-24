@@ -139,3 +139,85 @@ describe("rota do cron", () => {
     expect(revalidateTag).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Prazos diferentes por tipo de pedido e liberação sob demanda.
+//   - pedido com cobrança ONLINE (Mercado Pago) segura as peças por poucas horas (PRAZO_ONLINE_HORAS);
+//   - pedido combinado só pelo WhatsApp segura por 48 horas, porque depende de uma pessoa confirmar;
+//   - quando uma compra falha por falta de estoque, os pedidos pendentes vencidos são liberados na hora
+//     (sem esperar o cron diário) e a compra é tentada de novo.
+// ---------------------------------------------------------------------------
+import { payments } from "@/server/db/schema";
+import { PRAZO_ONLINE_HORAS } from "@/lib/prazos";
+import { OrderError } from "@/server/orders";
+
+/** Marca o pedido como tendo uma cobrança online iniciada (como a rota de pedidos faz ao criar a preferência). */
+async function comCobranca(id: number) {
+  await (await getDb()).insert(payments).values({ orderId: id, provider: "mercadopago", preferenceId: `pref-${id}`, status: "iniciado" });
+}
+
+describe("prazo por tipo de pedido", () => {
+  it("pedido com cobrança online expira no prazo curto; o do WhatsApp continua com 48 horas", async () => {
+    const online = await createOrder([{ ...GT3, qty: 1 }], await clienteDeTeste());
+    const zap = await createOrder([{ ...GT3, qty: 1 }], await clienteDeTeste());
+    await comCobranca(online.id);
+    await envelhecer(online.id, PRAZO_ONLINE_HORAS + 1);
+    await envelhecer(zap.id, PRAZO_ONLINE_HORAS + 1);
+    expect(await expirePendingOrders()).toBe(1);
+    expect(await statusDe(online.id)).toBe("cancelado");
+    expect(await statusDe(zap.id)).toBe("pendente");
+  });
+
+  it("pedido online ainda dentro do prazo curto não é cancelado", async () => {
+    const online = await createOrder([{ ...GT3, qty: 1 }], await clienteDeTeste());
+    await comCobranca(online.id);
+    await envelhecer(online.id, PRAZO_ONLINE_HORAS - 1);
+    expect(await expirePendingOrders()).toBe(0);
+    expect(await statusDe(online.id)).toBe("pendente");
+  });
+
+  it("pedido online já pago nunca expira, por mais antigo que seja", async () => {
+    const online = await createOrder([{ ...GT3, qty: 1 }], await clienteDeTeste());
+    await comCobranca(online.id);
+    await updateOrderStatus(online.id, "pago");
+    await envelhecer(online.id, 500);
+    expect(await expirePendingOrders()).toBe(0);
+    expect(await statusDe(online.id)).toBe("pago");
+  });
+});
+
+describe("liberação sob demanda", () => {
+  it("compra sem estoque libera pedidos vencidos e passa", async () => {
+    const cliente = await clienteDeTeste();
+    // Um pedido pendente e VENCIDO segura as 12 peças.
+    const preso = await createOrder([{ ...GT3, qty: 12 }], cliente);
+    await envelhecer(preso.id, 60);
+    expect(await stockOf("oversized-gt3-rs")).toBe(0);
+    const novo = await createOrder([{ ...GT3, qty: 3 }], cliente);
+    expect(novo.items[0].qty).toBe(3);
+    expect(await statusDe(preso.id)).toBe("cancelado");
+    expect(await stockOf("oversized-gt3-rs")).toBe(9);
+  });
+
+  it("não libera pedido que ainda está no prazo: a compra continua recusada", async () => {
+    const cliente = await clienteDeTeste();
+    const preso = await createOrder([{ ...GT3, qty: 12 }], cliente);
+    await envelhecer(preso.id, 5);
+    await expect(createOrder([{ ...GT3, qty: 1 }], cliente)).rejects.toMatchObject({ status: 409 });
+    expect(await statusDe(preso.id)).toBe("pendente");
+  });
+
+  it("só tenta liberar em caso de falta de estoque (erro de validação não cancela ninguém)", async () => {
+    const cliente = await clienteDeTeste();
+    const velho = await createOrder([{ ...GT3, qty: 1 }], cliente);
+    await envelhecer(velho.id, 60);
+    await expect(createOrder([{ ...GT3, size: "XG", qty: 1 }], cliente)).rejects.toBeInstanceOf(OrderError);
+    expect(await statusDe(velho.id)).toBe("pendente");
+  });
+
+  it("se mesmo liberando não houver estoque, a compra falha sem deixar nada pela metade", async () => {
+    const cliente = await clienteDeTeste();
+    await expect(createOrder([{ ...GT3, qty: 13 }], cliente)).rejects.toMatchObject({ status: 409 });
+    expect(await stockOf("oversized-gt3-rs")).toBe(12);
+  });
+});

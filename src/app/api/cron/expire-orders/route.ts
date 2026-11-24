@@ -30,9 +30,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  // Prazo configurável (PENDING_ORDER_HOURS); valor ausente ou inválido cai no padrão de 48 horas.
-  const horas = Number(process.env.PENDING_ORDER_HOURS);
-  const cancelados = await expirePendingOrders(Number.isFinite(horas) && horas > 0 ? horas : 48);
+  // Os prazos vêm de expirePendingOrders: curto para pedidos com cobrança online, e PENDING_ORDER_HOURS (padrão 48)
+  // para os combinados pelo WhatsApp.
+  const cancelados = await expirePendingOrders();
   if (cancelados > 0) revalidateTag("products", { expire: 0 }); // as peças voltaram ao estoque
 
   return NextResponse.json({ cancelados });
