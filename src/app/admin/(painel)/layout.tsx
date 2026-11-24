@@ -1,12 +1,15 @@
 // ============================================================================
-// Layout das telas do painel logado: resumo, pedidos, encomendas, produtos e clientes.
+// Layout das telas do painel logado: o BASTIDORES da loja (resumo, esteira de pedidos, encomendas, prateleira
+// de produtos e caderneta de clientes).
 // "(painel)" é um grupo de rotas: a pasta não aparece no endereço, mas agrupa tudo o que exige um administrador.
 //
 // Faz duas coisas: confere que quem chega é um administrador com login recente (senão, "não encontrado") e
-// coloca a barra de navegação do painel no topo de todas as telas, já com o nome de quem está logado e os
-// números de pedidos pendentes e encomendas novas.
+// monta o topo de todas as telas: a faixa que corre com o que espera pelo dono e a barra de navegação com o
+// nome de quem está logado e os números de pedidos pendentes e encomendas novas.
 // ============================================================================
 
+import { Faixa } from "@/components/admin/Faixa";
+import { itensDaFaixa } from "@/lib/ticker";
 import { requireAdmin } from "@/server/admin/auth";
 import { contagensDoPainel } from "@/server/admin/dashboard";
 import { AdminNav } from "./AdminNav";
@@ -20,10 +23,11 @@ export const instant = false;
 // Cada página e cada ação repetem a verificação por segurança.
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
   const admin = await requireAdmin();
-  const { pedidosPendentes, encomendasNovas } = await contagensDoPainel();
+  const contagens = await contagensDoPainel();
   return (
     <>
-      <AdminNav nome={admin.name} pedidos={pedidosPendentes} encomendas={encomendasNovas} />
+      <Faixa itens={itensDaFaixa(contagens)} />
+      <AdminNav nome={admin.name} pedidos={contagens.pedidosPendentes} encomendas={contagens.encomendasNovas} />
       <main className="mx-auto max-w-7xl px-6 py-12">{children}</main>
     </>
   );
