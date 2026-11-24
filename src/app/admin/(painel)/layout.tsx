@@ -1,13 +1,14 @@
 // ============================================================================
-// Layout das telas do painel logado: resumo, pedidos, encomendas e produtos.
-// "(painel)" é um grupo de rotas: a pasta não aparece no endereço, mas agrupa tudo o que exige
-// sessão (a tela de login fica fora dele).
+// Layout das telas do painel logado: resumo, pedidos, encomendas, produtos e clientes.
+// "(painel)" é um grupo de rotas: a pasta não aparece no endereço, mas agrupa tudo o que exige um administrador.
 //
-// Faz duas coisas: barra quem não tem sessão (redireciona ao login) e coloca a barra de navegação
-// do painel no topo de todas as telas.
+// Faz duas coisas: confere que quem chega é um administrador com login recente (senão, "não encontrado") e
+// coloca a barra de navegação do painel no topo de todas as telas, já com o nome de quem está logado e os
+// números de pedidos pendentes e encomendas novas.
 // ============================================================================
 
 import { requireAdmin } from "@/server/admin/auth";
+import { contagensDoPainel } from "@/server/admin/dashboard";
 import { AdminNav } from "./AdminNav";
 
 // Área privada: não precisa de casca estática instantânea. Ela bloqueia no servidor até validar a sessão.
@@ -18,10 +19,11 @@ export const instant = false;
 // encontrado" de verdade (status 404, sem título nem texto do painel), igual a qualquer endereço que não existe.
 // Cada página e cada ação repetem a verificação por segurança.
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
-  await requireAdmin();
+  const admin = await requireAdmin();
+  const { pedidosPendentes, encomendasNovas } = await contagensDoPainel();
   return (
     <>
-      <AdminNav />
+      <AdminNav nome={admin.name} pedidos={pedidosPendentes} encomendas={encomendasNovas} />
       <main className="mx-auto max-w-7xl px-6 py-12">{children}</main>
     </>
   );
