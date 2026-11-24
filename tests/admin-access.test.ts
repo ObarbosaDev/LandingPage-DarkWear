@@ -308,3 +308,39 @@ describe("toda ação do painel recusa quem não é administrador", () => {
   });
 });
 
+// O porteiro do painel (src/proxy.ts) só deixa passar quem tem "admin" no COOKIE. Se o login não gravasse o papel
+// no cookie, o administrador seria barrado pelo próprio porteiro. Por isso o papel gravado é testado aqui.
+describe("o papel do login vai para o cookie (que o porteiro lê)", () => {
+  const papelDoCookie = async () => {
+    const { verifySession, COOKIE_CLIENTE } = await import("@/server/customers/token");
+    const valor = jar.get(COOKIE_CLIENTE);
+    return valor ? verifySession(valor, process.env.CUSTOMER_SESSION_SECRET as string)?.role : undefined;
+  };
+
+  it("login de administrador grava role admin; login de cliente grava role cliente", async () => {
+    await criarAdmin("adm-cookie@exemplo.com");
+    await resultado(() => loginAction({}, form({ email: "adm-cookie@exemplo.com", password: SENHA })));
+    expect(await papelDoCookie()).toBe("admin");
+
+    jar.clear();
+    const id = await clienteDeTeste("cli-cookie@exemplo.com");
+    await (await getDb()).update(customers).set({ passwordHash: await hashPassword(SENHA) }).where(eq(customers.id, id));
+    await resultado(() => loginAction({}, form({ email: "cli-cookie@exemplo.com", password: SENHA })));
+    expect(await papelDoCookie()).toBe("cliente");
+  });
+
+  it("trocar a senha e 'sair dos outros' preservam o papel no cookie do administrador", async () => {
+    const id = await criarAdmin("adm-troca@exemplo.com");
+    await entrarComo(id);
+    await changePasswordAction({}, form({ current: SENHA, next: "outra senha forte 456", confirm: "outra senha forte 456" }));
+    expect(await papelDoCookie()).toBe("admin");
+    await signOutEverywhereAction();
+    expect(await papelDoCookie()).toBe("admin");
+  });
+
+  it("cadastro novo nunca grava admin", async () => {
+    await resultado(() => registerAction({}, form({ name: "Pessoa Nova", email: "nova@exemplo.com", phone: "11987654321", password: SENHA, privacy: "on" })));
+    expect(await papelDoCookie()).toBe("cliente");
+  });
+});
+
