@@ -149,23 +149,27 @@
 - [ ] **Step 4: Rodar a suíte inteira** (`npx vitest run`). Esperado: PASS. Verificar no navegador: sacola sem login, cadastro, compra pelo WhatsApp, pedido na lista.
 - [ ] **Step 5: Commits:** `feat: pedido guarda o cliente que comprou`, `feat: comprar exige login`, `feat: sacola leva ao login sem perder os itens`, `feat: consultas de pedidos do cliente`, `feat: página meus pedidos`, `feat: página de detalhe do pedido do cliente`, `fix: retorno do pagamento só mostra o pedido do próprio cliente`.
 
-### Task 7: Painel do dono (clientes e senha provisória)
+### Task 7: Admin por e-mail e senha (substitui a senha única) e tela de admin
+
+**Requisito novo do dono (durante a execução):** a tela de admin tem de ser perfeita; não pode haver nenhum botão, link ou gesto de admin na tela de entrar; o dono vai entregar e-mail e senha à pessoa que administra a loja.
+
+**Decisão:** o admin é uma **conta** com `customers.role = 'admin'`, que entra pela MESMA tela `/conta/entrar` e é levada a `/admin`. A senha única `ADMIN_PASSWORD` e o cookie `dw_admin` saem. O papel só é concedido por **comando de terminal do dono** (`npm run admin:criar`), nunca pela web.
 
 **Files:**
-- Modify: `src/server/admin/orders.ts` (`AdminOrder.customer: { name: string; email: string; phone: string } | null`), `src/app/admin/(painel)/pedidos/page.tsx`, `src/app/admin/actions.ts`, navegação do painel
-- Create: `src/server/admin/customers.ts` (`listCustomers()`), `src/app/admin/(painel)/clientes/page.tsx`
-- Modify (fluxo de troca obrigatória): `src/server/customers/session.ts` / `src/app/(site)/conta/page.tsx` para forçar a troca de senha quando `mustChangePassword`
-- Test: `tests/admin-customers.test.ts`
+- Create: `db/migrations/0008_papel_de_admin.up.sql` / `.down.sql`, `scripts/admin.ts`, `src/app/admin/(painel)/clientes/page.tsx`, `src/server/admin/customers.ts`, `tests/admin-access.test.ts`, `tests/admin-customers.test.ts`
+- Modify: `src/server/db/schema.ts`, `src/server/customers/index.ts` (papel e `mustChangePassword` no `CustomerView`), `src/server/customers/session.ts` (`iat` no token), `src/server/admin/auth.ts` (`requireAdmin` por papel), `src/app/actions-cliente.ts` (login leva admin ao painel; troca obrigatória de senha), `src/app/admin/**` (remover login por senha; novo visual), `src/server/env.ts`, `package.json`, `README.md`, `.env.example`
+- Delete: `src/app/admin/login/**`, `loginAction`/`logoutAction` do painel por senha, `ADMIN_PASSWORD`/`ADMIN_SESSION_SECRET`
 
 **Interfaces:**
-- Consumes: Task 3 (`setTemporaryPassword`).
-- Produces: ação `resetCustomerPasswordAction(form)` (só com `requireAdmin()`), que mostra a senha provisória **uma única vez**.
+- Produces: `CustomerView.role: "cliente" | "admin"`; `isAdmin(): Promise<boolean>`; `requireAdmin(): Promise<CustomerView>` (404 para quem não é admin, sem revelar que o painel existe; exige login feito nas últimas 12 horas); `listCustomers()`; `resetCustomerPasswordAction(form)`.
+- Regras de segurança: o papel nunca vem de formulário; sessão de admin vale 12 h desde o login (o cookie de cliente continua 30 dias); o primeiro login de um admin criado por comando obriga a trocar a senha; admin não pode excluir a própria conta por `/conta` enquanto for o único admin.
 
-- [ ] **Step 1: Testes que falham:** `listCustomers` nunca devolve o hash; `listOrders` traz nome, e-mail e celular do cliente e `null` nos pedidos antigos; a ação exige sessão de admin; cliente com `mustChangePassword` só alcança a tela de trocar a senha.
+- [ ] **Step 1: Testes que falham** (`admin-access`): `requireAdmin` dá 404 para anônimo, para cliente comum e para conta anonimizada; passa para admin com login recente; recusa admin com login de mais de 12 h; recusa cookie com versão antiga; o papel não muda por nenhum formulário (cadastro e troca de senha ignoram `role`); `loginAction` leva admin a `/admin` e cliente a `/conta`; `?next=/admin` não leva cliente comum ao painel.
 - [ ] **Step 2: Rodar.** Esperado: FAIL.
-- [ ] **Step 3: Implementar** a lista, a ação, a exibição única da senha e o bloqueio até trocar.
-- [ ] **Step 4: Rodar a suíte e verificar no navegador.** Esperado: PASS.
-- [ ] **Step 5: Commits:** `feat: dados do cliente nos pedidos do painel`, `feat: lista de clientes no painel`, `feat: senha provisória gerada pelo painel`, `feat: troca de senha obrigatória depois da provisória`.
+- [ ] **Step 3: Implementar** migração, papel, `iat`, `requireAdmin`, redirecionamento do login, remoção do login por senha e do `dw_admin`.
+- [ ] **Step 4: Comando `admin:criar`** (cria ou promove por e-mail, gera senha provisória exibida uma vez, marca troca obrigatória), `admin:remover` e `admin:senha`; testar o núcleo (função pura de `scripts/admin.ts`) contra o banco em memória.
+- [ ] **Step 5: Tela de admin nova** (ver Review Focus): painel, pedidos, produtos, encomendas e clientes, com navegação consistente, busca e filtros, estados vazios e erros claros; texto sempre legível; sem acesso de admin visível fora do painel. Verificar no navegador, inclusive em celular.
+- [ ] **Step 6: Commits pequenos** (`feat: papel de administrador nas contas`, `feat: painel só abre para administradores`, `feat: comando para criar administradores`, `chore: tira a senha única do painel`, `feat: lista de clientes no painel`, `feat: senha provisória gerada pelo painel`, e um commit por tela redesenhada).
 
 ### Task 8: Fechamento da etapa
 
