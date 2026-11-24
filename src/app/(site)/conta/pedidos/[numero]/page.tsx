@@ -17,6 +17,7 @@ import { eventoDoPedido, palavraDoStatus } from "@/lib/order-labels";
 import { methodLabel, installmentsLabel } from "@/lib/payment-labels";
 import { SITE } from "@/lib/site";
 import { whatsappLink } from "@/lib/whatsapp";
+import { formatAddress } from "@/server/customers/address";
 import { getCustomerOrder } from "@/server/customers/orders";
 import { requireCustomer } from "@/server/customers/session";
 
@@ -75,6 +76,18 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
             <span className="text-sm font-bold uppercase tracking-[0.15em]">Total</span>
             <span className="font-display text-5xl leading-none">{formatCents(pedido.totalCents)}</span>
           </div>
+
+          {/* Para onde o pedido vai: a cópia do endereço guardada no pedido (pedidos antigos não têm). */}
+          {pedido.entrega && (
+            <div className="mt-8 border-t-2 border-dashed border-background pt-5">
+              <p className="text-sm font-bold uppercase tracking-[0.15em]">Entrega</p>
+              <address className="mt-2 flex flex-col gap-0.5 text-base font-medium not-italic">
+                {formatAddress(pedido.entrega).map((linha) => (
+                  <span key={linha}>{linha}</span>
+                ))}
+              </address>
+            </div>
+          )}
 
           {/* Pagamento online (se houve). Tentativas só "iniciadas" (a página de pagamento aberta e não paga) ficam de fora. */}
           {pedido.payments.filter((p) => p.status !== "iniciado").length > 0 && (

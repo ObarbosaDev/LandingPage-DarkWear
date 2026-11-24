@@ -16,6 +16,7 @@ import { installmentsLabel, methodLabel } from "@/lib/payment-labels";
 import { tempoRelativo } from "@/lib/relative-time";
 import { clienteWhatsappLink } from "@/lib/whatsapp";
 import { NEXT_STATUS, type AdminOrder } from "@/server/admin/orders";
+import { formatAddress } from "@/server/customers/address";
 import type { StatusOrigin } from "@/server/db/schema";
 import { ConfirmButton } from "../ConfirmButton";
 
@@ -58,6 +59,12 @@ export function Ordem({ o }: { o: AdminOrder }) {
           {primeiro ? `${primeiro.qty}× ${primeiro.name}` : "—"}
           {o.items.length > 1 ? ` + ${o.items.length - 1} ${o.items.length - 1 === 1 ? "item" : "itens"}` : ""}
         </p>
+        {/* Para onde vai, de relance (o endereço completo está em "Detalhes"). */}
+        {o.entrega && (
+          <p className="mt-1 text-xs font-bold uppercase tracking-[0.08em]">
+            Entrega: {o.entrega.city} - {o.entrega.state}
+          </p>
+        )}
         <p className="text-xs font-bold uppercase tracking-[0.08em]">
           {pecas} {pecas === 1 ? "peça" : "peças"}
           {pagamentosVisiveis.length > 0 ? ` · ${methodLabel(pagamentosVisiveis.at(-1)!.method)}` : " · WhatsApp"}
@@ -115,6 +122,16 @@ export function Ordem({ o }: { o: AdminOrder }) {
               </li>
             ))}
           </ul>
+
+          {/* O endereço completo, como vai na etiqueta de envio. */}
+          {o.entrega && (
+            <address className="mt-3 flex flex-col gap-0.5 text-sm font-bold not-italic">
+              <span className="text-xs uppercase tracking-[0.15em]">Entregar em</span>
+              {formatAddress(o.entrega).map((linha) => (
+                <span key={linha}>{linha}</span>
+              ))}
+            </address>
+          )}
 
           {o.customer && (
             <p className="mt-3 break-all text-sm font-bold">
