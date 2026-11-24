@@ -18,9 +18,9 @@
 
 import "server-only";
 import { randomInt } from "node:crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { customers } from "@/server/db/schema";
+import { customers, orders } from "@/server/db/schema";
 import { fakeVerify, hashPassword, validatePassword, verifyPassword } from "@/server/customers/password";
 
 /** Os dados de um cliente que o resto do sistema pode ver. Repare: não há hash de senha aqui. */
@@ -257,6 +257,13 @@ export async function anonymizeCustomer(id: number): Promise<void> {
       sessionVersion: sql`${customers.sessionVersion} + 1`,
     })
     .where(and(eq(customers.id, Number(id)), isNull(customers.anonymizedAt)));
+  // A cópia do endereço nos pedidos também é dado pessoal. Some dos pedidos já ENCERRADOS (entregues ou
+  // cancelados); os que ainda estão em andamento (pendente, pago, enviado) mantêm a cópia até a entrega, porque
+  // a loja precisa dela para despachar. Pedidos de outros clientes não são tocados.
+  await db
+    .update(orders)
+    .set({ shipZip: null, shipStreet: null, shipNumber: null, shipComplement: null, shipDistrict: null, shipCity: null, shipState: null })
+    .where(and(eq(orders.customerId, Number(id)), inArray(orders.status, ["entregue", "cancelado"])));
 }
 
 // Letras e números sem os que se confundem ao ler (0/O, 1/l/I), para a senha provisória poder ser ditada.
