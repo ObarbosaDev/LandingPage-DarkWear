@@ -8,9 +8,10 @@
 // Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
 import "server-only";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { orderItems, orders, orderStatusHistory, payments, ORDER_STATUS, type OrderStatus, type PaymentStatus, type StatusOrigin } from "@/server/db/schema";
+import { customers, orderItems, orders, orderStatusHistory, payments, ORDER_STATUS, type OrderStatus, type PaymentStatus, type StatusOrigin } from "@/server/db/schema";
+import { padraoContem } from "@/server/admin/customers";
 import { cancelInTx, orderNumber } from "@/server/orders";
 
 // De cada status, para quais o dono pode mover o pedido.
@@ -33,6 +34,8 @@ export type AdminOrder = {
   totalCents: number;
   createdAt: Date;
   items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
+  /** Quem comprou. null só nos pedidos antigos, feitos antes de existir cadastro. Nunca inclui a senha. */
+  customer: { id: number; name: string; email: string; phone: string } | null;
   /** Cada mudança de status do pedido, da mais antiga para a mais recente. */
   history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; origin: StatusOrigin; at: Date }[];
   /** Pagamentos online do pedido (Mercado Pago), do mais antigo ao mais recente. Vazio = pedido fechado pelo WhatsApp. */
@@ -63,57 +66,75 @@ export function alertaDePagamento(status: OrderStatus, totalCents: number, pagam
  *
  * @param status se informado, só os pedidos desse status (filtro da tela)
  * @param limit  máximo de pedidos devolvidos
+ * @param busca  texto digitado na busca: acha pelo NÚMERO do pedido (DW-00012, 00012 ou 12) ou por parte do
+ *               nome ou do e-mail do cliente. É tratado como texto, nunca como curinga nem como SQL.
  */
-export async function listOrders(status?: OrderStatus, limit = 100): Promise<AdminOrder[]> {
+export async function listOrders(status?: OrderStatus, limit = 100, busca?: string): Promise<AdminOrder[]> {
   const db = await getDb();
+
+  const condicoes: SQL[] = [];
+  if (status) condicoes.push(eq(orders.status, status));
+  const termo = typeof busca === "string" ? busca.trim() : "";
+  if (termo) {
+    const padrao = padraoContem(termo);
+    const achar = [ilike(customers.name, padrao), ilike(customers.email, padrao)];
+    // "DW-00012", "dw-12", "00012" e "12" são o mesmo pedido.
+    const numero = /^(?:dw-?)?0*(\d{1,9})$/i.exec(termo);
+    if (numero) achar.push(eq(orders.id, Number(numero[1])));
+    condicoes.push(or(...achar) as SQL);
+  }
+
   const rows = await db
-    .select()
+    .select({
+      order: orders,
+      customer: { id: customers.id, name: customers.name, email: customers.email, phone: customers.phone },
+    })
     .from(orders)
-    // undefined = sem filtro (todos os status).
-    .where(status ? eq(orders.status, status) : undefined)
-    .orderBy(desc(orders.createdAt))
+    .leftJoin(customers, eq(customers.id, orders.customerId))
+    // Sem condição = todos os pedidos.
+    .where(condicoes.length ? and(...condicoes) : undefined)
+    .orderBy(desc(orders.createdAt), desc(orders.id))
     .limit(limit);
   if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.order.id);
 
   // Busca os itens de TODOS os pedidos da página numa consulta só (em vez de uma por pedido),
   // que é bem mais rápida, e depois distribui cada item ao seu pedido.
-  const items = await db
-    .select()
-    .from(orderItems)
-    .where(inArray(orderItems.orderId, rows.map((r) => r.id)));
+  const items = await db.select().from(orderItems).where(inArray(orderItems.orderId, ids));
 
   // O histórico de status também vem numa consulta só, e é distribuído a cada pedido.
   const historico = await db
     .select()
     .from(orderStatusHistory)
-    .where(inArray(orderStatusHistory.orderId, rows.map((r) => r.id)))
+    .where(inArray(orderStatusHistory.orderId, ids))
     .orderBy(asc(orderStatusHistory.at), asc(orderStatusHistory.id));
 
   // Pagamentos online, também numa consulta só.
   const pagamentos = await db
     .select()
     .from(payments)
-    .where(inArray(payments.orderId, rows.map((r) => r.id)))
+    .where(inArray(payments.orderId, ids))
     .orderBy(asc(payments.createdAt), asc(payments.id));
 
-  return rows.map((o) => {
+  return rows.map(({ order: o, customer }) => {
     const meus = pagamentos
       .filter((p) => p.orderId === o.id)
       .map((p) => ({ status: p.status, method: p.method, installments: p.installments, amountCents: p.amountCents, paidAt: p.paidAt, createdAt: p.createdAt }));
     return {
-    id: o.id,
-    number: orderNumber(o.id),
-    status: o.status,
-    totalCents: o.totalCents,
-    createdAt: o.createdAt,
-    items: items
-      .filter((i) => i.orderId === o.id)
-      .map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
-    history: historico
-      .filter((h) => h.orderId === o.id)
-      .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, at: h.at })),
-    payments: meus,
-    alerta: alertaDePagamento(o.status, o.totalCents, meus),
+      id: o.id,
+      number: orderNumber(o.id),
+      status: o.status,
+      totalCents: o.totalCents,
+      createdAt: o.createdAt,
+      items: items
+        .filter((i) => i.orderId === o.id)
+        .map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
+      customer: customer && customer.id !== null ? customer : null,
+      history: historico
+        .filter((h) => h.orderId === o.id)
+        .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, at: h.at })),
+      payments: meus,
+      alerta: alertaDePagamento(o.status, o.totalCents, meus),
     };
   });
 }
