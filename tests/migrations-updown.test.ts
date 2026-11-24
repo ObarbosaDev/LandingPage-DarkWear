@@ -43,11 +43,15 @@ const desde = (prefixo: string) => ids.length - ids.findIndex((i) => i.startsWit
 describe("rollbackMigrations (descida)", () => {
   // Por padrão desfaz só a última, deixando as anteriores intactas.
   it("desfaz só a última migração por padrão", async () => {
-    const { runner, tabelas, historico } = novoBanco();
+    const { c, runner, tabelas, historico } = novoBanco();
     await runMigrations(runner);
-    expect(await tabelas()).toContain("customers");
+    const colunasDeClientes = async () =>
+      (await c.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'customers'")).rows.map((r) => (r as { column_name: string }).column_name);
+    expect(await colunasDeClientes()).toContain("role");
     expect(await rollbackMigrations(runner)).toEqual([ids.at(-1)]);
-    expect(await tabelas()).not.toContain("customers");
+    // A última migração (o papel de administrador) saiu, mas a tabela de clientes da anterior continua.
+    expect(await colunasDeClientes()).not.toContain("role");
+    expect(await tabelas()).toContain("customers");
     expect(await tabelas()).toContain("product_images");
     // As anteriores continuam: o banco fica no estado exato de antes da última.
     expect(await tabelas()).toContain("order_status_history");

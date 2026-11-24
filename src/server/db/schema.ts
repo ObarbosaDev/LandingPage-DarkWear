@@ -66,6 +66,9 @@ export const customers = pgTable("customers", {
   passwordHash: text("password_hash").notNull(),
   sessionVersion: integer("session_version").notNull().default(1),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  // "cliente" (todo mundo) ou "admin" (quem administra a loja). Só um comando de terminal do dono concede
+  // "admin"; nenhuma tela ou API escreve este campo (migração 0008).
+  role: text("role").$type<"cliente" | "admin">().notNull().default("cliente"),
   privacyAcceptedAt: timestamp("privacy_accepted_at", { withTimezone: true }).notNull(),
   anonymizedAt: timestamp("anonymized_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
