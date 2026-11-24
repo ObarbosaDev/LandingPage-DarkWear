@@ -17,7 +17,11 @@ const CONGELADAS: Record<string, string> = {
   "0002_rate_limits": "cdc90596bf2303c32a9006392cc86df40479a4044795344a45dcc435a5af015f",
   "0003_integridade": "746c0ddb80aec46e4a414151d856f4e83efe9660fb8304490e4a66125ff3f134",
   "0004_historico_de_status": "989bb9b2c1449817720e97f84b2cf495819bb1a812267dc74801b3b923820fbd",
-  "0005_pagamentos": "f7d964694fcdb86361b60889bb12de40c0e28bb7a778dd4f1dc6fe3060f0d290"
+  "0005_pagamentos": "f7d964694fcdb86361b60889bb12de40c0e28bb7a778dd4f1dc6fe3060f0d290",
+  "0006_fotos_de_produto": "3b33df5f7e8026834888b2dd17fb83a760fb22ac7e06eecd7533621d563bf674",
+  "0007_clientes": "31391e9ac8a81adf73e6152a7e003de819413565e73427567b897e0556ee145e",
+  "0008_papel_de_admin": "2ec8f4f134f57b6dc4b0bd8bbfb7425fbf42a736184c1ae47700a26303b8fbf2",
+  "0009_endereco": "b3dd24903a859a6116cf84a82232d80b85cd618b6ee9da40f37f20169e87ecbd"
 };
 
 describe("migrações congeladas", () => {

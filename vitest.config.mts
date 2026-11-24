@@ -34,5 +34,9 @@ export default defineConfig({
     // Tempo máximo dos preparos (beforeEach). Cada arquivo sobe o seu próprio banco em memória, e com
     // muitos arquivos rodando juntos o primeiro arranque passa de 10 s (o padrão), sem haver erro algum.
     hookTimeout: 60_000,
+    // No máximo 6 arquivos de teste ao mesmo tempo. Cada arquivo sobe o seu próprio Postgres embutido (centenas de MB
+    // de memória): com todos os núcleos em uso, um processo de teste podia ser encerrado por falta de memória e levar
+    // junto os testes do arquivo, sem nenhuma mensagem de erro. Com 6 a suíte fica estável e custa só alguns segundos.
+    maxWorkers: 6,
   },
 });
