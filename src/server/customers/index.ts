@@ -2,8 +2,10 @@
 // Contas de cliente: cadastro, login, troca de senha, saída de todos os aparelhos, exclusão de
 // conta e senha provisória do painel.
 //
-// Quem usa: as ações das telas /conta/* (src/app/actions-cliente.ts), a sessão do cliente
-// (./session.ts) e o painel do dono (/admin/clientes).
+// Quem vai usar (em construção, ver docs/superpowers/plans/2026-11-23-contas-etapa-1.md): as ações das
+// telas /conta/*, a sessão do cliente (./session.ts) e o painel do dono (/admin/clientes). Por enquanto
+// estas funções existem e estão testadas, mas ainda NÃO estão ligadas a nenhuma tela: sessão, cookie,
+// limite de tentativas e a obrigação de trocar a senha provisória entram nas próximas tarefas.
 // A senha em si (regras, hash e verificação) fica em ./password.ts.
 //
 // Princípios:
@@ -75,8 +77,10 @@ export function parseRegisterForm(form: FormData): { ok: true; data: RegisterInp
   if (tamanhoNome < 2 || tamanhoNome > 80 || TEM_CONTROLE.test(name)) return { ok: false, error: "Informe o nome, de 2 a 80 caracteres." };
 
   // E-mail: minúsculas, sem espaços nas pontas, formato básico (algo@algo.algo) e até 254 caracteres.
+  // Só ASCII visível (de "!" a "~", menos "@" no meio de cada parte): o JavaScript e o Postgres
+  // minusculizam alguns caracteres não-ASCII de jeitos diferentes, e o banco recusaria depois de nós aceitarmos.
   const email = texto("email").trim().toLowerCase();
-  if (email.length > 254 || TEM_CONTROLE.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+  if (email.length > 254 || !/^[!-?A-~]+@[!-?A-~]+\.[!-?A-~]{2,}$/.test(email)) {
     return { ok: false, error: "Informe um e-mail válido." };
   }
 
@@ -180,8 +184,9 @@ export async function getCustomer(id: number): Promise<CustomerView | null> {
  * Troca a senha (tela /conta). Exige a senha atual. Aumenta a versão da sessão: os cookies de TODOS
  * os aparelhos deixam de valer (quem chama deve abrir a sessão de novo no aparelho atual).
  * Conta inexistente ou anonimizada responde como senha atual errada, sem revelar nada.
+ * "conflito" = a conta mudou no meio da troca (nada foi gravado); a pessoa deve tentar de novo.
  */
-export async function changePassword(id: number, atual: string, nova: string): Promise<"ok" | "senha-atual" | "invalida"> {
+export async function changePassword(id: number, atual: string, nova: string): Promise<"ok" | "senha-atual" | "invalida" | "conflito"> {
   if (typeof atual !== "string" || typeof nova !== "string") return "senha-atual";
   const db = await getDb();
   const [c] = await db.select().from(customers).where(and(eq(customers.id, Number(id)), isNull(customers.anonymizedAt)));
@@ -195,7 +200,9 @@ export async function changePassword(id: number, atual: string, nova: string): P
     .set({ passwordHash, mustChangePassword: false, sessionVersion: sql`${customers.sessionVersion} + 1` })
     .where(and(eq(customers.id, c.id), eq(customers.sessionVersion, c.sessionVersion)))
     .returning({ id: customers.id });
-  return feito.length > 0 ? "ok" : "senha-atual";
+  // Nenhuma linha mudou: a conta foi alterada no meio da troca (outro aparelho saiu de tudo, por exemplo).
+  // A senha atual estava certa, então não dizemos que estava errada: "conflito" pede para tentar de novo.
+  return feito.length > 0 ? "ok" : "conflito";
 }
 
 /** Botão "sair de todos os aparelhos": aumenta a versão da sessão e devolve o número novo (0 se a conta não existe). */

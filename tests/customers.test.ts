@@ -57,6 +57,13 @@ describe("parseRegisterForm", () => {
     expect(parseRegisterForm(form({ phone }))).toMatchObject({ ok: false, error: expect.stringMatching(/celular/i) });
   });
 
+  // JS e Postgres minusculizam alguns caracteres não-ASCII de jeitos diferentes ("İ", por exemplo): o banco
+  // recusaria o e-mail depois de a aplicação aceitar. Por isso só ASCII é aceito (endereços com acento
+  // têm de vir em punycode, que já é ASCII).
+  it.each([["ana@İstanbul.com"], ["josé@exemplo.com"], ["ana@exemplo.com​"], ["ana@exemplo.com x"]])("recusa o e-mail não ASCII %j", (email) => {
+    expect(parseRegisterForm(form({ email }))).toMatchObject({ ok: false, error: expect.stringMatching(/e-mail/i) });
+  });
+
   it.each([[""], ["ana"], ["ana@"], ["@x.com"], ["a b@x.com"], ["ana@x"], ["a@@x.com"], ["a".repeat(250) + "@x.com"]])("recusa o e-mail %j", (email) => {
     expect(parseRegisterForm(form({ email }))).toMatchObject({ ok: false, error: expect.stringMatching(/e-mail/i) });
   });
@@ -174,6 +181,18 @@ describe("changePassword", () => {
     expect(await changePassword(id, SENHA, "curta")).toBe("invalida");
     expect(await changePassword(id, SENHA, "ana@exemplo.com")).toBe("invalida");
     expect(await authenticate("ana@exemplo.com", SENHA)).toMatchObject({ sessionVersion: 1 });
+  });
+
+  // Se a versão da sessão mudou no meio (outro aparelho saiu de tudo), a troca não pode sobrescrever nada
+  // nem culpar a pessoa dizendo que a senha atual estava errada: ela estava certa. O resultado é "conflito".
+  it("corrida com 'sair de todos os aparelhos' devolve conflito, não 'senha atual errada'", async () => {
+    const id = await criar();
+    const troca = changePassword(id, SENHA, "outra senha forte 456");
+    await new Promise((r) => setTimeout(r, 20)); // deixa a troca ler a conta e começar a verificar a senha
+    await signOutEverywhere(id);
+    expect(await troca).toBe("conflito");
+    // A senha continua sendo a antiga.
+    expect(await authenticate("ana@exemplo.com", SENHA)).toMatchObject({ id });
   });
 
   it("conta inexistente ou anonimizada não troca nada", async () => {
