@@ -67,3 +67,14 @@
     animation: none;
   }
 }
+
+/* Faixa (ticker) do topo do painel: o texto corre da direita para a esquerda, sem parar.
+   O conteúdo é duplicado lado a lado; andar 50% e recomeçar dá o loop sem emenda (mesma ideia do .drift-left).
+   Pausa ao passar o mouse, para dar tempo de ler. */
+.faixa-corre { animation: drift-left 45s linear infinite; }
+.faixa:hover .faixa-corre { animation-play-state: paused; }
+
+/* Quem pediu menos movimento: a faixa fica parada e quebra em linhas, tudo legível. */
+@media (prefers-reduced-motion: reduce) {
+  .faixa-corre { animation: none; }
+}

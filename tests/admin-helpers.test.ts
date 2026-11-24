@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { agruparPorInicial } from "@/lib/grouping";
 import { saudacao } from "@/lib/greeting";
+import { itensDaFaixa } from "@/lib/ticker";
 import { medidorDeEstoque } from "@/lib/stock-meter";
 import { tempoRelativo } from "@/lib/relative-time";
 
@@ -144,6 +145,35 @@ describe("saudacao (pelo horário de São Paulo, não do servidor)", () => {
 
   it("data inválida não quebra: cai num cumprimento neutro", () => {
     expect(saudacao(new Date("lixo"))).toBe("Olá");
+  });
+});
+
+describe("itensDaFaixa (o texto que corre no topo do painel)", () => {
+  const zero = { pedidosPendentes: 0, encomendasNovas: 0, pedidosHoje: 0, pagamentosParaConferir: 0 };
+
+  it("sem nada esperando, diz que está tudo em dia", () => {
+    expect(itensDaFaixa(zero)).toEqual(["Tudo em dia: nada esperando por você"]);
+  });
+
+  it("mostra só o que tem número, no singular e no plural certos", () => {
+    expect(itensDaFaixa({ ...zero, pedidosPendentes: 1 })).toEqual(["1 pedido esperando pagamento"]);
+    expect(itensDaFaixa({ ...zero, pedidosPendentes: 3, encomendasNovas: 1 })).toEqual(["3 pedidos esperando pagamento", "1 encomenda nova"]);
+    expect(itensDaFaixa({ ...zero, encomendasNovas: 2 })).toEqual(["2 encomendas novas"]);
+    expect(itensDaFaixa({ ...zero, pedidosHoje: 1 })).toEqual(["1 pedido hoje"]);
+    expect(itensDaFaixa({ ...zero, pedidosHoje: 4 })).toEqual(["4 pedidos hoje"]);
+  });
+
+  it("pagamento a conferir vem primeiro (é o mais urgente) e com a palavra de alerta", () => {
+    const r = itensDaFaixa({ pedidosPendentes: 2, encomendasNovas: 1, pedidosHoje: 5, pagamentosParaConferir: 1 });
+    expect(r[0]).toBe("Atenção: 1 pagamento para conferir");
+    expect(r).toHaveLength(4);
+    expect(itensDaFaixa({ ...zero, pagamentosParaConferir: 3 })[0]).toBe("Atenção: 3 pagamentos para conferir");
+  });
+
+  it("número inválido (negativo, NaN, decimal) é tratado como zero, sem texto estranho", () => {
+    expect(itensDaFaixa({ pedidosPendentes: -2, encomendasNovas: NaN, pedidosHoje: 1.5, pagamentosParaConferir: undefined as unknown as number })).toEqual([
+      "Tudo em dia: nada esperando por você",
+    ]);
   });
 });
 
