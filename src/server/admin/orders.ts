@@ -43,7 +43,7 @@ export type AdminOrder = {
   /** Código de rastreio informado no envio (null = sem código). */
   trackingCode: string | null;
   /** Cada mudança de status do pedido, da mais antiga para a mais recente. */
-  history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; origin: StatusOrigin; at: Date }[];
+  history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; origin: StatusOrigin; actor: string | null; at: Date }[];
   /** Pagamentos online do pedido (Mercado Pago), do mais antigo ao mais recente. Vazio = pedido fechado pelo WhatsApp. */
   payments: { status: PaymentStatus; method: string | null; installments: number | null; amountCents: number | null; paidAt: Date | null; createdAt: Date }[];
   /**
@@ -140,7 +140,7 @@ export async function listOrders(status?: OrderStatus, limit = 100, busca?: stri
       trackingCode: o.trackingCode,
       history: historico
         .filter((h) => h.orderId === o.id)
-        .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, at: h.at })),
+        .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, actor: h.actor, at: h.at })),
       payments: meus,
       alerta: alertaDePagamento(o.status, o.totalCents, meus),
     };
@@ -161,8 +161,9 @@ export type StatusResult = "ok" | "invalido" | "nao-encontrado" | "rastreio-inva
  *
  * @param opcoes.tracking código de rastreio, lido SÓ ao marcar como "enviado" (vazio = sem código; nas outras
  *                        mudanças é ignorado). Código fora do formato recusa a mudança inteira.
+ * @param opcoes.actor    e-mail do administrador que está mudando (gravado no histórico do pedido)
  */
-export async function updateOrderStatus(id: number, next: OrderStatus, opcoes: { tracking?: string } = {}): Promise<StatusResult> {
+export async function updateOrderStatus(id: number, next: OrderStatus, opcoes: { tracking?: string; actor?: string } = {}): Promise<StatusResult> {
   if (!ORDER_STATUS.includes(next)) return "invalido";
   // O código só vale no envio. Digitou e é inválido? Recusa antes de tocar no pedido.
   let codigo: string | null = null;
@@ -181,13 +182,13 @@ export async function updateOrderStatus(id: number, next: OrderStatus, opcoes: {
     if (!NEXT_STATUS[o.status].includes(next)) return "invalido";
 
     // Cancelar devolve as peças ao estoque, na mesma transação.
-    if (next === "cancelado") return (await cancelInTx(tx, id, undefined, "painel")) ? "ok" : "invalido";
+    if (next === "cancelado") return (await cancelInTx(tx, id, undefined, "painel", opcoes.actor)) ? "ok" : "invalido";
 
     await tx
       .update(orders)
       .set({ status: next, updatedAt: new Date(), ...(codigo ? { trackingCode: codigo } : {}) })
       .where(eq(orders.id, id));
-    await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: o.status, toStatus: next, origin: "painel" });
+    await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: o.status, toStatus: next, origin: "painel", actor: opcoes.actor ?? null });
     return "ok";
   });
 }

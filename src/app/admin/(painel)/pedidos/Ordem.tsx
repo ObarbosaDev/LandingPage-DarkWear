@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { changeOrderStatusAction, setTrackingAction } from "@/app/admin/actions";
+import { nomeCurtoDoAtor } from "@/lib/audit-labels";
 import { linkDeRastreio } from "@/lib/tracking";
 import { formatCents } from "@/lib/money";
 import { installmentsLabel, methodLabel } from "@/lib/payment-labels";
@@ -211,7 +212,7 @@ export function Ordem({ o }: { o: AdminOrder }) {
           <ol className="mt-3 flex flex-col gap-1 text-xs font-bold uppercase tracking-[0.06em]">
             {o.history.map((h, k) => (
               <li key={k}>
-                {h.fromStatus ? `${h.fromStatus} → ${h.toStatus}` : "criado"} · {ORIGEM[h.origin]} · {dataHora.format(h.at)}
+                {h.fromStatus ? `${h.fromStatus} → ${h.toStatus}` : "criado"} · {h.actor ? nomeCurtoDoAtor(h.actor) : ORIGEM[h.origin]} · {dataHora.format(h.at)}
               </li>
             ))}
           </ol>

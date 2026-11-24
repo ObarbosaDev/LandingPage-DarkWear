@@ -18,6 +18,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { requireAdmin } from "@/server/admin/auth";
+import { auditar } from "@/server/admin/audit";
 import { resetCustomerPassword } from "@/server/admin/customers";
 import { setCustomStatus } from "@/server/admin/custom-orders";
 import { checkImageFile, deleteImageByUrl, saveImage } from "@/server/admin/images";
@@ -31,6 +32,7 @@ import {
   updateProduct,
 } from "@/server/admin/products";
 import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
+import { orderNumber } from "@/server/orders";
 
 // Em erro de validação, devolvemos também o que foi digitado: o React limpa o formulário depois de
 // cada envio, e o dono não pode perder o que escreveu por causa de um campo errado.
@@ -52,14 +54,14 @@ const refreshCatalog = () => updateTag("products");
  * O formulário envia o número do pedido ("id") e o status desejado ("next").
  */
 export async function changeOrderStatusAction(form: FormData): Promise<void> {
-  await requireAdmin();
+  const adm = await requireAdmin();
   const id = Number(form.get("id"));
   const next = String(form.get("next") ?? "") as OrderStatus;
   // Dados fora do esperado: ignora sem fazer nada (formulário adulterado).
   if (!Number.isInteger(id) || !ORDER_STATUS.includes(next)) return;
 
   // O código de rastreio (opcional) vem junto quando o botão é "Marcar como enviado".
-  const result = await updateOrderStatus(id, next, { tracking: String(form.get("tracking") ?? "") });
+  const result = await updateOrderStatus(id, next, { tracking: String(form.get("tracking") ?? ""), actor: adm.email });
   if (result === "rastreio-invalido") {
     // Nada foi mudado: o pedido continua no status de antes e o dono corrige o código.
     revalidatePath("/admin", "layout");
@@ -70,6 +72,7 @@ export async function changeOrderStatusAction(form: FormData): Promise<void> {
     revalidatePath("/admin", "layout");
     redirect("/admin/pedidos?aviso=mudou");
   }
+  await auditar(adm.email, "pedido.status", orderNumber(id), `→ ${next}`);
   if (next === "cancelado") refreshCatalog(); // cancelar devolve peças ao estoque
   // Atualiza todas as telas do painel (a lista, o resumo e os contadores).
   revalidatePath("/admin", "layout");
@@ -77,10 +80,12 @@ export async function changeOrderStatusAction(form: FormData): Promise<void> {
 
 /** Campo "Código de rastreio" + "Salvar" de um pedido já enviado (informar ou corrigir; vazio apaga o código). */
 export async function setTrackingAction(form: FormData): Promise<void> {
-  await requireAdmin();
+  const adm = await requireAdmin();
   const id = Number(form.get("id"));
   if (!Number.isInteger(id)) return;
-  const result = await setTrackingCode(id, String(form.get("tracking") ?? ""));
+  const codigo = String(form.get("tracking") ?? "");
+  const result = await setTrackingCode(id, codigo);
+  if (result === "ok") await auditar(adm.email, "pedido.rastreio", orderNumber(id), codigo.trim() ? "informado" : "apagado");
   revalidatePath("/admin", "layout");
   if (result === "rastreio-invalido") redirect("/admin/pedidos?aviso=rastreio");
 }
@@ -89,10 +94,11 @@ export async function setTrackingAction(form: FormData): Promise<void> {
 
 /** Seletor de andamento em /admin/encomendas (botão "Salvar" de cada encomenda). */
 export async function changeCustomStatusAction(form: FormData): Promise<void> {
-  await requireAdmin();
+  const adm = await requireAdmin();
   const id = Number(form.get("id"));
   if (!Number.isInteger(id)) return;
-  await setCustomStatus(id, String(form.get("status") ?? ""));
+  const status = String(form.get("status") ?? "");
+  if (await setCustomStatus(id, status)) await auditar(adm.email, "encomenda.status", `encomenda ${id}`, `→ ${status}`);
   revalidatePath("/admin/encomendas");
 }
 
@@ -124,7 +130,7 @@ async function processPhoto(form: FormData): Promise<{ error: string | null; cre
  * Em caso de erro, devolve a mensagem + o que foi digitado; em caso de sucesso, volta à lista.
  */
 export async function createProductAction(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireAdmin();
+  const adm = await requireAdmin();
   const photo = await processPhoto(form);
   if (photo.error) return { error: photo.error, values: typed(form) };
   const parsed = parseProductForm(form, "novo");
@@ -137,6 +143,7 @@ export async function createProductAction(_prev: FormState, form: FormData): Pro
     await deleteImageByUrl(photo.created);
     return { error: "Já existe um produto com esse endereço.", values: typed(form) };
   }
+  await auditar(adm.email, "produto.criar", parsed.data.slug, parsed.data.name);
   // A loja precisa mostrar o produto novo na hora, e a lista do painel também.
   refreshCatalog();
   revalidatePath("/admin/produtos");
@@ -145,7 +152,7 @@ export async function createProductAction(_prev: FormState, form: FormData): Pro
 
 /** Formulário de edição (/admin/produtos/[slug]). Mesma lógica do cadastro, mas altera um existente. */
 export async function updateProductAction(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireAdmin();
+  const adm = await requireAdmin();
   // A foto atual, para apagar do banco se for trocada ou removida (sem acumular fotos soltas).
   const before = await getProductRow(String(form.get("slug") ?? ""));
   const photo = await processPhoto(form);
@@ -162,6 +169,7 @@ export async function updateProductAction(_prev: FormState, form: FormData): Pro
   }
   // Só depois de salvar é seguro apagar a foto antiga (se a atual é outra).
   if (before?.image && before.image !== parsed.data.image) await deleteImageByUrl(before.image);
+  await auditar(adm.email, "produto.editar", parsed.data.slug, parsed.data.name);
   refreshCatalog();
   revalidatePath("/admin/produtos");
   redirect("/admin/produtos?salvo=1");
@@ -173,7 +181,7 @@ export async function updateProductAction(_prev: FormState, form: FormData): Pro
  * fica como está. Qualquer valor inválido recusa o conjunto inteiro (ver setVariantStock).
  */
 export async function setStockAction(form: FormData): Promise<void> {
-  await requireAdmin();
+  const adm = await requireAdmin();
   const slug = String(form.get("slug") ?? "");
   const estoque: Record<string, number> = {};
   for (const [nome, valor] of form.entries()) {
@@ -181,17 +189,20 @@ export async function setStockAction(form: FormData): Promise<void> {
     estoque[nome.slice("estoque:".length)] = Number(valor);
   }
   if (Object.keys(estoque).length === 0) return;
-  await setVariantStock(slug, estoque);
+  if (await setVariantStock(slug, estoque)) {
+    await auditar(adm.email, "produto.estoque", slug, Object.entries(estoque).map(([k, n]) => `${k}=${n}`).join(", "));
+  }
   refreshCatalog();
   revalidatePath("/admin/produtos");
 }
 
 /** Botão "Ocultar da loja" / "Mostrar na loja" de cada linha da lista /admin/produtos. */
 export async function setActiveAction(form: FormData): Promise<void> {
-  await requireAdmin();
+  const adm = await requireAdmin();
   const slug = String(form.get("slug") ?? "");
   // O botão envia "true" (mostrar) ou "false" (ocultar) num campo escondido.
-  await setProductActive(slug, form.get("active") === "true");
+  const mostrar = form.get("active") === "true";
+  if (await setProductActive(slug, mostrar)) await auditar(adm.email, "produto.visibilidade", slug, mostrar ? "mostrado na loja" : "ocultado da loja");
   refreshCatalog();
   revalidatePath("/admin/produtos");
 }
@@ -208,12 +219,13 @@ export type SenhaProvisoriaState = { error?: string; senha?: string; para?: stri
  * Contas de administrador são recusadas (só se gerenciam pelo comando de terminal).
  */
 export async function resetCustomerPasswordAction(_prev: SenhaProvisoriaState, form: FormData): Promise<SenhaProvisoriaState> {
-  await requireAdmin();
+  const adm = await requireAdmin();
   const id = Number(form.get("id"));
   const para = String(form.get("nome") ?? "");
   if (!Number.isSafeInteger(id) || id < 1) return { error: "Cliente inválido." };
   try {
     const senha = await resetCustomerPassword(id);
+    await auditar(adm.email, "cliente.senha-provisoria", `cliente ${id}`);
     return { senha, para };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Não foi possível gerar a senha." };

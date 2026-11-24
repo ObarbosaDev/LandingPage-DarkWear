@@ -217,6 +217,7 @@ export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
  *
  * @param somenteSe só cancela se o pedido ainda estiver nesse status (a expiração usa "pendente")
  * @param origem    quem está cancelando, para o histórico
+ * @param ator      e-mail do administrador, quando o cancelamento vem do painel (vai para o histórico)
  * @returns true se cancelou agora; false se não havia o que cancelar
  */
 export async function cancelInTx(
@@ -224,13 +225,14 @@ export async function cancelInTx(
   id: number,
   somenteSe: OrderStatus | undefined,
   origem: StatusOrigin,
+  ator?: string,
 ): Promise<boolean> {
   const [atual] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, id)).for("update");
   if (!atual || atual.status === "cancelado") return false;
   if (somenteSe && atual.status !== somenteSe) return false;
 
   await tx.update(orders).set({ status: "cancelado", updatedAt: new Date() }).where(eq(orders.id, id));
-  await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: atual.status, toStatus: "cancelado", origin: origem });
+  await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: atual.status, toStatus: "cancelado", origin: origem, actor: ator ?? null });
 
   // Devolve cada peça do pedido ao estoque DA SUA VARIAÇÃO (soma, em vez de gravar um número fixo). Se o dono
   // tirou aquele tamanho ou cor da peça depois da compra, a variação não existe mais e não há onde devolver.

@@ -230,9 +230,27 @@ export const orderStatusHistory = pgTable(
     fromStatus: text("from_status").$type<OrderStatus>(),
     toStatus: text("to_status").$type<OrderStatus>().notNull(),
     origin: text("origin").$type<StatusOrigin>().notNull(),
+    // E-mail do administrador que fez a mudança (só nas feitas pelo painel; migração 0012). Nunca vai ao cliente.
+    actor: text("actor"),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("order_status_history_order_idx").on(t.orderId, t.at)],
+);
+
+// ---------------------------------------------------------------------------
+// admin_audit: o diário do painel (migração 0012): quem fez o quê e quando. Só cresce.
+// ---------------------------------------------------------------------------
+export const adminAudit = pgTable(
+  "admin_audit",
+  {
+    id: serial("id").primaryKey(),
+    actorEmail: text("actor_email").notNull(),
+    action: text("action").notNull(),
+    target: text("target").notNull().default(""),
+    detail: text("detail").notNull().default(""),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("admin_audit_at_idx").on(t.at, t.id)],
 );
 
 // De onde veio uma mudança de status (ver order_status_history).

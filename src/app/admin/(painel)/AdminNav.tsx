@@ -23,6 +23,7 @@ const LINKS = [
   { href: "/admin/encomendas", label: "Encomendas", contagem: "encomendas" },
   { href: "/admin/produtos", label: "Prateleira", contagem: null },
   { href: "/admin/clientes", label: "Caderneta", contagem: null },
+  { href: "/admin/diario", label: "Diário", contagem: null },
 ] as const;
 
 export function AdminNav({ nome, pedidos, encomendas }: { nome: string; pedidos: number; encomendas: number }) {
