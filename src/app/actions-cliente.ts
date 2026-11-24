@@ -21,7 +21,6 @@
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { clearFailures, isLockedOut, registerFailure } from "@/server/admin/auth";
 import {
   anonymizeCustomer,
   authenticate,
@@ -32,7 +31,8 @@ import {
   signOutEverywhere,
 } from "@/server/customers";
 import { validatePassword } from "@/server/customers/password";
-import { endCustomerSession, requireCustomer, safeNext, startCustomerSession } from "@/server/customers/session";
+import { currentSession, endCustomerSession, requireCustomer, safeNext, startCustomerSession } from "@/server/customers/session";
+import { clearFailures, isLockedOut, registerFailure } from "@/server/login-attempts";
 import { clientKey, rateLimit } from "@/server/rate-limit";
 
 /**
@@ -103,7 +103,14 @@ export async function loginAction(_prev: ClienteFormState, form: FormData): Prom
 
   await clearFailures(chave);
   await startCustomerSession(entrou.id, entrou.sessionVersion);
-  redirect(safeNext(texto(form, "next")));
+  // Para onde ir:
+  //   - senha provisória: só pode trocá-la, antes de qualquer outra coisa;
+  //   - destino pedido (a sacola, por exemplo): vale, depois de passar por safeNext (nunca outro site);
+  //   - sem destino: o administrador vai ao painel e o cliente, à conta. É assim que o administrador chega ao
+  //     painel: entrando pela tela de todo mundo, sem nenhum botão de "admin".
+  if (entrou.mustChangePassword) redirect("/conta?trocar=1");
+  const pedido = texto(form, "next");
+  redirect(pedido ? safeNext(pedido) : entrou.role === "admin" ? "/admin" : "/conta");
 }
 
 /** Botão "Sair": encerra a sessão neste aparelho e volta à página inicial. */
@@ -119,7 +126,8 @@ export async function logoutAction(): Promise<void> {
  * (a versão da sessão avança) e este continua logado.
  */
 export async function changePasswordAction(_prev: ClienteFormState, form: FormData): Promise<ClienteFormState> {
-  const cliente = await requireCustomer("/conta");
+  // A única ação que quem tem senha provisória pode usar: é justamente a troca que ele precisa fazer.
+  const cliente = await requireCustomer("/conta", { permitirSenhaProvisoria: true });
 
   // Quem roubou uma sessão não pode adivinhar a senha atual por aqui: 5 tentativas a cada 15 minutos por conta.
   const limite = await rateLimit("customer-password", String(cliente.id), 5, 15 * MIN);
@@ -136,7 +144,8 @@ export async function changePasswordAction(_prev: ClienteFormState, form: FormDa
   if (r === "invalida") return { error: "A nova senha não é aceita. Escolha outra." };
   if (r === "conflito") return { error: "Sua conta mudou durante a troca. Tente de novo." };
 
-  // Este aparelho continua logado com a versão nova da sessão.
+  // Este aparelho continua logado com a versão nova da sessão. Aqui o horário do login É renovado, de propósito:
+  // a pessoa acabou de provar a senha atual (é o que dá direito a um login novo).
   const depois = await getCustomer(cliente.id);
   if (depois) await startCustomerSession(depois.id, depois.sessionVersion);
   revalidatePath("/conta");
@@ -146,10 +155,13 @@ export async function changePasswordAction(_prev: ClienteFormState, form: FormDa
 /** Botão "Sair de todos os aparelhos": derruba todas as sessões, menos esta. */
 export async function signOutEverywhereAction(): Promise<void> {
   const cliente = await requireCustomer("/conta");
+  // O horário do login atual, para NÃO renová-lo: "sair dos outros" não prova a senha, e renovar aqui deixaria um
+  // cookie roubado manter o acesso ao painel indefinidamente.
+  const loginOriginal = (await currentSession())?.iat;
   const versao = await signOutEverywhere(cliente.id);
   // Conta que sumiu no meio do caminho: volta à entrada em vez de abrir uma sessão que não vale.
   if (versao === 0) redirect("/conta/entrar");
-  await startCustomerSession(cliente.id, versao);
+  await startCustomerSession(cliente.id, versao, loginOriginal);
   revalidatePath("/conta");
 }
 
@@ -158,7 +170,10 @@ export async function signOutEverywhereAction(): Promise<void> {
  * é ANONIMIZADA: nome, e-mail e celular somem, os pedidos ficam (a loja precisa guardá-los).
  */
 export async function deleteAccountAction(_prev: ClienteFormState, form: FormData): Promise<ClienteFormState> {
-  const cliente = await requireCustomer("/conta");
+  const cliente = await requireCustomer("/conta", { permitirSenhaProvisoria: true });
+  // Conta de administrador não se exclui por aqui: a loja poderia ficar sem ninguém para administrá-la. Quem
+  // cuida do sistema remove o papel antes, pelo comando "npm run admin:remover".
+  if (cliente.role === "admin") return { error: "Contas de administrador não podem ser excluídas por aqui." };
 
   const limite = await rateLimit("customer-delete", String(cliente.id), 5, 15 * MIN);
   if (!limite.allowed) return { error: MUITAS_TENTATIVAS };

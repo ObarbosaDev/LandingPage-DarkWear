@@ -33,7 +33,8 @@ const botao =
   "border-2 border-background bg-background px-5 py-3 font-display text-xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background";
 
 export default async function ContaPage() {
-  const c = await requireCustomer("/conta");
+  // permitirSenhaProvisoria: é a única página que abre para quem entrou com senha provisória, para ele poder trocá-la.
+  const c = await requireCustomer("/conta", { permitirSenhaProvisoria: true });
 
   return (
     <section className="bg-background text-foreground">
@@ -43,6 +44,13 @@ export default async function ContaPage() {
           <br />
           conta
         </h1>
+
+        {/* Senha provisória (gerada pelo painel ou pelo comando do dono): enquanto não for trocada, o resto fica fechado. */}
+        {c.mustChangePassword && (
+          <p role="alert" className="mt-8 max-w-2xl border-2 border-foreground p-4 text-lg font-bold">
+            Você entrou com uma senha provisória. Troque-a na etiqueta “Senha” abaixo para liberar o resto da conta.
+          </p>
+        )}
 
         {/* A arara: cada etiqueta traz o seu trecho de barra (ver components/conta/Arara.tsx). */}
         <Arara>

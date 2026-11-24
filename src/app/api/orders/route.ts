@@ -44,6 +44,10 @@ export async function POST(request: Request) {
   // tocado e o Mercado Pago nem é chamado. A tela de sacola, ao receber 401, leva a pessoa a entrar.
   const cliente = await currentCustomer();
   if (!cliente) return NextResponse.json({ error: "Entre na sua conta para comprar." }, { status: 401 });
+  // Quem entrou com uma senha provisória (gerada pelo painel) só pode trocá-la: comprar fica fechado até lá.
+  if (cliente.mustChangePassword) {
+    return NextResponse.json({ error: "Troque a senha provisória em Sua conta antes de comprar." }, { status: 403 });
+  }
 
   // Lê o corpo (JSON). Se vier quebrado ou vazio, responde 400 (requisição malformada).
   let body: unknown;
