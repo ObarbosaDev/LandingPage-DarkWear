@@ -242,6 +242,14 @@ export async function anonymizeCustomer(id: number): Promise<void> {
       name: "Cliente removido",
       email: `removido-${id}@invalid`,
       phone: "",
+      // O endereço também é dado pessoal: some junto com a conta.
+      addressZip: null,
+      addressStreet: null,
+      addressNumber: null,
+      addressComplement: null,
+      addressDistrict: null,
+      addressCity: null,
+      addressState: null,
       // Um texto que não é um hash scrypt válido: nenhuma senha jamais confere com ele.
       passwordHash: "removido",
       mustChangePassword: false,
