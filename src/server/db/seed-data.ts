@@ -10,6 +10,7 @@
 // ============================================================================
 
 import type { Product } from "@/lib/product";
+import { dividirEstoque } from "@/lib/variants";
 
 export const PRODUCTS: Product[] = [
   {
@@ -24,6 +25,8 @@ export const PRODUCTS: Product[] = [
     sizes: ["P", "M", "G", "GG"],
     colors: ["Preta"],
     stock: 12,
+    // O estoque de exemplo é dividido por igual entre os tamanhos e cores; o dono ajusta no painel.
+    variants: dividirEstoque(12, ["P", "M", "G", "GG"], ["Preta"]),
     // Foto em /public/products. "light" = peça escura em foto sem fundo (ganha um contorno de luz).
     image: "/products/porsche-gt3.webp",
     photoBg: "light",
@@ -38,6 +41,8 @@ export const PRODUCTS: Product[] = [
     sizes: ["P", "M", "G", "GG", "XG"],
     colors: ["Branca"],
     stock: 5,
+    // O estoque de exemplo é dividido por igual entre os tamanhos e cores; o dono ajusta no painel.
+    variants: dividirEstoque(5, ["P", "M", "G", "GG", "XG"], ["Branca"]),
     image: "/products/blusa-2.webp",
     // "dark" = peça clara: aparece bem sobre o fundo escuro sem contorno extra.
     photoBg: "dark",
@@ -51,6 +56,8 @@ export const PRODUCTS: Product[] = [
     sizes: ["P", "M", "G", "GG"],
     colors: ["Preta"],
     stock: 8,
+    // O estoque de exemplo é dividido por igual entre os tamanhos e cores; o dono ajusta no painel.
+    variants: dividirEstoque(8, ["P", "M", "G", "GG"], ["Preta"]),
     image: "/products/eu-faco-programa.webp",
     photoBg: "light",
   },

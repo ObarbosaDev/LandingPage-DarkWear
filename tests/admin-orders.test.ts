@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { NEXT_STATUS, listOrders, updateOrderStatus } from "@/server/admin/orders";
 import { dashboardStats } from "@/server/admin/dashboard";
 import { createOrder } from "@/server/orders";
-import { setProductActive, setProductStock } from "@/server/admin/products";
+import { setProductActive, setVariantStock } from "@/server/admin/products";
 import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
 import { clienteDeTeste, resetDb, stockOf } from "./helpers/db";
 
@@ -71,7 +71,7 @@ describe("painel do dono", () => {
     const a = await createOrder([GT3], await clienteDeTeste());
     await createOrder([GT3], await clienteDeTeste());
     await updateOrderStatus(a.id, "pago");
-    await setProductStock("camisa-mumia", 2);
+    await setVariantStock("camisa-mumia", { "G|Branca": 2 });
     const s = await dashboardStats();
     expect(s.pendentes).toBe(1);
     expect(s.pagos).toBe(1);
@@ -81,14 +81,14 @@ describe("painel do dono", () => {
 
   // O ajuste rápido de estoque aceita só inteiros de 0 a 100000 e produtos que existem.
   it("ajuste de estoque recusa valores inválidos", async () => {
-    for (const v of [-1, 1.5, NaN, 100001]) expect(await setProductStock("camisa-mumia", v), String(v)).toBe(false);
+    for (const v of [-1, 1.5, NaN, 100001]) expect(await setVariantStock("camisa-mumia", { "G|Branca": v }), String(v)).toBe(false);
     expect(await stockOf("camisa-mumia")).toBe(5);
-    expect(await setProductStock("nao-existe", 3)).toBe(false);
+    expect(await setVariantStock("nao-existe", { "G|Branca": 3 })).toBe(false);
   });
 
   // Produto que o dono escondeu da loja não deve gerar alerta de "estoque baixo".
   it("produto oculto não aparece como estoque baixo", async () => {
-    await setProductStock("camisa-mumia", 1);
+    await setVariantStock("camisa-mumia", { "G|Branca": 1 });
     await setProductActive("camisa-mumia", false);
     expect((await dashboardStats()).lowStock.map((p) => p.slug)).not.toContain("camisa-mumia");
   });

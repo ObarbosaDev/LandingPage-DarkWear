@@ -7,6 +7,8 @@
 // código de servidor não pode ser importado por eles.
 // ============================================================================
 
+import type { EstoquePorVariacao } from "@/lib/variants";
+
 // Produto como a loja o enxerga (já pronto para a tela).
 
 export type Product = {
@@ -19,7 +21,9 @@ export type Product = {
   category: "Pronta entrega" | "Coleção";
   sizes: string[];
   colors: string[];
-  stock: number; // unidades disponíveis; 0 = esgotado
+  stock: number; // total de unidades disponíveis (soma das variações); 0 = esgotado
+  // Unidades de CADA tamanho e cor (chave "M|Preta"). Combinação ausente ou 0 = esgotada.
+  variants: EstoquePorVariacao;
   // Caminho da foto em /public. Enquanto estiver vazio, a página mostra um quadro de placeholder.
   image?: string;
   // "light" marca peça escura em foto com fundo transparente: ela ganha um contorno de luz para aparecer.

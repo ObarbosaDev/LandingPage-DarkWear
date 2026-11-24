@@ -116,4 +116,13 @@ async function seedIfEmpty(db: Db) {
       position: i,
     })),
   ).onConflictDoNothing(); // duas partidas simultâneas não derrubam uma à outra
+  // O estoque de cada tamanho e cor. O gatilho do banco (migração 0010) acerta o total de cada peça sozinho.
+  await db.insert(schema.productStock).values(
+    PRODUCTS.flatMap((p) =>
+      Object.entries(p.variants).map(([chave, stock]) => {
+        const [size, color] = chave.split("|");
+        return { productSlug: p.slug, size, color, stock };
+      }),
+    ),
+  ).onConflictDoNothing();
 }

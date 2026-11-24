@@ -75,6 +75,12 @@ describe("parseProductForm", () => {
     expect(r.ok && r.data.sizes).toEqual(["P", "M"]);
   });
 
+  // O "|" separa tamanho e cor nas chaves de estoque ("M|Preta"); num nome ele confundiria as chaves.
+  it('recusa o caractere "|" em tamanhos e cores', () => {
+    expect(parseProductForm(form({ sizes: "P|Q, M" }), "novo").ok).toBe(false);
+    expect(parseProductForm(form({ colors: "Preta|Branca" }), "novo").ok).toBe(false);
+  });
+
   // Inclui o campo vazio "": antes ele virava estoque 0 sem avisar o dono.
   it("recusa estoque inválido ao criar", () => {
     for (const stock of ["-1", "1.5", "abc", "", "100001"]) {

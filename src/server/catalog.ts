@@ -15,7 +15,8 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { products, type ProductRow } from "@/server/db/schema";
+import { productStock, products, type ProductRow } from "@/server/db/schema";
+import { chaveDaVariacao, type EstoquePorVariacao } from "@/lib/variants";
 import type { Product } from "@/lib/product";
 
 // O catálogo vem do banco. Fica em cache e é invalidado pela etiqueta "products"
@@ -26,7 +27,7 @@ import type { Product } from "@/lib/product";
  * Existe para a tela receber só o necessário e com tipos mais precisos (ex.: a categoria como uma
  * das duas opções válidas, e campos vazios como "ausente" em vez de null).
  */
-function toProduct(r: ProductRow): Product {
+function toProduct(r: ProductRow, variants: EstoquePorVariacao): Product {
   return {
     slug: r.slug,
     name: r.name,
@@ -36,9 +37,22 @@ function toProduct(r: ProductRow): Product {
     sizes: r.sizes,
     colors: r.colors,
     stock: r.stock,
+    variants,
     image: r.image ?? undefined,
     photoBg: (r.photoBg as Product["photoBg"]) ?? undefined,
   };
+}
+
+/** O estoque de todas as variações, agrupado por peça (uma consulta só para a vitrine inteira). */
+async function variantsBySlug(db: Awaited<ReturnType<typeof getDb>>) {
+  const linhas = await db.select().from(productStock);
+  const mapa = new Map<string, EstoquePorVariacao>();
+  for (const v of linhas) {
+    const atual = mapa.get(v.productSlug) ?? {};
+    atual[chaveDaVariacao(v.size, v.color)] = v.stock;
+    mapa.set(v.productSlug, atual);
+  }
+  return mapa;
 }
 
 /**
@@ -52,7 +66,8 @@ export async function getProducts(): Promise<Product[]> {
   cacheLife("hours");
   const db = await getDb();
   const rows = await db.select().from(products).where(eq(products.active, true)).orderBy(asc(products.position));
-  return rows.map(toProduct);
+  const porPeca = await variantsBySlug(db);
+  return rows.map((r) => toProduct(r, porPeca.get(r.slug) ?? {}));
 }
 
 /**
@@ -65,5 +80,7 @@ export async function getProduct(slug: string): Promise<Product | undefined> {
   cacheLife("hours");
   const db = await getDb();
   const [row] = await db.select().from(products).where(and(eq(products.slug, slug), eq(products.active, true)));
-  return row ? toProduct(row) : undefined;
+  if (!row) return undefined;
+  const linhas = await db.select().from(productStock).where(eq(productStock.productSlug, slug));
+  return toProduct(row, Object.fromEntries(linhas.map((v) => [chaveDaVariacao(v.size, v.color), v.stock])));
 }

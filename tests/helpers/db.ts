@@ -3,9 +3,16 @@
 // ============================================================================
 
 import { getDb } from "@/server/db";
-import { customOrders, customers, loginAttempts, orderItems, orders, products } from "@/server/db/schema";
+import { customOrders, customers, loginAttempts, orderItems, orders, productStock, products } from "@/server/db/schema";
 import { PRODUCTS } from "@/server/db/seed-data";
 import { eq, notInArray } from "drizzle-orm";
+
+/** Em qual variação (tamanho|cor) cada peça de exemplo guarda TODO o estoque nos testes. */
+export const ESTOQUE_DE_TESTE: Record<string, string> = {
+  "oversized-gt3-rs": "M|Preta",
+  "camisa-mumia": "G|Branca",
+  "eu-faco-programa": "M|Preta",
+};
 
 // Volta o banco ao estado inicial: sem pedidos e com o catálogo de exemplo, igual ao de fábrica.
 // Chamada no início de cada teste (beforeEach) para um teste nunca depender do que outro fez.
@@ -43,8 +50,18 @@ export async function resetDb() {
         photoBg: p.photoBg ?? null,
       })
       .onConflictDoNothing();
-    // ...e devolve o estoque inicial e reativa (um teste pode ter alterado ou ocultado).
-    await db.update(products).set({ stock: p.stock, active: true }).where(eq(products.slug, p.slug));
+    // ...e devolve o estoque inicial e reativa (um teste pode ter alterado ou ocultado). O estoque de teste fica
+    // CONCENTRADO numa variação (as outras em 0): assim os testes de compra, que usam sempre o mesmo tamanho e cor,
+    // enxergam o total da peça como antes, e o total (products.stock) vem do gatilho do banco.
+    await db.update(products).set({ sizes: p.sizes, colors: p.colors, active: true }).where(eq(products.slug, p.slug));
+    await db.delete(productStock).where(eq(productStock.productSlug, p.slug));
+    const principal = ESTOQUE_DE_TESTE[p.slug];
+    await db.insert(productStock).values(
+      Object.keys(p.variants).map((chave) => {
+        const [size, color] = chave.split("|");
+        return { productSlug: p.slug, size, color, stock: chave === principal ? p.stock : 0 };
+      }),
+    );
   }
 }
 

@@ -20,6 +20,7 @@ import {
   orderItems,
   orders,
   orderStatusHistory,
+  productStock,
   products,
   type OrderStatus,
   type StatusOrigin,
@@ -115,20 +116,29 @@ export async function createOrder(input: unknown, customerId: number, address?: 
       if (!p.sizes.includes(l.size)) throw new OrderError(`Tamanho inválido para ${p.name}.`);
       if (!p.colors.includes(l.color)) throw new OrderError(`Cor inválida para ${p.name}.`);
 
-      // Baixa o estoque em um único UPDATE condicional: se não houver quantidade, nenhuma linha muda.
-      // É isto que impede vender a mesma última peça a dois clientes ao mesmo tempo: a checagem
-      // (gte stock >= qty) e a subtração acontecem juntas, no próprio banco, de forma indivisível.
-      const updated = await tx
-        .update(products)
-        .set({ stock: sql`${products.stock} - ${l.qty}`, updatedAt: new Date() })
-        .where(and(eq(products.slug, l.slug), eq(products.active, true), gte(products.stock, l.qty)))
-        .returning({ name: products.name, priceCents: products.priceCents });
+      // Baixa o estoque DA VARIAÇÃO (tamanho x cor) em um único UPDATE condicional: se não houver a quantidade
+      // naquele tamanho e cor, nenhuma linha muda. É isto que impede vender a mesma última peça a dois clientes
+      // ao mesmo tempo (a checagem "stock >= qty" e a subtração acontecem juntas, no próprio banco) e também
+      // impede vender o M de uma peça que só tem G. O total da peça (products.stock) é atualizado pelo gatilho
+      // do banco (migração 0010); o código nunca o grava.
+      const baixou = await tx
+        .update(productStock)
+        .set({ stock: sql`${productStock.stock} - ${l.qty}` })
+        .where(
+          and(
+            eq(productStock.productSlug, l.slug),
+            eq(productStock.size, l.size),
+            eq(productStock.color, l.color),
+            gte(productStock.stock, l.qty),
+          ),
+        )
+        .returning({ stock: productStock.stock });
 
       // Nenhuma linha atualizada = a condição de estoque falhou. 409 = conflito com o estado atual.
-      if (updated.length === 0) throw new OrderError(`Estoque insuficiente para ${p.name}.`, 409);
+      if (baixou.length === 0) throw new OrderError(`Estoque insuficiente para ${p.name} (tamanho ${l.size}, cor ${l.color}).`, 409);
 
-      // Preço e nome vêm do banco (da linha que acabamos de atualizar), nunca do navegador.
-      const { name, priceCents } = updated[0];
+      // Preço e nome vêm do banco (da peça lida acima), nunca do navegador.
+      const { name, priceCents } = p;
       total += priceCents * l.qty;
       // Guardado na posição ORIGINAL do carrinho, para a resposta manter a ordem que o cliente viu.
       resolved[i] = { name, size: l.size, color: l.color, qty: l.qty, unitPriceCents: priceCents };
@@ -200,13 +210,14 @@ export async function cancelInTx(
   await tx.update(orders).set({ status: "cancelado", updatedAt: new Date() }).where(eq(orders.id, id));
   await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: atual.status, toStatus: "cancelado", origin: origem });
 
-  // Devolve cada peça do pedido ao estoque (soma, em vez de gravar um número fixo).
+  // Devolve cada peça do pedido ao estoque DA SUA VARIAÇÃO (soma, em vez de gravar um número fixo). Se o dono
+  // tirou aquele tamanho ou cor da peça depois da compra, a variação não existe mais e não há onde devolver.
   const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id));
   for (const it of items) {
     await tx
-      .update(products)
-      .set({ stock: sql`${products.stock} + ${it.qty}`, updatedAt: new Date() })
-      .where(eq(products.slug, it.productSlug));
+      .update(productStock)
+      .set({ stock: sql`${productStock.stock} + ${it.qty}` })
+      .where(and(eq(productStock.productSlug, it.productSlug), eq(productStock.size, it.size), eq(productStock.color, it.color)));
   }
   return true;
 }

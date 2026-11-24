@@ -199,7 +199,7 @@ describe("consistência dos pedidos", () => {
   // O total do pedido precisa ser exatamente a soma dos itens (preço congelado x quantidade).
   it("o total de cada pedido bate com a soma dos itens", async () => {
     await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 3 }, { slug: "camisa-mumia", size: "G", color: "Branca", qty: 2 }], await clienteDeTeste());
-    await createOrder([{ slug: "eu-faco-programa", size: "P", color: "Preta", qty: 1 }], await clienteDeTeste());
+    await createOrder([{ slug: "eu-faco-programa", size: "M", color: "Preta", qty: 1 }], await clienteDeTeste());
     const db = await getDb();
     const todos = await db.select().from(orders);
     const itens = await db.select().from(orderItems);
