@@ -4,6 +4,8 @@
 // Quem chama: a tela /carrinho, quando o cliente clica em "Finalizar pelo WhatsApp".
 // O que faz, em ordem:
 //   1. confere o limite de uso (anti-abuso);
+//   1b. exige que o cliente esteja logado (401 sem sessão): comprar exige conta, e o pedido fica no
+//       nome de quem está logado. O dono do pedido vem SÓ da sessão: nada no corpo da requisição o altera;
 //   2. lê os itens enviados;
 //   3. registra o pedido no banco e baixa o estoque (tudo ou nada);
 //   4. devolve o número do pedido e o link do WhatsApp com a mensagem pronta;
@@ -17,6 +19,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { buildCartMessage, whatsappLink } from "@/lib/whatsapp";
 import { OrderError, cancelOrder, createOrder } from "@/server/orders";
+import { currentCustomer } from "@/server/customers/session";
 import { startPayment } from "@/server/payments";
 import { mpConfigurado } from "@/server/payments/mercadopago";
 import { clientKey, rateLimit } from "@/server/rate-limit";
@@ -37,6 +40,11 @@ export async function POST(request: Request) {
   const limite = await rateLimit("orders", await clientKey(), 10, 10 * 60 * 1000);
   if (!limite.allowed) return tooMany(limite.retryAfterSeconds);
 
+  // Comprar exige conta. Conferido ANTES de qualquer outro trabalho: sem sessão válida, nenhum estoque é
+  // tocado e o Mercado Pago nem é chamado. A tela de sacola, ao receber 401, leva a pessoa a entrar.
+  const cliente = await currentCustomer();
+  if (!cliente) return NextResponse.json({ error: "Entre na sua conta para comprar." }, { status: 401 });
+
   // Lê o corpo (JSON). Se vier quebrado ou vazio, responde 400 (requisição malformada).
   let body: unknown;
   try {
@@ -54,7 +62,7 @@ export async function POST(request: Request) {
 
   try {
     // Só os "items" são usados do que veio: preços e totais enviados pelo navegador são ignorados.
-    const order = await createOrder((body as { items?: unknown })?.items);
+    const order = await createOrder((body as { items?: unknown })?.items, cliente.id);
 
     // O estoque mudou: o catálogo precisa refletir isso já na próxima leitura (sem servir valor antigo).
     revalidateTag("products", { expire: 0 });
