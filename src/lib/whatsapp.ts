@@ -20,6 +20,17 @@ export function whatsappLink(message: string) {
   return `https://wa.me/${SITE.whatsappNumber}?text=${encodeURIComponent(message)}`;
 }
 
+/**
+ * Link que abre uma conversa DO DONO COM UM CLIENTE (usado no painel). O celular vem do banco (DDD + número,
+ * 10 ou 11 dígitos); qualquer outra coisa devolve null, para um valor estranho nunca virar um link quebrado ou
+ * apontar para outro lugar. A mensagem é sempre codificada: não consegue escapar do parâmetro.
+ */
+export function clienteWhatsappLink(celular: string, mensagem?: string): string | null {
+  if (typeof celular !== "string" || !/^[0-9]{10,11}$/.test(celular)) return null;
+  const base = `https://wa.me/55${celular}`;
+  return mensagem ? `${base}?text=${encodeURIComponent(mensagem)}` : base;
+}
+
 /** Uma linha de pedido, como entra na mensagem. */
 export type OrderLine = {
   name: string;
