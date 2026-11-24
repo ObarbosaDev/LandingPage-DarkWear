@@ -161,6 +161,14 @@ export function Header() {
             </button>
           )}
 
+          {/* Minha conta: leva a /conta (quem não está logado cai na tela de entrar e volta para cá). */}
+          <Link href="/conta" aria-label="Minha conta" className="flex h-12 w-12 items-center justify-center text-foreground hover:opacity-70">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+            </svg>
+          </Link>
+
           {/* Ícone da sacola, com o número de peças (só aparece depois de ler o carrinho e se há itens). */}
           <Link
             href="/carrinho"
