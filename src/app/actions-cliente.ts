@@ -33,6 +33,7 @@ import {
 import { parseAddressForm, saveAddress } from "@/server/customers/address";
 import { validatePassword } from "@/server/customers/password";
 import { currentSession, endCustomerSession, requireCustomer, safeNext, startCustomerSession } from "@/server/customers/session";
+import { conferirSegundoFator, guardarDesafio, lerDesafio, limparDesafio } from "@/server/customers/second-factor";
 import { clearFailures, isLockedOut, registerFailure } from "@/server/login-attempts";
 import { clientKey, rateLimit } from "@/server/rate-limit";
 
@@ -40,7 +41,15 @@ import { clientKey, rateLimit } from "@/server/rate-limit";
  * O que as telas recebem de volta de uma ação: "error" (o que deu errado), "ok" (o que deu certo, sem
  * sair da tela) e "values" (o que foi digitado, para repovoar o formulário; nunca contém senha).
  */
-export type ClienteFormState = { error?: string; ok?: string; values?: Record<string, string> };
+export type ClienteFormState = {
+  error?: string;
+  ok?: string;
+  values?: Record<string, string>;
+  // "codigo" = a senha está certa e a conta tem segundo fator: a tela pede o código do aplicativo autenticador.
+  etapa?: "codigo";
+  // true = o passo do código não pode continuar (o bilhete venceu): a tela volta a pedir e-mail e senha.
+  reiniciar?: boolean;
+};
 
 const MIN = 60 * 1000;
 const MUITAS_TENTATIVAS = "Muitas tentativas. Tente de novo em alguns minutos.";
@@ -103,15 +112,66 @@ export async function loginAction(_prev: ClienteFormState, form: FormData): Prom
   }
 
   await clearFailures(chave);
+
+  // Conta com segundo fator (só administradores): a senha certa NÃO abre a sessão. Guarda um bilhete de 5 minutos
+  // e pede o código do aplicativo. Só quem já provou a senha vê este passo; a tela de entrar é igual para todos.
+  if (entrou.segundoFator) {
+    await guardarDesafio(entrou.id, entrou.sessionVersion);
+    return { etapa: "codigo", values: volta };
+  }
+
+  return abrirSessaoEIr(entrou, texto(form, "next"));
+}
+
+/** A conta que acabou de provar quem é (senha, e código se tiver). */
+type Entrou = { id: number; sessionVersion: number; mustChangePassword: boolean; role: "cliente" | "admin" };
+
+/**
+ * Abre a sessão e leva a pessoa ao destino. Nunca retorna (redireciona).
+ * Para onde ir:
+ *   - senha provisória: só pode trocá-la, antes de qualquer outra coisa;
+ *   - destino pedido (a sacola, por exemplo): vale, depois de passar por safeNext (nunca outro site);
+ *   - sem destino: o administrador vai ao painel e o cliente, à conta. É assim que o administrador chega ao
+ *     painel: entrando pela tela de todo mundo, sem nenhum botão de "admin".
+ */
+async function abrirSessaoEIr(entrou: Entrou, pedido: string): Promise<never> {
   await startCustomerSession(entrou.id, entrou.sessionVersion, Date.now(), entrou.role);
-  // Para onde ir:
-  //   - senha provisória: só pode trocá-la, antes de qualquer outra coisa;
-  //   - destino pedido (a sacola, por exemplo): vale, depois de passar por safeNext (nunca outro site);
-  //   - sem destino: o administrador vai ao painel e o cliente, à conta. É assim que o administrador chega ao
-  //     painel: entrando pela tela de todo mundo, sem nenhum botão de "admin".
   if (entrou.mustChangePassword) redirect("/conta?trocar=1");
-  const pedido = texto(form, "next");
   redirect(pedido ? safeNext(pedido) : entrou.role === "admin" ? "/admin" : "/conta");
+}
+
+/**
+ * Segundo passo do login (só para contas com segundo fator): confere o código do aplicativo autenticador.
+ *   - o bilhete do passo anterior (cookie de 5 minutos) diz de qual conta é: o formulário NÃO manda id nenhum;
+ *   - 5 erros em 15 minutos bloqueiam a conta (chave própria "2fa:<id>", separada da contagem da senha);
+ *   - o código só vale uma vez (conferirSegundoFator grava o passo usado) e vale só para esta conta.
+ */
+export async function codigoAction(_prev: ClienteFormState, form: FormData): Promise<ClienteFormState> {
+  // Por origem: o mesmo limite do login (quem tenta sem parar é barrado antes de gastar o banco).
+  const porOrigem = await rateLimit("customer-login", await clientKey(), 8, 15 * MIN);
+  if (!porOrigem.allowed) return { error: MUITAS_TENTATIVAS, etapa: "codigo" };
+
+  const bilhete = await lerDesafio();
+  if (!bilhete) return { error: "O tempo para digitar o código acabou. Entre de novo.", reiniciar: true };
+
+  const chave = `2fa:${bilhete.id}`;
+  if (await isLockedOut(chave)) return { error: MUITAS_TENTATIVAS, etapa: "codigo" };
+
+  // A conta pode ter mudado depois da senha (outra senha, outro aparelho desconectado): o bilhete deixa de valer.
+  const conta = await getCustomer(bilhete.id);
+  if (!conta || conta.sessionVersion !== bilhete.version) {
+    await limparDesafio();
+    return { error: "A conta mudou. Entre de novo.", reiniciar: true };
+  }
+
+  if (!(await conferirSegundoFator(bilhete.id, texto(form, "code")))) {
+    await registerFailure(chave);
+    return { error: "Código incorreto, vencido ou já usado.", etapa: "codigo" };
+  }
+
+  await clearFailures(chave);
+  await limparDesafio();
+  return abrirSessaoEIr(conta, texto(form, "next"));
 }
 
 /** Botão "Sair": encerra a sessão neste aparelho e volta à página inicial. */

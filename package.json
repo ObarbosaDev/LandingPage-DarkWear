@@ -15,7 +15,9 @@
     "admin:criar": "tsx --conditions=react-server scripts/admin.ts criar",
     "admin:senha": "tsx --conditions=react-server scripts/admin.ts senha",
     "admin:remover": "tsx --conditions=react-server scripts/admin.ts remover",
-    "admin:listar": "tsx --conditions=react-server scripts/admin.ts listar"
+    "admin:listar": "tsx --conditions=react-server scripts/admin.ts listar",
+    "admin:2fa": "tsx --conditions=react-server scripts/admin.ts 2fa",
+    "admin:2fa-remover": "tsx --conditions=react-server scripts/admin.ts 2fa-remover"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",

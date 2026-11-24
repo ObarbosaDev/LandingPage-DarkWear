@@ -15,7 +15,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { loginAction, type ClienteFormState } from "@/app/actions-cliente";
+import { codigoAction, loginAction, type ClienteFormState } from "@/app/actions-cliente";
 
 // Rótulo pequeno em fonte mono e o campo (só uma linha embaixo, que inverte ao receber o foco).
 const rotulo = "font-mono text-xs font-bold uppercase tracking-[0.18em]";
@@ -24,6 +24,9 @@ const campo =
 
 export function Provador({ next }: { next: string }) {
   const [estado, acao, pending] = useActionState<ClienteFormState, FormData>(loginAction, {});
+  // O passo do código do aplicativo autenticador: só aparece depois da senha certa, para contas que o têm.
+  const [estadoCodigo, acaoCodigo, pendingCodigo] = useActionState<ClienteFormState, FormData>(codigoAction, {});
+  const pedindoCodigo = estado.etapa === "codigo" && !estadoCodigo.reiniciar;
 
   // Uma dobradiça: uma barrinha preta na borda da porta (só enfeite).
   const dobradica = "block h-8 w-2 bg-background";
@@ -52,8 +55,41 @@ export function Provador({ next }: { next: string }) {
         <p className="inline-block border-2 border-background px-3 py-1 font-mono text-xs font-bold uppercase tracking-[0.2em]">
           Provador 01 · Livre
         </p>
-        <h2 className="mt-4 font-display text-5xl uppercase leading-[0.9]">Entrar</h2>
+        <h2 className="mt-4 font-display text-5xl uppercase leading-[0.9]">{pedindoCodigo ? "Código" : "Entrar"}</h2>
 
+        {pedindoCodigo ? (
+          // Segundo passo: o código de 6 dígitos do aplicativo autenticador. O e-mail e a senha já foram conferidos.
+          <form action={acaoCodigo} className="mt-6 flex flex-col gap-6">
+            <input type="hidden" name="next" value={next} />
+            <p className="text-base font-medium">Abra o aplicativo autenticador e digite o código de 6 dígitos.</p>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="code" className={rotulo}>Código</label>
+              <input
+                id="code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9 ]{6,7}"
+                maxLength={7}
+                required
+                autoFocus
+                className={`${campo} text-center text-3xl tracking-[0.4em]`}
+              />
+            </div>
+            {estadoCodigo.error ? (
+              <p role="alert" className="border-2 border-background p-3 text-base font-bold">
+                {estadoCodigo.error}
+              </p>
+            ) : null}
+            <button
+              type="submit"
+              disabled={pendingCodigo}
+              className="border-2 border-background bg-background px-6 py-4 font-display text-2xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background disabled:cursor-wait"
+            >
+              {pendingCodigo ? "Conferindo…" : "Confirmar"}
+            </button>
+          </form>
+        ) : (
         <form action={acao} className="mt-6 flex flex-col gap-6">
           {/* Para onde voltar depois de entrar (a sacola, por exemplo). Já vem conferido pela página. */}
           <input type="hidden" name="next" value={next} />
@@ -92,6 +128,14 @@ export function Provador({ next }: { next: string }) {
             {pending ? "Abrindo…" : "Entrar"}
           </button>
         </form>
+        )}
+
+        {/* O bilhete venceu ou a conta mudou: a tela volta ao e-mail e à senha, com o aviso. */}
+        {estadoCodigo.reiniciar && estadoCodigo.error ? (
+          <p role="alert" className="mt-4 border-2 border-background p-3 text-base font-bold">
+            {estadoCodigo.error}
+          </p>
+        ) : null}
 
         <p className="mt-6 text-base font-medium">
           Ainda não tem conta?{" "}

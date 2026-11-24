@@ -5,6 +5,8 @@
 //   npm run admin:senha -- --email maria@loja.com        (esqueceu a senha: gera outra provisória)
 //   npm run admin:remover -- --email maria@loja.com      (tira o acesso ao painel)
 //   npm run admin:listar                                 (quem administra hoje)
+//   npm run admin:2fa -- --email maria@loja.com          (liga o segundo fator: código do aplicativo autenticador)
+//   npm run admin:2fa-remover -- --email maria@loja.com  (desliga o segundo fator)
 //
 // POR QUE EXISTE: o painel não tem senha própria. Quem administra é uma conta com papel "admin", e este é o
 // ÚNICO jeito de conceder o papel: nenhum formulário ou tela do site faz isso. Quem roda este comando é quem
@@ -37,7 +39,9 @@ const AJUDA = `Uso:
   npm run admin:criar -- --email EMAIL --nome "NOME" --celular DDDNUMERO   cria (ou promove) um administrador
   npm run admin:senha -- --email EMAIL                                      gera outra senha provisória
   npm run admin:remover -- --email EMAIL                                    tira o acesso ao painel
-  npm run admin:listar                                                      lista os administradores`;
+  npm run admin:listar                                                      lista os administradores
+  npm run admin:2fa -- --email EMAIL                                        liga o segundo fator (aplicativo autenticador)
+  npm run admin:2fa-remover -- --email EMAIL                                desliga o segundo fator`;
 
 async function main() {
   // Lê o .env.local (se existir) para pegar DATABASE_URL, como o servidor faz.
@@ -45,7 +49,7 @@ async function main() {
 
   const [comando, ...resto] = process.argv.slice(2);
   const a = lerArgumentos(resto);
-  if (!comando || !["criar", "senha", "remover", "listar"].includes(comando)) {
+  if (!comando || !["criar", "senha", "remover", "listar", "2fa", "2fa-remover"].includes(comando)) {
     console.error(AJUDA);
     process.exitCode = 1;
     return;
@@ -53,6 +57,8 @@ async function main() {
 
   // Só agora carrega o código do servidor (precisa das variáveis de ambiente já lidas).
   const { createAdministrator, listAdministrators, removeAdministrator, resetAdministratorPassword } = await import("../src/server/admin/administrators");
+
+  const { desligarSegundoFator, ligarSegundoFator } = await import("../src/server/customers/second-factor");
 
   const destino = process.env.DATABASE_URL ? "banco de PRODUÇÃO (DATABASE_URL)" : "banco local (.data)";
   console.log(`Banco: ${destino}\n`);
@@ -70,6 +76,23 @@ async function main() {
     const r = await resetAdministratorPassword(a.email);
     console.log(`Nova senha provisória para ${a.email}.`);
     mostrarSenha(r.senhaProvisoria, site);
+  } else if (comando === "2fa") {
+    if (!a.email) throw new Error("Informe --email.");
+    const r = await ligarSegundoFator(a.email);
+    console.log(`Segundo fator ligado para ${r.email}.\n`);
+    console.log("Cadastre no aplicativo autenticador (Google Authenticator, Authy, 1Password...):");
+    console.log(`  Chave:   ${r.segredo.match(/.{1,4}/g)!.join(" ")}`);
+    console.log("  Tipo:    baseado em tempo (TOTP), 6 dígitos, 30 segundos");
+    console.log(`  Endereço (para gerar o QR code, se preferir): ${r.uri}\n`);
+    console.log("Esta chave aparece só agora e fica guardada CIFRADA no banco. As sessões abertas dessa pessoa foram encerradas:");
+    console.log("a partir da próxima entrada, além da senha, ela digita o código do aplicativo.");
+    console.log("Se perder o aparelho: npm run admin:2fa-remover e depois admin:2fa de novo.");
+  } else if (comando === "2fa-remover") {
+    if (!a.email) throw new Error("Informe --email.");
+    const r = await desligarSegundoFator(a.email);
+    if (r === "desligado") console.log(`Segundo fator desligado para ${a.email}. Ele volta a entrar só com a senha.`);
+    else if (r === "nao-tinha") console.log(`${a.email} não usava segundo fator. Nada foi alterado.`);
+    else throw new Error(`Administrador não encontrado: ${a.email}`);
   } else if (comando === "remover") {
     if (!a.email) throw new Error("Informe --email.");
     const r = await removeAdministrator(a.email);
@@ -81,7 +104,7 @@ async function main() {
   } else {
     const lista = await listAdministrators();
     if (lista.length === 0) console.log("Nenhum administrador. O painel está fechado. Crie um com: npm run admin:criar");
-    for (const adm of lista) console.log(`  ${adm.email.padEnd(36)} ${adm.name}${adm.mustChangePassword ? "   (ainda não trocou a senha provisória)" : ""}`);
+    for (const adm of lista) console.log(`  ${adm.email.padEnd(36)} ${adm.name}${adm.mustChangePassword ? "   (ainda não trocou a senha provisória)" : ""}   [2FA: ${adm.segundoFator ? "sim" : "não"}]`);
   }
 }
 

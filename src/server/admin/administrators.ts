@@ -88,7 +88,8 @@ export async function removeAdministrator(emailBruto: string): Promise<"removido
   const db = await getDb();
   await db
     .update(customers)
-    .set({ role: "cliente", sessionVersion: sql`${customers.sessionVersion} + 1` })
+    // Sem o papel, o segundo fator não faz mais sentido: o segredo é apagado.
+    .set({ role: "cliente", totpSecret: null, totpLastStep: 0, sessionVersion: sql`${customers.sessionVersion} + 1` })
     .where(eq(customers.id, conta.id));
   return "removido";
 }
@@ -115,10 +116,18 @@ export async function resetAdministratorPassword(emailBruto: string): Promise<{ 
 }
 
 /** Os administradores ativos, por ordem de criação. Nunca devolve o hash da senha. */
-export async function listAdministrators(): Promise<{ id: number; name: string; email: string; mustChangePassword: boolean; createdAt: Date }[]> {
+export async function listAdministrators(): Promise<{ id: number; name: string; email: string; mustChangePassword: boolean; segundoFator: boolean; createdAt: Date }[]> {
   const db = await getDb();
   return db
-    .select({ id: customers.id, name: customers.name, email: customers.email, mustChangePassword: customers.mustChangePassword, createdAt: customers.createdAt })
+    .select({
+      id: customers.id,
+      name: customers.name,
+      email: customers.email,
+      mustChangePassword: customers.mustChangePassword,
+      // Só se TEM ou não (o segredo nunca sai do banco por aqui).
+      segundoFator: sql<boolean>`${customers.totpSecret} IS NOT NULL`,
+      createdAt: customers.createdAt,
+    })
     .from(customers)
     .where(and(eq(customers.role, "admin"), isNull(customers.anonymizedAt)))
     .orderBy(asc(customers.id));

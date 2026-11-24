@@ -5,7 +5,7 @@
 // no banco são as migrações (src/server/db/migrations.ts). Mudou aqui? Crie também uma migração.
 // ============================================================================
 
-import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, boolean, customType, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 // Coluna de bytes (bytea): o Drizzle não traz pronta. O Neon devolve Buffer e o PGlite devolve
 // Uint8Array; os dois são normalizados para Uint8Array.
@@ -87,6 +87,10 @@ export const customers = pgTable("customers", {
   // "cliente" (todo mundo) ou "admin" (quem administra a loja). Só um comando de terminal do dono concede
   // "admin"; nenhuma tela ou API escreve este campo (migração 0008).
   role: text("role").$type<"cliente" | "admin">().notNull().default("cliente"),
+  // Segundo fator (migração 0013): o segredo do aplicativo autenticador, CIFRADO (nulo = a conta não usa), e o último
+  // passo de 30 segundos já aceito (um código só vale uma vez). Só o terminal do dono liga isto (npm run admin:2fa).
+  totpSecret: text("totp_secret"),
+  totpLastStep: bigint("totp_last_step", { mode: "number" }).notNull().default(0),
   // Endereço de entrega (migração 0009): ou não há nenhum, ou está completo (o banco confere). Um por conta.
   addressZip: text("address_zip"),
   addressStreet: text("address_street"),

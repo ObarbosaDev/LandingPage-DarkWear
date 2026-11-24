@@ -148,7 +148,7 @@ export async function registerCustomer(input: RegisterInput): Promise<{ ok: true
 export async function authenticate(
   email: string,
   password: string,
-): Promise<{ id: number; sessionVersion: number; mustChangePassword: boolean; role: "cliente" | "admin" } | null> {
+): Promise<{ id: number; sessionVersion: number; mustChangePassword: boolean; role: "cliente" | "admin"; segundoFator: boolean } | null> {
   if (typeof email !== "string" || typeof password !== "string") {
     await fakeVerify();
     return null;
@@ -163,7 +163,7 @@ export async function authenticate(
     return null;
   }
   if (!(await verifyPassword(password, c.passwordHash))) return null;
-  return { id: c.id, sessionVersion: c.sessionVersion, mustChangePassword: c.mustChangePassword, role: c.role };
+  return { id: c.id, sessionVersion: c.sessionVersion, mustChangePassword: c.mustChangePassword, role: c.role, segundoFator: c.totpSecret !== null };
 }
 
 /** Um cliente pelo id, sem o hash da senha. null se não existe ou se a conta foi anonimizada. */
@@ -253,6 +253,9 @@ export async function anonymizeCustomer(id: number): Promise<void> {
       // Um texto que não é um hash scrypt válido: nenhuma senha jamais confere com ele.
       passwordHash: "removido",
       mustChangePassword: false,
+      // O segredo do segundo fator some junto com a conta.
+      totpSecret: null,
+      totpLastStep: 0,
       anonymizedAt: new Date(),
       sessionVersion: sql`${customers.sessionVersion} + 1`,
     })
