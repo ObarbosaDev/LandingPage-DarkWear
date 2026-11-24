@@ -12,6 +12,7 @@ import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { customers, orderItems, orders, orderStatusHistory, payments, ORDER_STATUS, type OrderStatus, type PaymentStatus, type StatusOrigin } from "@/server/db/schema";
 import { padraoContem } from "@/server/admin/customers";
+import { addressFromOrder, type Address } from "@/server/customers/address";
 import { cancelInTx, orderNumber } from "@/server/orders";
 
 // De cada status, para quais o dono pode mover o pedido.
@@ -36,6 +37,8 @@ export type AdminOrder = {
   items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
   /** Quem comprou. null só nos pedidos antigos, feitos antes de existir cadastro. Nunca inclui a senha. */
   customer: { id: number; name: string; email: string; phone: string } | null;
+  /** Para onde entregar: a cópia do endereço guardada NO PEDIDO (null nos pedidos antigos e nos sem endereço). */
+  entrega: Address | null;
   /** Cada mudança de status do pedido, da mais antiga para a mais recente. */
   history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; origin: StatusOrigin; at: Date }[];
   /** Pagamentos online do pedido (Mercado Pago), do mais antigo ao mais recente. Vazio = pedido fechado pelo WhatsApp. */
@@ -130,6 +133,7 @@ export async function listOrders(status?: OrderStatus, limit = 100, busca?: stri
         .filter((i) => i.orderId === o.id)
         .map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
       customer: customer && customer.id !== null ? customer : null,
+      entrega: addressFromOrder(o),
       history: historico
         .filter((h) => h.orderId === o.id)
         .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, at: h.at })),

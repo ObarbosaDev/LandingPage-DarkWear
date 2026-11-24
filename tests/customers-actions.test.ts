@@ -17,8 +17,10 @@ import {
   loginAction,
   logoutAction,
   registerAction,
+  saveAddressAction,
   signOutEverywhereAction,
 } from "@/app/actions-cliente";
+import { getAddress } from "@/server/customers/address";
 import { resetDb } from "./helpers/db";
 
 // ---------- o "navegador" de mentira ----------
@@ -292,3 +294,54 @@ describe("deleteAccountAction", () => {
     expect(await getCustomer(id)).toMatchObject({ id });
   });
 });
+
+describe("saveAddressAction", () => {
+  const enviar = (o: Record<string, string> = {}) =>
+    saveAddressAction({}, form({ cep: "01310-100", street: "Avenida Paulista", number: "1000", complement: "Sala 12", district: "Bela Vista", city: "São Paulo", state: "SP", ...o }));
+
+  it("sem sessão, manda para a entrada (a ação pode ser chamada direto)", async () => {
+    expect(await rodar(() => enviar())).toMatchObject({ destino: expect.stringMatching(/^\/conta\/entrar/) });
+  });
+
+  it("grava o endereço da conta de quem está logado", async () => {
+    const id = await criar();
+    await startCustomerSession(id, 1);
+    expect(await rodar(() => enviar())).toMatchObject({ estado: { ok: expect.stringMatching(/endereço/i) } });
+    expect(await getAddress(id)).toEqual({ zip: "01310100", street: "Avenida Paulista", number: "1000", complement: "Sala 12", district: "Bela Vista", city: "São Paulo", state: "SP" });
+  });
+
+  it("endereço inválido: erro claro, devolve o que foi digitado e NADA é gravado", async () => {
+    const id = await criar();
+    await startCustomerSession(id, 1);
+    const r = await rodar(() => enviar({ cep: "123", street: "Rua Digitada" }));
+    expect(r).toMatchObject({ estado: { error: expect.stringMatching(/CEP/), values: { street: "Rua Digitada", cep: "123" } } });
+    expect(await getAddress(id)).toBeNull();
+  });
+
+  // A ação não recebe id de cliente: só dá para gravar na própria conta, nada no corpo escolhe outra.
+  it("grava só na conta de quem está logado, ignorando qualquer id enviado no formulário", async () => {
+    const eu = await criar("eu@exemplo.com");
+    const outro = await criar("outro@exemplo.com");
+    await startCustomerSession(eu, 1);
+    await rodar(() => enviar({ id: String(outro), customerId: String(outro), customer_id: String(outro) }));
+    expect(await getAddress(eu)).not.toBeNull();
+    expect(await getAddress(outro)).toBeNull();
+  });
+
+  it("quem tem senha provisória só pode trocar a senha: não salva endereço", async () => {
+    const id = await criar();
+    await (await getDb()).update(customers).set({ mustChangePassword: true }).where(eq(customers.id, id));
+    await startCustomerSession(id, 1);
+    expect(await rodar(() => enviar())).toEqual({ destino: "/conta?trocar=1" });
+    expect(await getAddress(id)).toBeNull();
+  });
+
+  it("trocar o endereço substitui o anterior", async () => {
+    const id = await criar();
+    await startCustomerSession(id, 1);
+    await rodar(() => enviar());
+    await rodar(() => enviar({ street: "Rua Nova", complement: "" }));
+    expect(await getAddress(id)).toMatchObject({ street: "Rua Nova", complement: null });
+  });
+});
+

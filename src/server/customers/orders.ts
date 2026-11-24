@@ -17,6 +17,7 @@ import "server-only";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { orderItems, orders, orderStatusHistory, payments, type OrderStatus, type PaymentStatus } from "@/server/db/schema";
+import { addressFromOrder, type Address } from "@/server/customers/address";
 import { orderNumber } from "@/server/orders";
 
 /** Uma linha da lista "Meus pedidos". */
@@ -38,6 +39,8 @@ export type CustomerOrderDetail = {
   items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
   /** Cada mudança de status, da mais antiga para a mais recente. */
   history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; at: Date }[];
+  /** Para onde o pedido vai: a cópia do endereço guardada NO PEDIDO (null nos pedidos antigos). */
+  entrega: Address | null;
   /** Pagamentos online do pedido (vazio se foi fechado pelo WhatsApp). */
   payments: { status: PaymentStatus; method: string | null; installments: number | null; amountCents: number | null; paidAt: Date | null; createdAt: Date }[];
 };
@@ -98,6 +101,7 @@ export async function getCustomerOrder(customerId: number, number: string): Prom
     status: o.status,
     totalCents: o.totalCents,
     createdAt: o.createdAt,
+    entrega: addressFromOrder(o),
     items: itens.map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
     history: historico.map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, at: h.at })),
     payments: pagamentos.map((p) => ({ status: p.status, method: p.method, installments: p.installments, amountCents: p.amountCents, paidAt: p.paidAt, createdAt: p.createdAt })),

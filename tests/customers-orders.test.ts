@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { orders, payments } from "@/server/db/schema";
 import { createOrder } from "@/server/orders";
+import type { Address } from "@/server/customers/address";
 import { getCustomerOrder, listCustomerOrders } from "@/server/customers/orders";
 import { clienteDeTeste, resetDb } from "./helpers/db";
 
@@ -102,3 +103,30 @@ describe("getCustomerOrder", () => {
     expect(texto).not.toMatch(/777|pref-secreta|origin|provider|customer/i);
   });
 });
+
+describe("endereço de entrega no detalhe do pedido", () => {
+  const endereco: Address = { zip: "01310100", street: "Avenida Paulista", number: "1000", complement: "Sala 12", district: "Bela Vista", city: "São Paulo", state: "SP" };
+
+  it("o detalhe traz o endereço guardado no pedido; pedido sem cópia vem com entrega null", async () => {
+    const ana = await clienteDeTeste();
+    const com = await createOrder(item(1), ana, endereco);
+    const sem = await createOrder(item(1), ana);
+    expect((await getCustomerOrder(ana, com.number))?.entrega).toEqual(endereco);
+    expect((await getCustomerOrder(ana, sem.number))?.entrega).toBeNull();
+  });
+
+  it("o endereço de um pedido nunca aparece para outro cliente", async () => {
+    const ana = await clienteDeTeste("ana@exemplo.com");
+    const bia = await clienteDeTeste("bia@exemplo.com");
+    const p = await createOrder(item(1), ana, endereco);
+    expect(await getCustomerOrder(bia, p.number)).toBeNull();
+    expect(JSON.stringify(await listCustomerOrders(bia))).not.toMatch(/Paulista|01310/);
+  });
+
+  it("a lista de pedidos não carrega o endereço (só o detalhe)", async () => {
+    const ana = await clienteDeTeste();
+    await createOrder(item(1), ana, endereco);
+    expect(JSON.stringify(await listCustomerOrders(ana))).not.toMatch(/Paulista|01310/);
+  });
+});
+

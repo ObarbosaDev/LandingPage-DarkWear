@@ -30,6 +30,7 @@ import {
   registerCustomer,
   signOutEverywhere,
 } from "@/server/customers";
+import { parseAddressForm, saveAddress } from "@/server/customers/address";
 import { validatePassword } from "@/server/customers/password";
 import { currentSession, endCustomerSession, requireCustomer, safeNext, startCustomerSession } from "@/server/customers/session";
 import { clearFailures, isLockedOut, registerFailure } from "@/server/login-attempts";
@@ -150,6 +151,24 @@ export async function changePasswordAction(_prev: ClienteFormState, form: FormDa
   if (depois) await startCustomerSession(depois.id, depois.sessionVersion, Date.now(), depois.role);
   revalidatePath("/conta");
   return { ok: "Senha alterada. Os outros aparelhos foram desconectados." };
+}
+
+/**
+ * Formulário de endereço de entrega (etiqueta "Entrega" de /conta). Grava na conta de QUEM ESTÁ LOGADO: a ação não
+ * recebe id de cliente (nada no formulário escolhe outra conta). Em erro, devolve a mensagem e o que foi digitado
+ * (endereço não é segredo, então pode voltar à tela). O pedido guarda uma cópia do endereço no momento da compra;
+ * mudar aqui depois não muda pedidos já feitos.
+ */
+export async function saveAddressAction(_prev: ClienteFormState, form: FormData): Promise<ClienteFormState> {
+  // Sem permitirSenhaProvisoria: quem tem senha provisória só pode trocar a senha.
+  const cliente = await requireCustomer("/conta");
+  const lido = parseAddressForm(form);
+  if (!lido.ok) {
+    return { error: lido.error, values: Object.fromEntries(["cep", "street", "number", "complement", "district", "city", "state"].map((k) => [k, texto(form, k)])) };
+  }
+  if (!(await saveAddress(cliente.id, lido.data))) return { error: "Não foi possível salvar o endereço. Entre de novo e tente outra vez." };
+  revalidatePath("/conta");
+  return { ok: "Endereço salvo." };
 }
 
 /** Botão "Sair de todos os aparelhos": derruba todas as sessões, menos esta. */

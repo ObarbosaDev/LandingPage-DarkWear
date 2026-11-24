@@ -130,3 +130,21 @@ export function formatCep(zip: string): string {
 export function formatAddress(a: Address): string[] {
   return [`${a.street}, ${a.number}${a.complement ? ` - ${a.complement}` : ""}`, `${a.district}, ${a.city} - ${a.state}`, `CEP ${formatCep(a.zip)}`];
 }
+
+/**
+ * A CÓPIA do endereço guardada num pedido (colunas ship_*), ou null se o pedido não tem (os antigos e os feitos
+ * antes desta etapa) ou se faltar qualquer parte dela. É a leitura que o comprovante do cliente e o painel usam.
+ */
+export function addressFromOrder(o: {
+  shipZip: string | null;
+  shipStreet: string | null;
+  shipNumber: string | null;
+  shipComplement: string | null;
+  shipDistrict: string | null;
+  shipCity: string | null;
+  shipState: string | null;
+}): Address | null {
+  if (!o.shipZip || !o.shipStreet || !o.shipNumber || !o.shipDistrict || !o.shipCity || !o.shipState) return null;
+  return { zip: o.shipZip, street: o.shipStreet, number: o.shipNumber, complement: o.shipComplement, district: o.shipDistrict, city: o.shipCity, state: o.shipState };
+}
+

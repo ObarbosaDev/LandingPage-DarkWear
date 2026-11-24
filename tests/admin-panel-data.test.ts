@@ -288,3 +288,16 @@ describe("dashboardStats: fechamento do mês (ticket médio)", () => {
   });
 });
 
+describe("listOrders: endereço de entrega", () => {
+  const endereco = { zip: "01310100", street: "Avenida Paulista", number: "1000", complement: null, district: "Bela Vista", city: "São Paulo", state: "SP" };
+
+  it("traz o endereço guardado no pedido (para o dono despachar); pedido sem cópia vem com entrega null", async () => {
+    const ana = await clienteDeTeste();
+    const com = await createOrder(item(), ana, endereco);
+    const sem = await createOrder(item(), ana);
+    const lista = await listOrders();
+    expect(lista.find((o) => o.id === com.id)?.entrega).toEqual(endereco);
+    expect(lista.find((o) => o.id === sem.id)?.entrega).toBeNull();
+  });
+});
+
