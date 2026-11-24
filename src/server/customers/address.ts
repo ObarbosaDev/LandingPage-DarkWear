@@ -31,8 +31,9 @@ export type Address = {
   state: string;
 };
 
-/** As 27 unidades da federação. */
-export const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"] as const;
+// As 27 unidades da federação ficam em src/lib/ufs.ts (o formulário, no navegador, usa a mesma lista).
+import { UFS } from "@/lib/ufs";
+export { UFS };
 
 // Qualquer caractere de controle, inclusive os separadores de linha do Unicode.
 const CONTROLE = /[\u0000-\u001f\u007f\u2028\u2029]/;

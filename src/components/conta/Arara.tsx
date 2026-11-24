@@ -20,10 +20,11 @@ export function Arara({ children }: { children: ReactNode }) {
 /**
  * Uma etiqueta da arara.
  * @param titulo  a legenda pequena no topo do papel (também é o nome acessível da seção)
+ * @param id      âncora opcional (ex.: a sacola leva a /conta#endereco)
  */
-export function Etiqueta({ titulo, children }: { titulo: string; children: ReactNode }) {
+export function Etiqueta({ titulo, id, children }: { titulo: string; id?: string; children: ReactNode }) {
   return (
-    <section aria-label={titulo} className="relative flex flex-col items-center px-4 pb-6">
+    <section id={id} aria-label={titulo} className="relative flex flex-col items-center px-4 pb-6 scroll-mt-24">
       <span aria-hidden="true" className="absolute inset-x-0 top-0 block h-1.5 bg-foreground" />
       <span aria-hidden="true" className="mt-1.5 block h-8 w-0.5 bg-foreground" />
       <div className="relative w-full bg-foreground px-6 pb-7 pt-9 text-background">

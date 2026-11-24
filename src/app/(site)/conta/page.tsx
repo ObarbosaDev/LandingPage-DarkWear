@@ -13,6 +13,8 @@ import Link from "next/link";
 import { Arara, Etiqueta } from "@/components/conta/Arara";
 import { ExcluirContaForm, TrocarSenhaForm } from "@/components/conta/FormulariosDaConta";
 import { logoutAction, signOutEverywhereAction } from "@/app/actions-cliente";
+import { EnderecoForm } from "@/components/conta/EnderecoForm";
+import { formatAddress, getAddress } from "@/server/customers/address";
 import { requireCustomer } from "@/server/customers/session";
 
 export const metadata: Metadata = { title: "Minha conta", robots: { index: false } };
@@ -32,9 +34,11 @@ function formatarCelular(d: string): string {
 const botao =
   "border-2 border-background bg-background px-5 py-3 font-display text-xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background";
 
-export default async function ContaPage() {
+export default async function ContaPage({ searchParams }: { searchParams: Promise<{ endereco?: string }> }) {
+  const { endereco: pediuEndereco } = await searchParams;
   // permitirSenhaProvisoria: é a única página que abre para quem entrou com senha provisória, para ele poder trocá-la.
   const c = await requireCustomer("/conta", { permitirSenhaProvisoria: true });
+  const endereco = await getAddress(c.id);
 
   return (
     <section className="bg-background text-foreground">
@@ -49,6 +53,13 @@ export default async function ContaPage() {
         {c.mustChangePassword && (
           <p role="alert" className="mt-8 max-w-2xl border-2 border-foreground p-4 text-lg font-bold">
             Você entrou com uma senha provisória. Troque-a na etiqueta “Senha” abaixo para liberar o resto da conta.
+          </p>
+        )}
+
+        {/* Vindo da sacola sem endereço cadastrado: explica o que falta para comprar. */}
+        {pediuEndereco && !endereco && (
+          <p role="alert" className="mt-8 max-w-2xl border-2 border-foreground p-4 text-lg font-bold">
+            Para finalizar a compra, cadastre o endereço de entrega na etiqueta “Entrega” abaixo.
           </p>
         )}
 
@@ -77,6 +88,19 @@ export default async function ContaPage() {
             <Link href="/conta/pedidos" className={`${botao} mt-5 inline-block`}>
               Meus pedidos
             </Link>
+          </Etiqueta>
+
+          <Etiqueta titulo="Entrega" id="endereco">
+            {endereco ? (
+              <address className="mb-5 flex flex-col gap-0.5 font-mono text-sm font-bold not-italic">
+                {formatAddress(endereco).map((linha) => (
+                  <span key={linha}>{linha}</span>
+                ))}
+              </address>
+            ) : (
+              <p className="mb-5 text-base font-medium">Ainda sem endereço. Ele é necessário para fechar o pedido.</p>
+            )}
+            <EnderecoForm inicial={endereco} />
           </Etiqueta>
 
           <Etiqueta titulo="Senha">
