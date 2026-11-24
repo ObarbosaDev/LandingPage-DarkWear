@@ -23,6 +23,7 @@ import {
   resetCustomerPasswordAction,
   setActiveAction,
   setStockAction,
+  setTrackingAction,
   updateProductAction,
 } from "@/app/admin/actions";
 import { clienteDeTeste, resetDb } from "./helpers/db";
@@ -270,6 +271,7 @@ describe("toda ação do painel recusa quem não é administrador", () => {
     ["cadastrar produto", () => createProductAction({}, f({ name: "X", price: "10", category: "Coleção", sizes: "M", colors: "Preta" }))],
     ["editar produto", () => updateProductAction({}, f({ name: "X", price: "10", category: "Coleção", sizes: "M", colors: "Preta" }))],
     ["ajustar estoque", () => setStockAction(f())],
+    ["informar rastreio", () => setTrackingAction(f({ tracking: "AB123456789BR" }))],
     ["mostrar ou ocultar produto", () => setActiveAction(f())],
     ["gerar senha provisória de cliente", () => resetCustomerPasswordAction({}, f())],
   ];

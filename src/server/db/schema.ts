@@ -122,6 +122,8 @@ export const orders = pgTable(
     shipDistrict: text("ship_district"),
     shipCity: text("ship_city"),
     shipState: text("ship_state"),
+    // Código de rastreio, informado pelo dono ao enviar (migração 0011). Só existe em pedido enviado ou entregue.
+    trackingCode: text("tracking_code"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -41,6 +41,8 @@ export type CustomerOrderDetail = {
   history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; at: Date }[];
   /** Para onde o pedido vai: a cópia do endereço guardada NO PEDIDO (null nos pedidos antigos). */
   entrega: Address | null;
+  /** Código de rastreio informado pelo dono no envio (null = ainda não há). */
+  trackingCode: string | null;
   /** Pagamentos online do pedido (vazio se foi fechado pelo WhatsApp). */
   payments: { status: PaymentStatus; method: string | null; installments: number | null; amountCents: number | null; paidAt: Date | null; createdAt: Date }[];
 };
@@ -102,6 +104,7 @@ export async function getCustomerOrder(customerId: number, number: string): Prom
     totalCents: o.totalCents,
     createdAt: o.createdAt,
     entrega: addressFromOrder(o),
+    trackingCode: o.trackingCode,
     items: itens.map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
     history: historico.map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, at: h.at })),
     payments: pagamentos.map((p) => ({ status: p.status, method: p.method, installments: p.installments, amountCents: p.amountCents, paidAt: p.paidAt, createdAt: p.createdAt })),

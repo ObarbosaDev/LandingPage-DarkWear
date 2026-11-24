@@ -21,7 +21,7 @@ import { requireAdmin } from "@/server/admin/auth";
 import { resetCustomerPassword } from "@/server/admin/customers";
 import { setCustomStatus } from "@/server/admin/custom-orders";
 import { checkImageFile, deleteImageByUrl, saveImage } from "@/server/admin/images";
-import { updateOrderStatus } from "@/server/admin/orders";
+import { setTrackingCode, updateOrderStatus } from "@/server/admin/orders";
 import {
   createProduct,
   getProductRow,
@@ -58,7 +58,13 @@ export async function changeOrderStatusAction(form: FormData): Promise<void> {
   // Dados fora do esperado: ignora sem fazer nada (formulário adulterado).
   if (!Number.isInteger(id) || !ORDER_STATUS.includes(next)) return;
 
-  const result = await updateOrderStatus(id, next);
+  // O código de rastreio (opcional) vem junto quando o botão é "Marcar como enviado".
+  const result = await updateOrderStatus(id, next, { tracking: String(form.get("tracking") ?? "") });
+  if (result === "rastreio-invalido") {
+    // Nada foi mudado: o pedido continua no status de antes e o dono corrige o código.
+    revalidatePath("/admin", "layout");
+    redirect("/admin/pedidos?aviso=rastreio");
+  }
   if (result !== "ok") {
     // Outra pessoa já mudou o pedido (ou a mudança não é permitida): avisa em vez de falhar calado.
     revalidatePath("/admin", "layout");
@@ -67,6 +73,16 @@ export async function changeOrderStatusAction(form: FormData): Promise<void> {
   if (next === "cancelado") refreshCatalog(); // cancelar devolve peças ao estoque
   // Atualiza todas as telas do painel (a lista, o resumo e os contadores).
   revalidatePath("/admin", "layout");
+}
+
+/** Campo "Código de rastreio" + "Salvar" de um pedido já enviado (informar ou corrigir; vazio apaga o código). */
+export async function setTrackingAction(form: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(form.get("id"));
+  if (!Number.isInteger(id)) return;
+  const result = await setTrackingCode(id, String(form.get("tracking") ?? ""));
+  revalidatePath("/admin", "layout");
+  if (result === "rastreio-invalido") redirect("/admin/pedidos?aviso=rastreio");
 }
 
 // ---------- Encomendas personalizadas ----------

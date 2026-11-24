@@ -101,6 +101,11 @@ export default async function PedidosPage({
           Esse pedido já foi alterado por outra pessoa, ou a mudança não é permitida. A esteira foi atualizada.
         </p>
       ) : null}
+      {aviso === "rastreio" ? (
+        <p role="alert" className="border-2 border-foreground p-4 text-lg font-bold">
+          O código de rastreio é inválido: use de 6 a 40 letras e números (ex.: AB123456789BR). Nada foi alterado.
+        </p>
+      ) : null}
 
       {/* Filtros rápidos: todas as colunas, uma coluna só, ou só os pagamentos a conferir. */}
       <nav aria-label="Filtrar a esteira" className="flex flex-wrap gap-2">

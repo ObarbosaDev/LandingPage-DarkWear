@@ -14,6 +14,7 @@ import { customers, orderItems, orders, orderStatusHistory, payments, ORDER_STAT
 import { padraoContem } from "@/server/admin/customers";
 import { addressFromOrder, type Address } from "@/server/customers/address";
 import { cancelInTx, orderNumber } from "@/server/orders";
+import { normalizarRastreio } from "@/lib/tracking";
 
 // De cada status, para quais o dono pode mover o pedido.
 // Define o fluxo: pendente → pago → enviado → entregue. Só dá para cancelar antes do envio.
@@ -39,6 +40,8 @@ export type AdminOrder = {
   customer: { id: number; name: string; email: string; phone: string } | null;
   /** Para onde entregar: a cópia do endereço guardada NO PEDIDO (null nos pedidos antigos e nos sem endereço). */
   entrega: Address | null;
+  /** Código de rastreio informado no envio (null = sem código). */
+  trackingCode: string | null;
   /** Cada mudança de status do pedido, da mais antiga para a mais recente. */
   history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; origin: StatusOrigin; at: Date }[];
   /** Pagamentos online do pedido (Mercado Pago), do mais antigo ao mais recente. Vazio = pedido fechado pelo WhatsApp. */
@@ -134,6 +137,7 @@ export async function listOrders(status?: OrderStatus, limit = 100, busca?: stri
         .map((i) => ({ name: i.name, size: i.size, color: i.color, qty: i.qty, unitPriceCents: i.unitPriceCents })),
       customer: customer && customer.id !== null ? customer : null,
       entrega: addressFromOrder(o),
+      trackingCode: o.trackingCode,
       history: historico
         .filter((h) => h.orderId === o.id)
         .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, at: h.at })),
@@ -143,17 +147,29 @@ export async function listOrders(status?: OrderStatus, limit = 100, busca?: stri
   });
 }
 
-/** Resultado de uma mudança de status: deu certo, não é permitida, ou o pedido não existe. */
-export type StatusResult = "ok" | "invalido" | "nao-encontrado";
+/**
+ * Resultado de uma mudança de status: deu certo, não é permitida, o pedido não existe, ou o código de
+ * rastreio informado não tem formato válido (nesse caso nada foi mudado).
+ */
+export type StatusResult = "ok" | "invalido" | "nao-encontrado" | "rastreio-invalido";
 
 /**
  * Muda o status de um pedido, obedecendo o fluxo de NEXT_STATUS.
  * Cancelar também devolve as peças ao estoque.
  * Devolve "invalido" quando a mudança não é permitida OU quando outra pessoa mudou o pedido
  * no meio do caminho (a tela então avisa o dono).
+ *
+ * @param opcoes.tracking código de rastreio, lido SÓ ao marcar como "enviado" (vazio = sem código; nas outras
+ *                        mudanças é ignorado). Código fora do formato recusa a mudança inteira.
  */
-export async function updateOrderStatus(id: number, next: OrderStatus): Promise<StatusResult> {
+export async function updateOrderStatus(id: number, next: OrderStatus, opcoes: { tracking?: string } = {}): Promise<StatusResult> {
   if (!ORDER_STATUS.includes(next)) return "invalido";
+  // O código só vale no envio. Digitou e é inválido? Recusa antes de tocar no pedido.
+  let codigo: string | null = null;
+  if (next === "enviado" && opcoes.tracking?.trim()) {
+    codigo = normalizarRastreio(opcoes.tracking);
+    if (!codigo) return "rastreio-invalido";
+  }
   const db = await getDb();
 
   // Tudo numa transação, com a linha do pedido TRAVADA: se duas pessoas clicam ao mesmo tempo, a
@@ -167,8 +183,30 @@ export async function updateOrderStatus(id: number, next: OrderStatus): Promise<
     // Cancelar devolve as peças ao estoque, na mesma transação.
     if (next === "cancelado") return (await cancelInTx(tx, id, undefined, "painel")) ? "ok" : "invalido";
 
-    await tx.update(orders).set({ status: next, updatedAt: new Date() }).where(eq(orders.id, id));
+    await tx
+      .update(orders)
+      .set({ status: next, updatedAt: new Date(), ...(codigo ? { trackingCode: codigo } : {}) })
+      .where(eq(orders.id, id));
     await tx.insert(orderStatusHistory).values({ orderId: id, fromStatus: o.status, toStatus: next, origin: "painel" });
+    return "ok";
+  });
+}
+
+/**
+ * Informa, troca ou apaga (texto vazio) o código de rastreio de um pedido JÁ enviado ou entregue.
+ * Serve para corrigir um código digitado errado ou para informar um que o dono não tinha na hora do envio.
+ * Pedido que ainda não saiu não tem código ("invalido"); código fora do formato é "rastreio-invalido".
+ */
+export async function setTrackingCode(id: number, bruto: string): Promise<StatusResult> {
+  const texto = bruto.trim();
+  const codigo = texto ? normalizarRastreio(texto) : null;
+  if (texto && !codigo) return "rastreio-invalido";
+  const db = await getDb();
+  return db.transaction(async (tx): Promise<StatusResult> => {
+    const [o] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, id)).for("update");
+    if (!o) return "nao-encontrado";
+    if (o.status !== "enviado" && o.status !== "entregue") return "invalido";
+    await tx.update(orders).set({ trackingCode: codigo, updatedAt: new Date() }).where(eq(orders.id, id));
     return "ok";
   });
 }

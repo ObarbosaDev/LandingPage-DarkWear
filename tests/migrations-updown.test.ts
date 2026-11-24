@@ -40,6 +40,12 @@ const ids = MIGRATIONS.map((m) => m.id);
 // exemplo, sem precisar contar de novo toda vez que uma migração nova é criada.
 const desde = (prefixo: string) => ids.length - ids.findIndex((i) => i.startsWith(prefixo));
 
+/** Confere no histórico do banco se uma migração está aplicada. */
+async function migracaoAplicada(runner: SqlRunner, id: string): Promise<boolean> {
+  const r = await runner.query("SELECT 1 FROM schema_migrations WHERE id = $1", [id]);
+  return (r.rows as unknown[]).length > 0;
+}
+
 describe("rollbackMigrations (descida)", () => {
   // Por padrão desfaz só a última, deixando as anteriores intactas.
   it("desfaz só a última migração por padrão", async () => {
@@ -50,8 +56,9 @@ describe("rollbackMigrations (descida)", () => {
     expect(await colunasDeClientes()).toContain("address_zip");
     expect(await tabelas()).toContain("product_stock");
     expect(await rollbackMigrations(runner)).toEqual([ids.at(-1)]);
-    // A última migração (o estoque por variação) saiu, mas o endereço e o papel de administrador das anteriores continuam.
-    expect(await tabelas()).not.toContain("product_stock");
+    // A última migração saiu (o estoque por variação, o endereço e o papel de administrador das anteriores continuam).
+    expect(await migracaoAplicada(runner, ids.at(-1)!)).toBe(false);
+    expect(await tabelas()).toContain("product_stock");
     expect(await colunasDeClientes()).toContain("address_zip");
     expect(await colunasDeClientes()).toContain("role");
     expect(await tabelas()).toContain("customers");

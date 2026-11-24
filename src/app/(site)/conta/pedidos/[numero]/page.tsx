@@ -16,6 +16,7 @@ import { formatCents } from "@/lib/money";
 import { eventoDoPedido, palavraDoStatus } from "@/lib/order-labels";
 import { methodLabel, installmentsLabel } from "@/lib/payment-labels";
 import { SITE } from "@/lib/site";
+import { linkDeRastreio } from "@/lib/tracking";
 import { whatsappLink } from "@/lib/whatsapp";
 import { formatAddress } from "@/server/customers/address";
 import { getCustomerOrder } from "@/server/customers/orders";
@@ -86,6 +87,22 @@ export default async function PedidoPage({ params }: { params: Promise<{ numero:
                   <span key={linha}>{linha}</span>
                 ))}
               </address>
+            </div>
+          )}
+
+          {/* Rastreio: o código que o dono informou ao enviar (com link quando é dos Correios). */}
+          {pedido.trackingCode && (
+            <div className="mt-8 border-t-2 border-dashed border-background pt-5">
+              <p className="text-sm font-bold uppercase tracking-[0.15em]">Rastreio</p>
+              <p className="mt-2 text-base font-medium">
+                {linkDeRastreio(pedido.trackingCode) ? (
+                  <a href={linkDeRastreio(pedido.trackingCode)!} className="font-mono text-xl font-bold underline underline-offset-4">
+                    {pedido.trackingCode}
+                  </a>
+                ) : (
+                  <span className="font-mono text-xl font-bold">{pedido.trackingCode}</span>
+                )}
+              </p>
             </div>
           )}
 

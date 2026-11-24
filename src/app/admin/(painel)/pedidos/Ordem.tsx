@@ -10,7 +10,8 @@
 // que confere o acesso do administrador por conta própria.
 // ============================================================================
 
-import { changeOrderStatusAction } from "@/app/admin/actions";
+import { changeOrderStatusAction, setTrackingAction } from "@/app/admin/actions";
+import { linkDeRastreio } from "@/lib/tracking";
 import { formatCents } from "@/lib/money";
 import { installmentsLabel, methodLabel } from "@/lib/payment-labels";
 import { tempoRelativo } from "@/lib/relative-time";
@@ -81,9 +82,22 @@ export function Ordem({ o }: { o: AdminOrder }) {
         {(proximo || podeCancelar) && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {proximo && (
-              <form action={changeOrderStatusAction} className="flex-1">
+              <form action={changeOrderStatusAction} className="flex flex-1 flex-col gap-2">
                 <input type="hidden" name="id" value={o.id} />
                 <input type="hidden" name="next" value={proximo} />
+                {/* Ao enviar, o dono pode já informar o código de rastreio (opcional). */}
+                {proximo === "enviado" && (
+                  <label className="flex flex-col gap-1 text-xs font-bold uppercase tracking-[0.1em]">
+                    Código de rastreio (opcional)
+                    <input
+                      name="tracking"
+                      maxLength={60}
+                      autoComplete="off"
+                      placeholder="AB123456789BR"
+                      className="border-2 border-background bg-transparent px-3 py-2 text-base font-bold normal-case tracking-normal placeholder:text-background"
+                    />
+                  </label>
+                )}
                 <button
                   type="submit"
                   className="w-full border-2 border-background bg-background px-3 py-2.5 font-display text-xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background"
@@ -105,6 +119,41 @@ export function Ordem({ o }: { o: AdminOrder }) {
                 </ConfirmButton>
               </form>
             )}
+          </div>
+        )}
+
+        {/* Rastreio: o código do pedido enviado e um campo para informar ou corrigir. */}
+        {(o.status === "enviado" || o.status === "entregue") && (
+          <div className="mt-4 border-t-2 border-dashed border-background pt-3">
+            <p className="text-xs font-bold uppercase tracking-[0.12em]">
+              Rastreio:{" "}
+              {o.trackingCode ? (
+                linkDeRastreio(o.trackingCode) ? (
+                  <a href={linkDeRastreio(o.trackingCode)!} className="underline underline-offset-4">
+                    {o.trackingCode}
+                  </a>
+                ) : (
+                  o.trackingCode
+                )
+              ) : (
+                "sem código"
+              )}
+            </p>
+            <form action={setTrackingAction} className="mt-2 flex gap-2">
+              <input type="hidden" name="id" value={o.id} />
+              <input
+                name="tracking"
+                aria-label={`Código de rastreio do pedido ${o.number}`}
+                defaultValue={o.trackingCode ?? ""}
+                maxLength={60}
+                autoComplete="off"
+                placeholder="AB123456789BR"
+                className="min-w-0 flex-1 border-2 border-background bg-transparent px-3 py-2 text-base font-bold placeholder:text-background"
+              />
+              <button type="submit" className="border-2 border-background px-3 py-2 text-sm font-bold uppercase transition-colors hover:bg-background hover:text-foreground">
+                Salvar
+              </button>
+            </form>
           </div>
         )}
 
