@@ -36,16 +36,19 @@ function novoBanco() {
 }
 
 const ids = MIGRATIONS.map((m) => m.id);
+// Quantas migrações há da que começa com o prefixo até a última. Os testes descem "até a 0004", por
+// exemplo, sem precisar contar de novo toda vez que uma migração nova é criada.
+const desde = (prefixo: string) => ids.length - ids.findIndex((i) => i.startsWith(prefixo));
 
 describe("rollbackMigrations (descida)", () => {
   // Por padrão desfaz só a última, deixando as anteriores intactas.
   it("desfaz só a última migração por padrão", async () => {
     const { runner, tabelas, historico } = novoBanco();
     await runMigrations(runner);
-    expect(await tabelas()).toContain("product_images");
+    expect(await tabelas()).toContain("customers");
     expect(await rollbackMigrations(runner)).toEqual([ids.at(-1)]);
-    expect(await tabelas()).not.toContain("product_images");
-    expect(await tabelas()).toContain("payments");
+    expect(await tabelas()).not.toContain("customers");
+    expect(await tabelas()).toContain("product_images");
     // As anteriores continuam: o banco fica no estado exato de antes da última.
     expect(await tabelas()).toContain("order_status_history");
     expect(await tabelas()).toContain("rate_limits");
@@ -55,11 +58,12 @@ describe("rollbackMigrations (descida)", () => {
   it("desfaz várias, da mais nova para a mais antiga", async () => {
     const { runner, restricoes, tabelas, historico } = novoBanco();
     await runMigrations(runner);
-    expect(await rollbackMigrations(runner, 4)).toEqual(ids.slice(-4).reverse());
-    expect(await historico()).toEqual(ids.slice(0, -4));
+    expect(await rollbackMigrations(runner, desde("0003"))).toEqual(ids.slice(-desde("0003")).reverse());
+    expect(await historico()).toEqual(ids.slice(0, -desde("0003")));
     expect(await tabelas()).not.toContain("order_status_history");
     expect(await tabelas()).not.toContain("payments");
     expect(await tabelas()).not.toContain("product_images");
+    expect(await tabelas()).not.toContain("customers");
     // As regras da 0003 saíram junto.
     const r = await restricoes();
     for (const nome of ["products_categoria", "orders_status_valido", "order_items_produto_fk"]) expect(r, nome).not.toContain(nome);
@@ -85,8 +89,8 @@ describe("rollbackMigrations (descida)", () => {
     await c.exec("INSERT INTO orders (status, total_cents) VALUES ('pago', 2000)");
     await c.exec("INSERT INTO order_items (order_id, product_slug, name, size, color, qty, unit_price_cents) VALUES (1, 'camisa-x', 'X', 'M', 'Preta', 2, 1000)");
 
-    await rollbackMigrations(runner, 3); // desfaz as três últimas (inclui o histórico de status)
-    expect(await runMigrations(runner)).toEqual(ids.slice(-3));
+    await rollbackMigrations(runner, desde("0004")); // desfaz da 0004 (histórico de status) até a última
+    expect(await runMigrations(runner)).toEqual(ids.slice(-desde("0004")));
 
     // Pedido, item e produto continuam, e o histórico foi reconstruído a partir do status atual.
     expect((await c.query("SELECT count(*)::int AS n FROM orders")).rows).toEqual([{ n: 1 }]);
