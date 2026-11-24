@@ -89,7 +89,7 @@ export function Etiqueta({ next }: { next: string }) {
             </button>
             <p className="text-base font-medium">
               Já tem conta?{" "}
-              <Link href={`/conta/entrar?next=${encodeURIComponent(next)}`} className="font-bold underline underline-offset-4">
+              <Link href={next ? `/conta/entrar?next=${encodeURIComponent(next)}` : "/conta/entrar"} className="font-bold underline underline-offset-4">
                 Entrar
               </Link>
             </p>

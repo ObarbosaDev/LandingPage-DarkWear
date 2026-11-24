@@ -16,7 +16,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Provador } from "@/components/conta/Provador";
-import { currentCustomer, safeNext } from "@/server/customers/session";
+import { currentCustomer, destinoDaUrl } from "@/server/customers/session";
 
 export const metadata: Metadata = { title: "Entrar", robots: { index: false } };
 
@@ -25,10 +25,11 @@ export const instant = false;
 
 export default async function EntrarPage({ searchParams }: { searchParams: Promise<{ next?: string | string[]; reentrar?: string }> }) {
   const { next: bruto, reentrar } = await searchParams;
-  const next = safeNext(Array.isArray(bruto) ? bruto[0] : bruto);
+  // Vazio quando a URL não pediu destino: é o que deixa o administrador ir ao painel (ver destinoDaUrl).
+  const next = destinoDaUrl(bruto);
   // Já entrou? Não há por que mostrar a porta: segue para o destino (a não ser que o painel tenha pedido para
   // entrar de novo).
-  if (!reentrar && (await currentCustomer())) redirect(next);
+  if (!reentrar && (await currentCustomer())) redirect(next || "/conta");
 
   return (
     <section className="bg-background text-foreground">

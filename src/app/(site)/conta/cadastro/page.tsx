@@ -8,7 +8,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Etiqueta } from "@/components/conta/Etiqueta";
-import { currentCustomer, safeNext } from "@/server/customers/session";
+import { currentCustomer, destinoDaUrl } from "@/server/customers/session";
 
 export const metadata: Metadata = { title: "Criar conta", robots: { index: false } };
 
@@ -17,8 +17,8 @@ export const instant = false;
 
 export default async function CadastroPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
   const { next: bruto } = await searchParams;
-  const next = safeNext(Array.isArray(bruto) ? bruto[0] : bruto);
-  if (await currentCustomer()) redirect(next);
+  const next = destinoDaUrl(bruto);
+  if (await currentCustomer()) redirect(next || "/conta");
 
   return (
     <section className="bg-background text-foreground">

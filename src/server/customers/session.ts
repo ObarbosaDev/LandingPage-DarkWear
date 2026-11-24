@@ -135,3 +135,15 @@ export function safeNext(bruto: unknown, padrao: string = "/conta"): string {
   const permitido = (c: string) => c === "/conta" || c.startsWith("/conta/") || c === "/carrinho";
   return permitido(caminho) && permitido(decodificado) ? bruto : padrao;
 }
+
+/**
+ * O destino que a tela de entrar (e a de cadastro) repassa ao formulário, a partir do "?next=" da URL.
+ * SEM destino na URL devolve VAZIO, de propósito (e não o padrão "/conta"): é o vazio que deixa a ação de entrar
+ * levar o administrador ao painel. Se a tela repassasse "/conta" sempre, o administrador cairia na conta.
+ * Com destino, ele passa por safeNext (um destino suspeito vira "/conta").
+ */
+export function destinoDaUrl(bruto: string | string[] | undefined): string {
+  const valor = Array.isArray(bruto) ? bruto[0] : bruto;
+  return valor ? safeNext(valor) : "";
+}
+

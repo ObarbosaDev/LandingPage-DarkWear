@@ -95,7 +95,7 @@ export function Provador({ next }: { next: string }) {
 
         <p className="mt-6 text-base font-medium">
           Ainda não tem conta?{" "}
-          <Link href={`/conta/cadastro?next=${encodeURIComponent(next)}`} className="font-bold underline underline-offset-4">
+          <Link href={next ? `/conta/cadastro?next=${encodeURIComponent(next)}` : "/conta/cadastro"} className="font-bold underline underline-offset-4">
             Criar a minha
           </Link>
         </p>

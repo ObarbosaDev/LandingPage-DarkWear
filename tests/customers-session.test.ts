@@ -13,6 +13,7 @@ import {
   currentCustomer,
   endCustomerSession,
   requireCustomer,
+  destinoDaUrl,
   safeNext,
   signSession,
   startCustomerSession,
@@ -290,3 +291,22 @@ describe("safeNext", () => {
     expect(safeNext("https://x", "/carrinho")).toBe("/carrinho");
   });
 });
+
+// A tela de entrar repassa o destino que veio na URL ao formulário. Quando NÃO veio nenhum, ela tem de repassar
+// "vazio" (e não o padrão "/conta"): é o vazio que deixa a ação de entrar levar o administrador ao painel. Se a
+// tela mandasse "/conta" sempre, o administrador nunca chegaria ao painel por ela (defeito já ocorrido).
+describe("destinoDaUrl (o que a tela de entrar repassa ao formulário)", () => {
+  it("sem destino na URL devolve vazio, nunca o padrão", () => {
+    for (const v of [undefined, "", [], [""]]) expect(destinoDaUrl(v as never), JSON.stringify(v)).toBe("");
+  });
+
+  it("destino seguro passa como veio; primeiro valor se vier repetido", () => {
+    expect(destinoDaUrl("/carrinho")).toBe("/carrinho");
+    expect(destinoDaUrl(["/conta/pedidos", "/carrinho"])).toBe("/conta/pedidos");
+  });
+
+  it("destino perigoso vira o padrão seguro (/conta), não vazio: quem pediu algo suspeito não vai ao painel de brinde", () => {
+    for (const v of ["https://outro.site", "//x.com", "/admin", "javascript:alert(1)", "/conta/../admin"]) expect(destinoDaUrl(v), v).toBe("/conta");
+  });
+});
+
