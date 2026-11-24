@@ -1,8 +1,8 @@
 // ============================================================================
 // Página da LOJA: /loja (e /loja?q=termo, quando o cliente usa a busca do cabeçalho).
 //
-// Estrutura: uma abertura com o título "Loja" e o total de peças em numeral gigante, seguida do
-// índice de peças (IndiceLoja): nomes enormes em linhas, com a foto aparecendo ao passar o mouse.
+// Estrutura: uma abertura com o título "Loja" e o total de peças em numeral gigante, seguida da vitrine
+// (Vitrine): as peças em quadrados, com a foto inteira à vista, o nome e o preço embaixo.
 //
 // Por que há <Suspense> aqui: a busca (?q=) só é conhecida na hora do pedido, então a lista de
 // resultados é "dinâmica". Envolvê-la em Suspense deixa o resto da página (título, abertura)
@@ -12,7 +12,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getProducts } from "@/server/catalog";
-import { IndiceLoja } from "@/components/IndiceLoja";
+import { Vitrine } from "@/components/Vitrine";
 
 export const metadata: Metadata = { title: "Loja" };
 
@@ -32,7 +32,7 @@ async function Contagem() {
 
 /**
  * A lista de peças, já filtrada pela busca. Lê o parâmetro ?q= do endereço, procura no NOME das peças
- * (sem diferenciar maiúsculas de minúsculas) e entrega o resultado ao índice.
+ * (sem diferenciar maiúsculas de minúsculas) e entrega o resultado à vitrine.
  */
 async function Resultados({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
@@ -56,7 +56,7 @@ async function Resultados({ searchParams }: { searchParams: Promise<{ q?: string
           Nenhuma peça com esse nome. Tente outro termo.
         </p>
       ) : (
-        <IndiceLoja products={list} />
+        <Vitrine products={list} />
       )}
     </>
   );

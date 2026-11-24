@@ -223,7 +223,7 @@ Um caminho sugerido para entender o sistema:
 | Rota | Descrição |
 | --- | --- |
 | `/` | Home: título, arco de produtos, catálogo, como funciona e envio de arte |
-| `/loja` | Catálogo em índice tipográfico, com filtro por categoria, busca (`?q=termo`) e a foto da peça seguindo o mouse |
+| `/loja` | Vitrine de quadrados (foto, nome e preço de cada peça à vista), com busca (`?q=termo`) |
 | `/loja/[slug]` | Página de um produto, com lupa para ampliar a estampa |
 | `/personalizar` | Encomenda com arte própria: a abertura é a área de soltar o arquivo |
 | `/carrinho` | Sacola em forma de recibo, com o fechamento pelo WhatsApp |

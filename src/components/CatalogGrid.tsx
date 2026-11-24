@@ -1,6 +1,6 @@
 // ============================================================================
 // Catálogo em GRADE com filtro por categoria, usado na HOME (seção "Catálogo").
-// (A página /loja usa outro formato, o índice tipográfico: IndiceLoja.)
+// (A página /loja usa outro formato, a vitrine de quadrados: Vitrine.)
 //
 // Mostra botões de filtro (Todos, e uma categoria para cada tipo de peça existente) com a contagem
 // de peças, e abaixo a grade de blocos (ProductTile). É componente de navegador porque guarda
