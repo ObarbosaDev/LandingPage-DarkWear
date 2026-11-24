@@ -18,12 +18,12 @@ const BLOCOS = [
   {
     titulo: "Que dados guardamos",
     texto:
-      "Quando você cria uma conta: nome, e-mail, celular e a sua senha (a senha é guardada apenas de forma embaralhada, nunca em texto: nem nós conseguimos lê-la). Quando você compra: as peças do pedido, os valores, as datas e a situação do pagamento. Não pedimos CPF.",
+      "Quando você cria uma conta: nome, e-mail, celular e a sua senha (a senha é guardada apenas de forma embaralhada, nunca em texto: nem nós conseguimos lê-la). Quando você cadastra a entrega: o endereço (CEP, rua, número, complemento, bairro, cidade e estado). Quando você compra: as peças do pedido, os valores, as datas, a situação do pagamento e uma cópia do endereço usado naquele pedido. Não pedimos CPF.",
   },
   {
     titulo: "Para que usamos",
     texto:
-      "Para identificar você nos pedidos, mostrar o seu histórico, falar com você sobre a entrega pelo WhatsApp e cumprir obrigações da loja. Não vendemos nem compartilhamos os seus dados para propaganda.",
+      "Para identificar você nos pedidos, mostrar o seu histórico, falar com você sobre a entrega pelo WhatsApp e cumprir obrigações da loja. Não vendemos nem compartilhamos os seus dados para propaganda. Para preencher o endereço sozinho, enviamos apenas o CEP (8 números) a um serviço público de consulta de CEP, o ViaCEP, e nada mais sobre você.",
   },
   {
     titulo: "O pagamento",
@@ -33,7 +33,7 @@ const BLOCOS = [
   {
     titulo: "Por quanto tempo",
     texto:
-      "Os dados da conta ficam enquanto a conta existir. Os pedidos precisam ser guardados pela loja por exigência legal e fiscal, mas depois que você exclui a conta eles deixam de estar ligados ao seu nome, e-mail e celular.",
+      "Os dados da conta ficam enquanto a conta existir. Os pedidos precisam ser guardados pela loja por exigência legal e fiscal, mas depois que você exclui a conta eles deixam de estar ligados ao seu nome, e-mail e celular, e o endereço é apagado da conta e dos pedidos já entregues ou cancelados. Pedidos ainda em andamento mantêm o endereço até a entrega, porque a loja precisa dele para enviar.",
   },
   {
     titulo: "Seus direitos",
