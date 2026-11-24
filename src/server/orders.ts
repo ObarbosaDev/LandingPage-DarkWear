@@ -88,10 +88,11 @@ function parseItems(input: unknown): OrderItemInput[] {
  * Se QUALQUER item falhar (sem estoque, peça oculta, tamanho inexistente...), nada é gravado e o
  * estoque dos outros itens não é mexido ("tudo ou nada").
  *
- * @param input itens do carrinho, como vieram do navegador (ainda não confiáveis)
+ * @param input      itens do carrinho, como vieram do navegador (ainda não confiáveis)
+ * @param customerId cliente que está comprando (vem da sessão, nunca do navegador)
  * @throws OrderError com a mensagem a mostrar ao cliente
  */
-export async function createOrder(input: unknown): Promise<OrderView> {
+export async function createOrder(input: unknown, customerId?: number): Promise<OrderView> {
   const lines = parseItems(input);
   const db = await getDb();
 
@@ -133,7 +134,8 @@ export async function createOrder(input: unknown): Promise<OrderView> {
     // Cabeçalho do pedido. O status nasce "pendente" (padrão da tabela) até o dono confirmar o pagamento.
     const [order] = await tx
       .insert(orders)
-      .values({ totalCents: total })
+      // Quem comprou (nulo só para testes e pedidos antigos; a rota exige login, ver /api/orders).
+      .values({ totalCents: total, customerId: customerId ?? null })
       .returning({ id: orders.id, status: orders.status });
 
     // Primeira linha do histórico: o pedido nasceu (não veio de nenhum status anterior).
