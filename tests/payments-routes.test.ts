@@ -15,6 +15,7 @@ import { POST as webhook } from "@/app/api/webhooks/mercadopago/route";
 import { POST as criarPedido } from "@/app/api/orders/route";
 import { GET as config } from "@/app/api/payments/config/route";
 import { createOrder } from "@/server/orders";
+import { saveAddress } from "@/server/customers/address";
 import { startCustomerSession } from "@/server/customers/session";
 import { clienteDeTeste, resetDb } from "./helpers/db";
 
@@ -86,6 +87,8 @@ beforeEach(async () => {
   await (await getDb()).delete(rateLimits); // o limite de pedidos por origem não pode acumular entre testes
   jar.clear();
   dono = await clienteDeTeste();
+  // Comprar exige endereço de entrega.
+  await saveAddress(dono, { zip: "01310100", street: "Avenida Paulista", number: "1000", complement: null, district: "Bela Vista", city: "São Paulo", state: "SP" });
   await startCustomerSession(dono, 1);
   process.env.MERCADOPAGO_ACCESS_TOKEN = "TEST-token";
   delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
