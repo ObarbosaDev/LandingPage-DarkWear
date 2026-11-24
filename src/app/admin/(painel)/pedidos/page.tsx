@@ -15,6 +15,7 @@ import { requireAdmin } from "@/server/admin/auth";
 import { NEXT_STATUS, listOrders } from "@/server/admin/orders";
 import { ORDER_STATUS, type OrderStatus, type StatusOrigin } from "@/server/db/schema";
 import { formatCents } from "@/lib/money";
+import { installmentsLabel, methodLabel } from "@/lib/payment-labels";
 import { changeOrderStatusAction } from "@/app/admin/actions";
 import { ConfirmButton } from "../ConfirmButton";
 
@@ -94,6 +95,33 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
                   </li>
                 ))}
               </ul>
+
+              {/* Alerta: pagamento aprovado que NÃO deixou o pedido pago. O cliente já pagou, então o dono
+                  precisa agir (estornar no Mercado Pago ou reativar o pedido à mão). */}
+              {o.alerta ? (
+                <p role="alert" className="border-t-2 border-foreground bg-foreground px-5 py-3 text-base font-bold text-background">
+                  {o.alerta === "cancelado"
+                    ? "ATENÇÃO: o cliente pagou, mas este pedido está cancelado (as peças já voltaram ao estoque). Estorne o pagamento no Mercado Pago ou refaça o pedido."
+                    : "ATENÇÃO: há um pagamento aprovado com valor diferente do total do pedido. Confira no Mercado Pago antes de enviar."}
+                </p>
+              ) : null}
+
+              {/* Pagamentos online (Mercado Pago): forma, parcelas, valor e situação. Pedido fechado pelo
+                  WhatsApp não tem esta linha. Tentativas "iniciado" (o cliente abriu a página de
+                  pagamento e ainda não pagou) aparecem como "aguardando". */}
+              {o.payments.length > 0 ? (
+                <ul className="flex flex-col gap-1 border-t-2 border-foreground px-5 py-3 font-mono text-xs uppercase tracking-[0.1em]">
+                  {o.payments.map((p, k) => (
+                    <li key={k}>
+                      Pagamento online · {p.status === "iniciado" ? "aguardando" : p.status}
+                      {p.status !== "iniciado" ? ` · ${methodLabel(p.method)}` : ""}
+                      {installmentsLabel(p.method, p.installments) ? ` · ${installmentsLabel(p.method, p.installments)}` : ""}
+                      {p.amountCents != null ? ` · ${formatCents(p.amountCents)}` : ""}
+                      {p.paidAt ? ` · pago em ${dataHora.format(p.paidAt)}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
 
               {/* Histórico do pedido: cada mudança de status com a data e quem a fez (cliente, painel ou
                   prazo de expiração). Responde "quando esse pedido foi pago?". */}

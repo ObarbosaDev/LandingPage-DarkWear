@@ -10,7 +10,7 @@
 import "server-only";
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { orderItems, orders, orderStatusHistory, ORDER_STATUS, type OrderStatus, type StatusOrigin } from "@/server/db/schema";
+import { orderItems, orders, orderStatusHistory, payments, ORDER_STATUS, type OrderStatus, type PaymentStatus, type StatusOrigin } from "@/server/db/schema";
 import { cancelInTx, orderNumber } from "@/server/orders";
 
 // De cada status, para quais o dono pode mover o pedido.
@@ -35,7 +35,28 @@ export type AdminOrder = {
   items: { name: string; size: string; color: string; qty: number; unitPriceCents: number }[];
   /** Cada mudança de status do pedido, da mais antiga para a mais recente. */
   history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; origin: StatusOrigin; at: Date }[];
+  /** Pagamentos online do pedido (Mercado Pago), do mais antigo ao mais recente. Vazio = pedido fechado pelo WhatsApp. */
+  payments: { status: PaymentStatus; method: string | null; installments: number | null; amountCents: number | null; paidAt: Date | null; createdAt: Date }[];
+  /**
+   * Pagamento aprovado que NÃO levou o pedido a "pago" e que o dono precisa resolver:
+   * "cancelado" (pagou depois de o pedido expirar) ou "valor" (valor diferente do total).
+   * null = nada a resolver.
+   */
+  alerta: "cancelado" | "valor" | null;
 };
+
+/**
+ * Decide se um pedido tem um pagamento aprovado que exige a atenção do dono (ver AdminOrder.alerta).
+ * Pedido cancelado com pagamento aprovado: o cliente pagou e não vai receber, é preciso estornar ou
+ * reativar à mão. Pedido ainda pendente com pagamento aprovado: o valor não bateu com o total.
+ */
+export function alertaDePagamento(status: OrderStatus, totalCents: number, pagamentos: AdminOrder["payments"]): AdminOrder["alerta"] {
+  const aprovados = pagamentos.filter((p) => p.status === "aprovado");
+  if (aprovados.length === 0) return null;
+  if (status === "cancelado") return "cancelado";
+  if (status === "pendente" && aprovados.some((p) => p.amountCents !== totalCents)) return "valor";
+  return null;
+}
 
 /**
  * Lista os pedidos, do mais novo para o mais antigo.
@@ -68,7 +89,18 @@ export async function listOrders(status?: OrderStatus, limit = 100): Promise<Adm
     .where(inArray(orderStatusHistory.orderId, rows.map((r) => r.id)))
     .orderBy(asc(orderStatusHistory.at), asc(orderStatusHistory.id));
 
-  return rows.map((o) => ({
+  // Pagamentos online, também numa consulta só.
+  const pagamentos = await db
+    .select()
+    .from(payments)
+    .where(inArray(payments.orderId, rows.map((r) => r.id)))
+    .orderBy(asc(payments.createdAt), asc(payments.id));
+
+  return rows.map((o) => {
+    const meus = pagamentos
+      .filter((p) => p.orderId === o.id)
+      .map((p) => ({ status: p.status, method: p.method, installments: p.installments, amountCents: p.amountCents, paidAt: p.paidAt, createdAt: p.createdAt }));
+    return {
     id: o.id,
     number: orderNumber(o.id),
     status: o.status,
@@ -80,7 +112,10 @@ export async function listOrders(status?: OrderStatus, limit = 100): Promise<Adm
     history: historico
       .filter((h) => h.orderId === o.id)
       .map((h) => ({ fromStatus: h.fromStatus, toStatus: h.toStatus, origin: h.origin, at: h.at })),
-  }));
+    payments: meus,
+    alerta: alertaDePagamento(o.status, o.totalCents, meus),
+    };
+  });
 }
 
 /** Resultado de uma mudança de status: deu certo, não é permitida, ou o pedido não existe. */
