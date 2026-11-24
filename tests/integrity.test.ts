@@ -13,7 +13,7 @@ import { getDb } from "@/server/db";
 import { orderItems, orders, orderStatusHistory, products } from "@/server/db/schema";
 import { createOrder, expirePendingOrders } from "@/server/orders";
 import { updateOrderStatus, listOrders } from "@/server/admin/orders";
-import { resetDb } from "./helpers/db";
+import { clienteDeTeste, resetDb } from "./helpers/db";
 
 beforeEach(resetDb);
 
@@ -90,7 +90,7 @@ describe("regras do banco: pedidos", () => {
 
   // Chave estrangeira: um item de pedido só pode apontar para uma peça que existe.
   it("recusa item de pedido de uma peça inexistente", async () => {
-    const p = await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }]);
+    const p = await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }], await clienteDeTeste());
     expect(
       await recusado(`INSERT INTO order_items (order_id, product_slug, name, size, color, qty, unit_price_cents)
                       VALUES (${p.id}, 'nao-existe', 'X', 'M', 'Preta', 1, 100)`),
@@ -98,14 +98,14 @@ describe("regras do banco: pedidos", () => {
   });
 
   it("não deixa apagar uma peça que já tem pedido", async () => {
-    await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }]);
+    await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }], await clienteDeTeste());
     expect(await recusado("DELETE FROM products WHERE slug = 'oversized-gt3-rs'")).toBe(true);
     // Uma peça sem pedidos pode ser apagada.
     expect(await recusado("DELETE FROM products WHERE slug = 'camisa-mumia'")).toBe(false);
   });
 
   it("recusa quantidade fora de 1 a 99 no item do pedido", async () => {
-    const p = await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }]);
+    const p = await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }], await clienteDeTeste());
     for (const qty of [0, -1, 100]) {
       expect(
         await recusado(`INSERT INTO order_items (order_id, product_slug, name, size, color, qty, unit_price_cents)
@@ -128,7 +128,7 @@ describe("gatilho de updated_at", () => {
   });
 
   it("vale também para pedidos", async () => {
-    const p = await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }]);
+    const p = await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }], await clienteDeTeste());
     const db = await getDb();
     await db.execute(sql.raw(`UPDATE orders SET updated_at = '2020-01-01' WHERE id = ${p.id}`));
     await db.execute(sql.raw(`UPDATE orders SET total_cents = total_cents WHERE id = ${p.id}`));
@@ -148,26 +148,26 @@ describe("histórico de status", () => {
   }
 
   it("registra a criação do pedido", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     expect(await historico(p.id)).toEqual(["início→pendente (pedido)"]);
   });
 
   it("registra cada mudança feita pelo painel", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await updateOrderStatus(p.id, "pago");
     await updateOrderStatus(p.id, "enviado");
     expect(await historico(p.id)).toEqual(["início→pendente (pedido)", "pendente→pago (painel)", "pago→enviado (painel)"]);
   });
 
   it("registra o cancelamento pelo painel com o status de onde veio", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await updateOrderStatus(p.id, "pago");
     await updateOrderStatus(p.id, "cancelado");
     expect((await historico(p.id)).at(-1)).toBe("pago→cancelado (painel)");
   });
 
   it("registra a expiração como 'prazo', e não como o painel", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     const db = await getDb();
     await db.update(orders).set({ createdAt: new Date(Date.now() - 100 * 3600_000) }).where(eq(orders.id, p.id));
     expect(await expirePendingOrders(48)).toBe(1);
@@ -176,19 +176,19 @@ describe("histórico de status", () => {
 
   // Mudança recusada não pode deixar rastro no histórico.
   it("não registra mudanças recusadas", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await updateOrderStatus(p.id, "enviado"); // pula o "pago": recusado
     expect(await historico(p.id)).toEqual(["início→pendente (pedido)"]);
   });
 
   it("três cancelamentos ao mesmo tempo geram uma linha só de histórico", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await Promise.all([updateOrderStatus(p.id, "cancelado"), updateOrderStatus(p.id, "cancelado"), updateOrderStatus(p.id, "cancelado")]);
     expect((await historico(p.id)).filter((l) => l.includes("→cancelado"))).toHaveLength(1);
   });
 
   it("aparece na listagem do painel, da mais antiga para a mais recente", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await updateOrderStatus(p.id, "pago");
     const [pedido] = await listOrders();
     expect(pedido.history.map((h) => h.toStatus)).toEqual(["pendente", "pago"]);
@@ -198,8 +198,8 @@ describe("histórico de status", () => {
 describe("consistência dos pedidos", () => {
   // O total do pedido precisa ser exatamente a soma dos itens (preço congelado x quantidade).
   it("o total de cada pedido bate com a soma dos itens", async () => {
-    await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 3 }, { slug: "camisa-mumia", size: "G", color: "Branca", qty: 2 }]);
-    await createOrder([{ slug: "eu-faco-programa", size: "P", color: "Preta", qty: 1 }]);
+    await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 3 }, { slug: "camisa-mumia", size: "G", color: "Branca", qty: 2 }], await clienteDeTeste());
+    await createOrder([{ slug: "eu-faco-programa", size: "P", color: "Preta", qty: 1 }], await clienteDeTeste());
     const db = await getDb();
     const todos = await db.select().from(orders);
     const itens = await db.select().from(orderItems);

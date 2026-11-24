@@ -11,7 +11,7 @@ import { getDb } from "@/server/db";
 import { orders } from "@/server/db/schema";
 import { createOrder, expirePendingOrders } from "@/server/orders";
 import { updateOrderStatus } from "@/server/admin/orders";
-import { resetDb, stockOf } from "./helpers/db";
+import { clienteDeTeste, resetDb, stockOf } from "./helpers/db";
 
 // Fora de uma requisição do Next, o revalidateTag não tem onde atuar: nos testes ele só é observado.
 // (vi.fn() é uma "função espiã": registra se e como foi chamada, para o teste conferir depois.)
@@ -46,7 +46,7 @@ async function statusDe(id: number) {
 
 describe("expirePendingOrders", () => {
   it("cancela pedido pendente antigo e devolve as peças", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await envelhecer(p.id, 49);
     expect(await expirePendingOrders(48)).toBe(1);
     expect(await statusDe(p.id)).toBe("cancelado");
@@ -55,7 +55,7 @@ describe("expirePendingOrders", () => {
 
   // 47 horas é menos que o prazo de 48: o pedido ainda pode ser pago.
   it("não mexe em pedido recente", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await envelhecer(p.id, 47);
     expect(await expirePendingOrders(48)).toBe(0);
     expect(await statusDe(p.id)).toBe("pendente");
@@ -65,8 +65,8 @@ describe("expirePendingOrders", () => {
   // Dois pedidos MUITO antigos (500 h), mas já pagos/enviados: pertencem a clientes que pagaram, então
   // a expiração jamais pode tocá-los.
   it("não cancela pedido que já foi pago, enviado ou entregue", async () => {
-    const pago = await createOrder([GT3]);
-    const enviado = await createOrder([GT3]);
+    const pago = await createOrder([GT3], await clienteDeTeste());
+    const enviado = await createOrder([GT3], await clienteDeTeste());
     await updateOrderStatus(pago.id, "pago");
     await updateOrderStatus(enviado.id, "pago");
     await updateOrderStatus(enviado.id, "enviado");
@@ -80,7 +80,7 @@ describe("expirePendingOrders", () => {
 
   // Se o cron rodar duas vezes juntas (ou repetir), as peças não podem voltar duas vezes ao estoque.
   it("não devolve estoque em dobro se rodar duas vezes ou ao mesmo tempo", async () => {
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await envelhecer(p.id, 100);
     const r = await Promise.all([expirePendingOrders(48), expirePendingOrders(48)]);
     expect(r.reduce((a, b) => a + b, 0)).toBe(1);
@@ -89,9 +89,9 @@ describe("expirePendingOrders", () => {
   });
 
   it("cancela vários de uma vez", async () => {
-    const a = await createOrder([GT3]);
-    const b = await createOrder([{ ...GT3, qty: 3 }]);
-    const novo = await createOrder([GT3]);
+    const a = await createOrder([GT3], await clienteDeTeste());
+    const b = await createOrder([{ ...GT3, qty: 3 }], await clienteDeTeste());
+    const novo = await createOrder([GT3], await clienteDeTeste());
     await envelhecer(a.id, 60);
     await envelhecer(b.id, 72);
     expect(await expirePendingOrders(48)).toBe(2);
@@ -122,7 +122,7 @@ describe("rota do cron", () => {
   it("com o segredo certo, cancela os antigos e avisa a loja", async () => {
     process.env.CRON_SECRET = "segredo-do-cron";
     process.env.PENDING_ORDER_HOURS = "24";
-    const p = await createOrder([GT3]);
+    const p = await createOrder([GT3], await clienteDeTeste());
     await envelhecer(p.id, 30);
     const r = await chamar("Bearer segredo-do-cron");
     expect(r.status).toBe(200);

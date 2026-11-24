@@ -12,7 +12,7 @@ import { orders, payments } from "@/server/db/schema";
 import { alertaDePagamento, listOrders } from "@/server/admin/orders";
 import { createOrder } from "@/server/orders";
 import { installmentsLabel, methodLabel } from "@/lib/payment-labels";
-import { resetDb } from "./helpers/db";
+import { clienteDeTeste, resetDb } from "./helpers/db";
 
 const itens = [{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }];
 const pag = (o: Partial<Parameters<typeof alertaDePagamento>[2][number]> = {}) => ({
@@ -58,8 +58,8 @@ describe("alertaDePagamento", () => {
 
 describe("listOrders com pagamentos", () => {
   it("traz os pagamentos de cada pedido, e pedido sem pagamento online vem com lista vazia", async () => {
-    const a = await createOrder(itens);
-    const b = await createOrder(itens);
+    const a = await createOrder(itens, await clienteDeTeste());
+    const b = await createOrder(itens, await clienteDeTeste());
     const db = await getDb();
     await db.insert(payments).values({ orderId: a.id, provider: "mercadopago", providerPaymentId: "1", status: "aprovado", method: "debit_card", installments: 1, amountCents: 8990 });
     await db.update(orders).set({ status: "pago" }).where(eq(orders.id, a.id));
@@ -75,7 +75,7 @@ describe("listOrders com pagamentos", () => {
   });
 
   it("o alerta aparece para quem pagou depois de o pedido ser cancelado", async () => {
-    const o = await createOrder(itens);
+    const o = await createOrder(itens, await clienteDeTeste());
     const db = await getDb();
     await db.update(orders).set({ status: "cancelado" }).where(eq(orders.id, o.id));
     await db.insert(payments).values({ orderId: o.id, provider: "mercadopago", providerPaymentId: "2", status: "aprovado", amountCents: 8990 });

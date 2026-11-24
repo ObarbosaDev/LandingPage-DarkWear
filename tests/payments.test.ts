@@ -15,7 +15,7 @@ import { orderStatusHistory, orders, payments, products } from "@/server/db/sche
 import { createOrder } from "@/server/orders";
 import { applyPayment, getPaymentView, startPayment } from "@/server/payments";
 import { PagamentoError, assinaturaValida, buscarPagamento, criarPreferencia, traduzirStatus } from "@/server/payments/mercadopago";
-import { resetDb } from "./helpers/db";
+import { clienteDeTeste, resetDb } from "./helpers/db";
 
 // ---------- ajudantes ----------
 
@@ -40,7 +40,7 @@ const pagamentoMP = (o: Record<string, unknown> = {}) => ({
 
 /** Cria um pedido de verdade (1 camiseta de R$ 89,90) e devolve o id dele. */
 async function pedido(qty = 1) {
-  const o = await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty }]);
+  const o = await createOrder([{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty }], await clienteDeTeste());
   return o;
 }
 
@@ -334,15 +334,31 @@ describe("applyPayment", () => {
 describe("getPaymentView", () => {
   it("devolve só a situação (status do pedido e do último pagamento)", async () => {
     const o = await pedido();
-    expect(await getPaymentView(o.number)).toEqual({ number: o.number, status: "pendente", payment: null });
+    const dono = await clienteDeTeste();
+    expect(await getPaymentView(o.number, dono)).toEqual({ number: o.number, status: "pendente", payment: null });
     const db = await getDb();
     await db.insert(payments).values({ orderId: o.id, provider: "mercadopago", status: "iniciado" });
     await db.insert(payments).values({ orderId: o.id, provider: "mercadopago", providerPaymentId: "9", status: "recusado" });
-    expect((await getPaymentView(o.number))?.payment).toBe("recusado"); // o mais recente
-    expect(Object.keys((await getPaymentView(o.number))!).sort()).toEqual(["number", "payment", "status"]);
+    expect((await getPaymentView(o.number, dono))?.payment).toBe("recusado"); // o mais recente
+    expect(Object.keys((await getPaymentView(o.number, dono))!).sort()).toEqual(["number", "payment", "status"]);
+  });
+
+  // O número do pedido é fácil de adivinhar: o pedido de OUTRO cliente é indistinguível de um que não existe.
+  it("pedido de outro cliente devolve null, como um número que não existe", async () => {
+    const o = await pedido();
+    const dono = await clienteDeTeste();
+    const outro = await clienteDeTeste("outro@teste.com");
+    expect(await getPaymentView(o.number, outro)).toBeNull();
+    expect(await getPaymentView("DW-99999", outro)).toBeNull();
+    expect(await getPaymentView(o.number, dono)).not.toBeNull();
+  });
+
+  it("cliente com id inválido nunca vê nada", async () => {
+    const o = await pedido();
+    for (const id of [0, -1, 1.5, NaN, 999999]) expect(await getPaymentView(o.number, id), String(id)).toBeNull();
   });
 
   it.each(["", "DW-1", "DW-0000X", "dw-00001", "1", "DW-00001; DROP TABLE orders", "DW-99999999", " DW-00001", "DW--0001"])("número inválido ou inexistente %j → null", async (n) => {
-    expect(await getPaymentView(n)).toBeNull();
+    expect(await getPaymentView(n, await clienteDeTeste())).toBeNull();
   });
 });

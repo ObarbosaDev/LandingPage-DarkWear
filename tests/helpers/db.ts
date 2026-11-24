@@ -57,17 +57,17 @@ export async function stockOf(slug: string): Promise<number> {
 
 /**
  * Um cliente de teste, criado direto no banco (sem passar pelo cadastro, que é lento por causa do hash
- * da senha). Se já existe um com o e-mail, devolve o mesmo. Os pedidos dos testes precisam de um dono,
+ * da senha). Se já existe um com o e-mail, devolve o mesmo (também quando várias chamadas chegam juntas). Os pedidos dos testes precisam de um dono,
  * porque comprar exige conta.
  */
 export async function clienteDeTeste(email = "cliente@teste.com"): Promise<number> {
   const db = await getDb();
-  const [existente] = await db.select({ id: customers.id }).from(customers).where(eq(customers.email, email));
-  if (existente) return existente.id;
-  const [novo] = await db
+  await db
     .insert(customers)
     // O hash não é de uma senha de verdade: serve só para satisfazer a restrição "não vazio" do banco.
     .values({ name: "Cliente de Teste", email, phone: "11987654321", passwordHash: "hash-de-teste", privacyAcceptedAt: new Date() })
-    .returning({ id: customers.id });
-  return novo.id;
+    // Vários testes pedem o cliente ao mesmo tempo (pedidos simultâneos): quem perder a corrida só lê o que já existe.
+    .onConflictDoNothing({ target: customers.email });
+  const [c] = await db.select({ id: customers.id }).from(customers).where(eq(customers.email, email));
+  return c.id;
 }

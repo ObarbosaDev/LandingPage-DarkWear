@@ -10,18 +10,28 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { orders, payments, products } from "@/server/db/schema";
+import { orders, payments, products, rateLimits } from "@/server/db/schema";
 import { POST as webhook } from "@/app/api/webhooks/mercadopago/route";
 import { POST as criarPedido } from "@/app/api/orders/route";
 import { GET as config } from "@/app/api/payments/config/route";
 import { createOrder } from "@/server/orders";
-import { resetDb } from "./helpers/db";
+import { startCustomerSession } from "@/server/customers/session";
+import { clienteDeTeste, resetDb } from "./helpers/db";
 
 // Fora de uma requisição real do Next, estas duas funções não existem: viram "não fazem nada".
 vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
 // connection() (que marca a rota como dinâmica) só funciona dentro de uma requisição real.
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), connection: async () => {} }));
-vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-real-ip": "10.0.0.1" }) }));
+// O "navegador" de mentira: um pote de cookies (para a sessão do cliente) e os cabeçalhos da origem.
+const jar = new Map<string, string>();
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ "x-real-ip": "10.0.0.1" }),
+  cookies: async () => ({
+    get: (n: string) => (jar.has(n) ? { name: n, value: jar.get(n) } : undefined),
+    set: (n: string, v: string) => void jar.set(n, v),
+    delete: (o: { name: string }) => void jar.delete(o.name),
+  }),
+}));
 
 const SEGREDO = "segredo-do-webhook";
 
@@ -67,9 +77,16 @@ const statusDe = async (id: number) => (await (await getDb()).select({ s: orders
 const estoque = async () => (await (await getDb()).select({ s: products.stock }).from(products).where(eq(products.slug, "oversized-gt3-rs")))[0].s;
 const itens = [{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }];
 
+// O cliente que está logado nos testes (comprar exige conta).
+let dono = 0;
+
 beforeEach(async () => {
   await resetDb();
   await (await getDb()).delete(payments);
+  await (await getDb()).delete(rateLimits); // o limite de pedidos por origem não pode acumular entre testes
+  jar.clear();
+  dono = await clienteDeTeste();
+  await startCustomerSession(dono, 1);
   process.env.MERCADOPAGO_ACCESS_TOKEN = "TEST-token";
   delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -94,7 +111,7 @@ describe("GET /api/payments/config", () => {
 
 describe("POST /api/webhooks/mercadopago", () => {
   it("aviso de pagamento aprovado marca o pedido como pago", async () => {
-    const o = await createOrder(itens);
+    const o = await createOrder(itens, await clienteDeTeste());
     fakeMP({ pagamento: pagamentoMP(o.id) });
     const res = await webhook(aviso({ query: "?data.id=777&type=payment" }));
     expect(res.status).toBe(200);
@@ -103,7 +120,7 @@ describe("POST /api/webhooks/mercadopago", () => {
   });
 
   it("aceita o número também pelo corpo JSON, e reentregas não fazem mal", async () => {
-    const o = await createOrder(itens);
+    const o = await createOrder(itens, await clienteDeTeste());
     fakeMP({ pagamento: pagamentoMP(o.id) });
     const corpo = { type: "payment", data: { id: 777 } };
     expect((await (await webhook(aviso({ body: corpo }))).json()).resultado).toBe("pago");
@@ -137,7 +154,7 @@ describe("POST /api/webhooks/mercadopago", () => {
     });
 
     it("aceita a assinatura correta", async () => {
-      const o = await createOrder(itens);
+      const o = await createOrder(itens, await clienteDeTeste());
       fakeMP({ pagamento: pagamentoMP(o.id) });
       const res = await webhook(aviso({ query: "?data.id=777&type=payment", headers: { "x-signature": assinatura("777"), "x-request-id": "req-1" } }));
       expect(res.status).toBe(200);
@@ -150,7 +167,7 @@ describe("POST /api/webhooks/mercadopago", () => {
       ["assinatura de outro pagamento", { "x-signature": "__OUTRO__", "x-request-id": "req-1" }],
       ["lixo", { "x-signature": "abc", "x-request-id": "req-1" }],
     ])("recusa com 401: %s", async (_nome, headers) => {
-      const o = await createOrder(itens);
+      const o = await createOrder(itens, await clienteDeTeste());
       const spy = fakeMP({ pagamento: pagamentoMP(o.id) });
       const h = { ...headers } as Record<string, string>;
       if (h["x-signature"] === "__OUTRO__") h["x-signature"] = assinatura("888");
@@ -176,7 +193,7 @@ describe("POST /api/webhooks/mercadopago", () => {
   });
 
   it("erro do Mercado Pago ou do banco devolve 500 (para ele reenviar) e não altera o pedido", async () => {
-    const o = await createOrder(itens);
+    const o = await createOrder(itens, await clienteDeTeste());
     fakeMP({ pagamentoStatus: 503 });
     const res = await webhook(aviso({ query: "?data.id=777&type=payment" }));
     expect(res.status).toBe(500);
@@ -184,7 +201,7 @@ describe("POST /api/webhooks/mercadopago", () => {
   });
 
   it("valor diferente: responde 200, NÃO paga e avisa no log", async () => {
-    const o = await createOrder(itens);
+    const o = await createOrder(itens, await clienteDeTeste());
     fakeMP({ pagamento: pagamentoMP(o.id, { transaction_amount: 1 }) });
     const res = await webhook(aviso({ query: "?data.id=777&type=payment" }));
     expect((await res.json()).resultado).toBe("valor-divergente");
@@ -196,6 +213,52 @@ describe("POST /api/webhooks/mercadopago", () => {
     fakeMP({ pagamentoStatus: 500 });
     const texto = await (await webhook(aviso({ query: "?data.id=777&type=payment" }))).text();
     expect(texto).not.toMatch(/TEST-token|Bearer|stack|at /);
+  });
+});
+
+describe("POST /api/orders exige login", () => {
+  const pedir = (extra: Record<string, unknown> = {}) =>
+    criarPedido(new Request("http://x/api/orders", { method: "POST", body: JSON.stringify({ items: itens, ...extra }) }));
+
+  it("sem sessão responde 401, não cria pedido e NÃO baixa o estoque", async () => {
+    jar.clear();
+    const antes = await estoque();
+    const res = await pedir();
+    expect(res.status).toBe(401);
+    expect((await res.json()).error).toMatch(/entre na sua conta/i);
+    expect(await estoque()).toBe(antes);
+    expect(await (await getDb()).select().from(orders)).toHaveLength(0);
+  });
+
+  it("o mesmo vale para pagamento online sem sessão (e o Mercado Pago nem é chamado)", async () => {
+    jar.clear();
+    const spy = fakeMP();
+    expect((await pedir({ payment: "online" })).status).toBe(401);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("cookie vencido, adulterado ou de versão antiga também dá 401", async () => {
+    jar.set("dw_cliente", "lixo.lixo");
+    expect((await pedir()).status).toBe(401);
+    jar.clear();
+    await startCustomerSession(dono, 99); // versão que não é a da conta
+    expect((await pedir()).status).toBe(401);
+  });
+
+  it("com sessão, o pedido fica no nome de quem está logado", async () => {
+    const res = await pedir();
+    expect(res.status).toBe(201);
+    const [o] = await (await getDb()).select().from(orders);
+    expect(o.customerId).toBe(dono);
+  });
+
+  // O dono do pedido vem SÓ da sessão: nada que o navegador mande no corpo pode trocá-lo.
+  it("ignora qualquer 'customerId' enviado no corpo", async () => {
+    const outro = await clienteDeTeste("outro@teste.com");
+    const res = await pedir({ customerId: outro, customer_id: outro, customer: { id: outro } });
+    expect(res.status).toBe(201);
+    const [o] = await (await getDb()).select().from(orders);
+    expect(o.customerId).toBe(dono);
   });
 });
 

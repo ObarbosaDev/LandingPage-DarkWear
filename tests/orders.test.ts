@@ -14,7 +14,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { products } from "@/server/db/schema";
 import { cancelOrder, createOrder, orderNumber, OrderError } from "@/server/orders";
-import { resetDb, stockOf } from "./helpers/db";
+import { clienteDeTeste, resetDb, stockOf } from "./helpers/db";
 
 // Itens do catálogo de exemplo usados nos testes (sem a quantidade; cada teste define a sua).
 const GT3 = { slug: "oversized-gt3-rs", size: "M", color: "Preta" }; // estoque inicial 12, R$ 89,90
@@ -39,7 +39,7 @@ async function falha(promessa: Promise<unknown>): Promise<OrderError> {
 
 describe("createOrder", () => {
   it("registra o pedido, calcula o total no servidor e baixa o estoque", async () => {
-    const pedido = await createOrder([{ ...GT3, qty: 2 }, { ...MUMIA, qty: 1 }]);
+    const pedido = await createOrder([{ ...GT3, qty: 2 }, { ...MUMIA, qty: 1 }], await clienteDeTeste());
     // 2 x R$ 89,90 + 1 x R$ 99,90, em centavos.
     expect(pedido.totalCents).toBe(2 * 8990 + 9990);
     expect(pedido.status).toBe("pendente");
@@ -52,13 +52,13 @@ describe("createOrder", () => {
   // O servidor baixa o estoque em ordem alfabética (para evitar deadlock), mas a resposta deve
   // seguir a ordem em que o cliente montou a sacola.
   it("mantém a ordem do carrinho mesmo baixando o estoque em ordem alfabética", async () => {
-    const pedido = await createOrder([{ ...MUMIA, qty: 1 }, { ...GT3, qty: 1 }]);
+    const pedido = await createOrder([{ ...MUMIA, qty: 1 }, { ...GT3, qty: 1 }], await clienteDeTeste());
     expect(pedido.items.map((i) => i.name)).toEqual(["Camisa Múmia", "Oversized GT3 RS"]);
   });
 
   // Sem isso, duas linhas de qtd 2 passariam cada uma por um estoque de 3, vendendo 4.
   it("junta linhas repetidas do mesmo item", async () => {
-    const pedido = await createOrder([{ ...GT3, qty: 1 }, { ...GT3, qty: 2 }]);
+    const pedido = await createOrder([{ ...GT3, qty: 1 }, { ...GT3, qty: 2 }], await clienteDeTeste());
     expect(pedido.items).toHaveLength(1);
     expect(pedido.items[0].qty).toBe(3);
     expect(await stockOf("oversized-gt3-rs")).toBe(9);
@@ -66,47 +66,48 @@ describe("createOrder", () => {
 
   // Segurança: um cliente mal-intencionado poderia tentar enviar "preço R$ 0,01". Tem de ser ignorado.
   it("ignora qualquer preço enviado pelo cliente", async () => {
-    const pedido = await createOrder([{ ...GT3, qty: 1, price: 0.01, priceCents: 1 }]);
+    const pedido = await createOrder([{ ...GT3, qty: 1, price: 0.01, priceCents: 1 }], await clienteDeTeste());
     expect(pedido.totalCents).toBe(8990);
   });
 
   it("recusa estoque insuficiente (409) sem mexer no estoque", async () => {
-    const e = await falha(createOrder([{ ...MUMIA, qty: 6 }]));
+    const e = await falha(createOrder([{ ...MUMIA, qty: 6 }], await clienteDeTeste()));
     expect(e.status).toBe(409);
     expect(await stockOf("camisa-mumia")).toBe(5);
   });
 
   // O primeiro item tem estoque, o segundo não: o primeiro NÃO pode ficar descontado.
   it("é tudo ou nada: se um item falha, o outro não é descontado", async () => {
-    await falha(createOrder([{ ...GT3, qty: 2 }, { ...MUMIA, qty: 99 }]));
+    await falha(createOrder([{ ...GT3, qty: 2 }, { ...MUMIA, qty: 99 }], await clienteDeTeste()));
     expect(await stockOf("oversized-gt3-rs")).toBe(12);
   });
 
   it("recusa tamanho, cor e produto inválidos", async () => {
-    await falha(createOrder([{ ...GT3, size: "XG", qty: 1 }]));
-    await falha(createOrder([{ ...GT3, color: "Rosa", qty: 1 }]));
-    await falha(createOrder([{ slug: "nao-existe", size: "M", color: "Preta", qty: 1 }]));
+    await falha(createOrder([{ ...GT3, size: "XG", qty: 1 }], await clienteDeTeste()));
+    await falha(createOrder([{ ...GT3, color: "Rosa", qty: 1 }], await clienteDeTeste()));
+    await falha(createOrder([{ slug: "nao-existe", size: "M", color: "Preta", qty: 1 }], await clienteDeTeste()));
     expect(await stockOf("oversized-gt3-rs")).toBe(12);
   });
 
   // Quantidade deve ser um número inteiro entre 1 e 99; o texto "2" e o null também são recusados.
   it("recusa quantidade inválida e carrinho vazio", async () => {
-    for (const qty of [0, -1, 1.5, 100, "2", null]) await falha(createOrder([{ ...GT3, qty }]));
-    await falha(createOrder([]));
-    await falha(createOrder("lixo"));
-    await falha(createOrder(null));
+    for (const qty of [0, -1, 1.5, 100, "2", null]) await falha(createOrder([{ ...GT3, qty }], await clienteDeTeste()));
+    await falha(createOrder([], await clienteDeTeste()));
+    await falha(createOrder("lixo", await clienteDeTeste()));
+    await falha(createOrder(null, await clienteDeTeste()));
   });
 
   it("não vende produto oculto", async () => {
     await (await getDb()).update(products).set({ active: false }).where(eq(products.slug, GT3.slug));
-    await falha(createOrder([{ ...GT3, qty: 1 }]));
+    await falha(createOrder([{ ...GT3, qty: 1 }], await clienteDeTeste()));
   });
 
   // O PGlite atende uma consulta por vez, então aqui o que se prova é a regra (o UPDATE condicional
   // nunca deixa o estoque negativo nem vende além dele), não a disputa de linhas do Postgres real.
   // 20 pedidos de 1 peça disparados juntos contra um estoque de 12: devem passar 12 e falhar 8.
   it("com muitos pedidos ao mesmo tempo, só vende o que existe", async () => {
-    const resultados = await Promise.allSettled(Array.from({ length: 20 }, () => createOrder([{ ...GT3, qty: 1 }])));
+    const cliente = await clienteDeTeste();
+    const resultados = await Promise.allSettled(Array.from({ length: 20 }, () => createOrder([{ ...GT3, qty: 1 }], cliente)));
     expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(12);
     expect(resultados.filter((r) => r.status === "rejected")).toHaveLength(8);
     expect(await stockOf("oversized-gt3-rs")).toBe(0);
@@ -115,7 +116,7 @@ describe("createOrder", () => {
 
 describe("cancelOrder", () => {
   it("devolve as peças ao estoque", async () => {
-    const p = await createOrder([{ ...GT3, qty: 3 }, { ...MUMIA, qty: 2 }]);
+    const p = await createOrder([{ ...GT3, qty: 3 }, { ...MUMIA, qty: 2 }], await clienteDeTeste());
     expect(await cancelOrder(p.id)).toBe(true);
     expect(await stockOf("oversized-gt3-rs")).toBe(12);
     expect(await stockOf("camisa-mumia")).toBe(5);
@@ -124,7 +125,7 @@ describe("cancelOrder", () => {
   // Defeito real que a revisão de código achou: cancelar duas vezes devolvia as peças em dobro,
   // deixando a loja com mais peças do que existem.
   it("cancelar de novo não devolve estoque em dobro", async () => {
-    const p = await createOrder([{ ...GT3, qty: 2 }]);
+    const p = await createOrder([{ ...GT3, qty: 2 }], await clienteDeTeste());
     expect(await cancelOrder(p.id)).toBe(true);
     expect(await cancelOrder(p.id)).toBe(false);
     expect(await stockOf("oversized-gt3-rs")).toBe(12);
@@ -132,7 +133,7 @@ describe("cancelOrder", () => {
 
   // O mesmo defeito, agora com dois ou três cliques acontecendo juntos (duas abas, dois funcionários).
   it("três cancelamentos ao mesmo tempo repõem o estoque uma vez só", async () => {
-    const p = await createOrder([{ ...GT3, qty: 2 }]);
+    const p = await createOrder([{ ...GT3, qty: 2 }], await clienteDeTeste());
     const r = await Promise.all([cancelOrder(p.id), cancelOrder(p.id), cancelOrder(p.id)]);
     expect(r.filter(Boolean)).toHaveLength(1);
     expect(await stockOf("oversized-gt3-rs")).toBe(12);
