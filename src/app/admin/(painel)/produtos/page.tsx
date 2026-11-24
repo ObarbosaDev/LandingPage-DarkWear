@@ -4,7 +4,7 @@
 // Cada peça é um quadrado emoldurado com a foto inteira, como na vitrine da loja, só que do lado de dentro do
 // balcão: embaixo da foto, o nome, o preço, a PILHA DE ESTOQUE (10 blocos, um por peça: dá para ler o estoque
 // sem ler o número) e os controles. O dono faz tudo sem sair da prateleira:
-//   - ajustar o ESTOQUE de uma peça (campo + "Salvar");
+//   - ajustar o ESTOQUE de cada tamanho e cor de uma peça (grade de campos + "Salvar");
 //   - OCULTAR ou MOSTRAR uma peça na loja (a peça oculta fica marcada "Oculto" e em preto e branco);
 //   - entrar na edição (preço, foto, descrição) pelo nome ou por "Editar", ou cadastrar uma nova ("Novo produto").
 // Toda mudança vale na loja na mesma hora (o cache do catálogo é descartado pelas ações).
@@ -21,7 +21,8 @@ import { formatCents } from "@/lib/money";
 import type { Product } from "@/lib/product";
 import { medidorDeEstoque } from "@/lib/stock-meter";
 import { requireAdmin } from "@/server/admin/auth";
-import { listAllProducts } from "@/server/admin/products";
+import { estoqueDaVariacao, type EstoquePorVariacao } from "@/lib/variants";
+import { listAllProducts, listVariantStock } from "@/server/admin/products";
 import type { ProductRow } from "@/server/db/schema";
 import { setActiveAction, setStockAction } from "@/app/admin/actions";
 
@@ -31,8 +32,9 @@ export const instant = false;
 export const metadata: Metadata = { title: { absolute: "Prateleira · Painel DarkWear" } };
 
 /** A linha do banco no formato que o componente da foto espera (campos vazios viram "ausentes"). */
-const comoProduto = (p: ProductRow): Product => ({
+const comoProduto = (p: ProductRow, variants: EstoquePorVariacao): Product => ({
   ...p,
+  variants,
   category: p.category as Product["category"],
   image: p.image ?? undefined,
   photoBg: (p.photoBg ?? undefined) as Product["photoBg"],
@@ -43,6 +45,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
   await requireAdmin();
   const { salvo } = await searchParams;
   const produtos = await listAllProducts();
+  const variacoes = await listVariantStock();
 
   return (
     <div className="flex flex-col gap-10">
@@ -74,12 +77,16 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
         <ul className="grid gap-x-8 gap-y-14 sm:grid-cols-2 xl:grid-cols-3">
           {produtos.map((p) => {
             const m = medidorDeEstoque(p.stock);
+            const estoque = variacoes.get(p.slug) ?? {};
+            // Quantas combinações de tamanho e cor estão zeradas (o dono vê de relance o que repor).
+            const combos = p.sizes.flatMap((s) => p.colors.map((c) => ({ s, c, n: estoqueDaVariacao(estoque, s, c) })));
+            const zeradas = combos.filter((x) => x.n === 0).length;
             return (
               <li key={p.slug} className="flex flex-col">
                 {/* O quadrado da foto: igual ao da vitrine da loja. Peça oculta fica em preto e branco e marcada. */}
                 <Link href={`/admin/produtos/${p.slug}`} aria-label={`Editar ${p.name}`} className="group relative block aspect-square w-full border-2 border-foreground bg-background p-[8%]">
                   <div className={`h-full w-full ${p.active ? "" : "grayscale"}`}>
-                    <ProductImage product={comoProduto(p)} sizes="(min-width: 1280px) 28vw, (min-width: 640px) 45vw, 90vw" />
+                    <ProductImage product={comoProduto(p, estoque)} sizes="(min-width: 1280px) 28vw, (min-width: 640px) 45vw, 90vw" />
                   </div>
                   <span className="absolute left-0 top-0 flex gap-px font-mono text-xs font-bold uppercase tracking-[0.15em]">
                     {!p.active && <span className="bg-foreground px-3 py-1 text-background">Oculto</span>}
@@ -108,25 +115,40 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
                   </span>
                 </div>
 
-                {/* Ajuste rápido de estoque: o campo já vem com o valor atual; o "slug" escondido diz de qual peça é. */}
-                <form action={setStockAction} className="mt-4 flex flex-wrap items-center gap-2">
-                  <input type="hidden" name="slug" value={p.slug} />
-                  <label htmlFor={`estoque-${p.slug}`} className="font-mono text-xs font-bold uppercase tracking-[0.15em]">
-                    Estoque
-                  </label>
-                  <input
-                    id={`estoque-${p.slug}`}
-                    name="stock"
-                    type="number"
-                    min={0}
-                    step={1}
-                    defaultValue={p.stock}
-                    className="w-24 border-2 border-foreground bg-transparent px-3 py-2 text-lg font-bold"
-                  />
-                  <button type="submit" className="border-2 border-foreground px-4 py-2 text-base font-medium transition-colors hover:bg-foreground hover:text-background">
-                    Salvar
-                  </button>
-                </form>
+                {/* Ajuste de estoque POR TAMANHO E COR. Cada campo já vem com o valor atual e se chama
+                    "estoque:<tamanho>|<cor>"; o "slug" escondido diz de qual peça é. Recolhido para o cartão ficar curto. */}
+                <details className="mt-4 border-2 border-foreground">
+                  <summary className="cursor-pointer px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em]">
+                    Estoque por tamanho e cor
+                    {zeradas > 0 ? ` · ${zeradas} de ${combos.length} zerados` : ""}
+                  </summary>
+                  <form action={setStockAction} className="flex flex-col gap-4 border-t-2 border-foreground p-4">
+                    <input type="hidden" name="slug" value={p.slug} />
+                    {p.colors.map((cor) => (
+                      <fieldset key={cor}>
+                        <legend className="mb-2 font-mono text-xs font-bold uppercase tracking-[0.15em]">{cor}</legend>
+                        <div className="flex flex-wrap gap-3">
+                          {p.sizes.map((tam) => (
+                            <label key={tam} className="flex flex-col gap-1 font-mono text-xs font-bold uppercase">
+                              {tam}
+                              <input
+                                name={`estoque:${tam}|${cor}`}
+                                type="number"
+                                min={0}
+                                step={1}
+                                defaultValue={estoqueDaVariacao(estoque, tam, cor)}
+                                className="w-20 border-2 border-foreground bg-transparent px-2 py-2 text-lg font-bold"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    ))}
+                    <button type="submit" className="self-start border-2 border-foreground px-4 py-2 text-base font-medium transition-colors hover:bg-foreground hover:text-background">
+                      Salvar estoque
+                    </button>
+                  </form>
+                </details>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {/* Mostrar/ocultar: o campo escondido "active" já leva o valor OPOSTO ao atual, então um

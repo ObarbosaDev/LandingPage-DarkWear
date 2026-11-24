@@ -27,7 +27,7 @@ import {
   getProductRow,
   parseProductForm,
   setProductActive,
-  setProductStock,
+  setVariantStock,
   updateProduct,
 } from "@/server/admin/products";
 import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
@@ -151,14 +151,21 @@ export async function updateProductAction(_prev: FormState, form: FormData): Pro
   redirect("/admin/produtos?salvo=1");
 }
 
-/** Campo "Estoque" + botão "Salvar" de cada linha da lista /admin/produtos. */
+/**
+ * Os campos de estoque por tamanho e cor + botão "Salvar" de cada peça em /admin/produtos.
+ * Cada campo se chama "estoque:<tamanho>|<cor>" (ex.: "estoque:M|Preta"). Campo vazio NÃO vira 0 (Number("") é 0):
+ * fica como está. Qualquer valor inválido recusa o conjunto inteiro (ver setVariantStock).
+ */
 export async function setStockAction(form: FormData): Promise<void> {
   await requireAdmin();
   const slug = String(form.get("slug") ?? "");
-  // Campo vazio não pode virar 0 (Number("") é 0): sem número digitado, não muda nada.
-  const raw = String(form.get("stock") ?? "").trim();
-  if (!raw) return;
-  await setProductStock(slug, Number(raw));
+  const estoque: Record<string, number> = {};
+  for (const [nome, valor] of form.entries()) {
+    if (!nome.startsWith("estoque:") || typeof valor !== "string" || !valor.trim()) continue;
+    estoque[nome.slice("estoque:".length)] = Number(valor);
+  }
+  if (Object.keys(estoque).length === 0) return;
+  await setVariantStock(slug, estoque);
   refreshCatalog();
   revalidatePath("/admin/produtos");
 }

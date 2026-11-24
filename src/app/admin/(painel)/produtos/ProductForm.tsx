@@ -77,15 +77,19 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
           />
         </div>
         <div className="flex flex-col gap-3">
-          <label htmlFor="stock" className={label}>Estoque</label>
+          <label htmlFor="stock" className={label}>{editing ? "Estoque" : "Estoque de cada tamanho e cor"}</label>
           {/* Ao editar o estoque NÃO é um campo: mexer nele aqui poderia apagar vendas feitas
-              enquanto o formulário estava aberto. O ajuste fica na lista de produtos. */}
+              enquanto o formulário estava aberto. O ajuste (por tamanho e cor) fica na lista de produtos.
+              Ao cadastrar, o número vale para CADA combinação de tamanho e cor (depois dá para ajustar uma a uma). */}
           {editing ? (
             <p className="text-lg font-medium">
-              {product!.stock} peças. Ajuste na lista de produtos, para não apagar vendas recentes.
+              {product!.stock} peças no total. Ajuste por tamanho e cor na lista de produtos, para não apagar vendas recentes.
             </p>
           ) : (
-            <input id="stock" name="stock" type="number" min={0} step={1} required defaultValue={v("stock", "0")} className={field} />
+            <>
+              <input id="stock" name="stock" type="number" min={0} step={1} required defaultValue={v("stock", "0")} className={field} />
+              <p className="text-base font-medium">Vale para cada tamanho e cor. Depois você ajusta um a um na lista.</p>
+            </>
           )}
         </div>
         <div className="flex flex-col gap-3">
