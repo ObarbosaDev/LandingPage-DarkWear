@@ -50,7 +50,7 @@ export async function dashboardStats() {
   const [hoje] = await db.select({ n: count() }).from(orders).where(gte(orders.createdAt, inicioDoDia));
   // Faturamento do mês: só pedidos que o cliente PAGOU (pago, enviado ou entregue), feitos neste mês.
   const [mes] = await db
-    .select({ total: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int` })
+    .select({ total: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`, pedidos: count() })
     .from(orders)
     .where(and(inArray(orders.status, ["pago", "enviado", "entregue"]), gte(orders.createdAt, inicioDoMes)));
   // Pagamentos que pedem a atenção do dono: aprovado em pedido CANCELADO (o cliente pagou e não vai receber)
@@ -80,6 +80,9 @@ export async function dashboardStats() {
     novasEncomendas: novas.n,
     pedidosHoje: hoje.n,
     faturamentoMesCents: mes.total,
+    // Fechamento do mês: quantos pedidos foram pagos e quanto cada um rendeu, em média (0 se nenhum, sem dividir por zero).
+    pedidosPagosMes: mes.pedidos,
+    ticketMedioCents: mes.pedidos > 0 ? Math.round(mes.total / mes.pedidos) : 0,
     pagamentosParaConferir: conferir.n,
     totalClientes: clientes.n,
     lowStock,

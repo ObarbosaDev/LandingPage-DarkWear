@@ -254,3 +254,27 @@ describe("contagensDoPainel (os números pequenos da barra de navegação)", () 
     expect(await contagensDoPainel()).toEqual({ pedidosPendentes: 0, encomendasNovas: 0 });
   });
 });
+
+describe("dashboardStats: fechamento do mês (ticket médio)", () => {
+  it("conta os pedidos pagos do mês e calcula o ticket médio (faturamento ÷ pedidos pagos)", async () => {
+    const ana = await clienteDeTeste();
+    const a = await createOrder(item(1), ana); // 8990
+    const b = await createOrder(item(3), ana); // 26970
+    const c = await createOrder(item(1), ana); // pendente: não conta
+    await setStatus(a.id, "pago");
+    await setStatus(b.id, "entregue");
+    void c;
+    const s = await dashboardStats();
+    expect(s.pedidosPagosMes).toBe(2);
+    expect(s.faturamentoMesCents).toBe(8990 + 26970);
+    expect(s.ticketMedioCents).toBe(Math.round((8990 + 26970) / 2));
+  });
+
+  it("sem pedidos pagos, ticket médio e contagem são zero (nunca divisão por zero)", async () => {
+    const s = await dashboardStats();
+    expect(s.pedidosPagosMes).toBe(0);
+    expect(s.ticketMedioCents).toBe(0);
+    expect(Number.isFinite(s.ticketMedioCents)).toBe(true);
+  });
+});
+
