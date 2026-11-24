@@ -69,6 +69,14 @@ export const customers = pgTable("customers", {
   // "cliente" (todo mundo) ou "admin" (quem administra a loja). Só um comando de terminal do dono concede
   // "admin"; nenhuma tela ou API escreve este campo (migração 0008).
   role: text("role").$type<"cliente" | "admin">().notNull().default("cliente"),
+  // Endereço de entrega (migração 0009): ou não há nenhum, ou está completo (o banco confere). Um por conta.
+  addressZip: text("address_zip"),
+  addressStreet: text("address_street"),
+  addressNumber: text("address_number"),
+  addressComplement: text("address_complement"),
+  addressDistrict: text("address_district"),
+  addressCity: text("address_city"),
+  addressState: text("address_state"),
   privacyAcceptedAt: timestamp("privacy_accepted_at", { withTimezone: true }).notNull(),
   anonymizedAt: timestamp("anonymized_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -88,6 +96,14 @@ export const orders = pgTable(
     totalCents: integer("total_cents").notNull(),
     // Quem comprou. Nulo só nos pedidos antigos, feitos antes de existir cadastro.
     customerId: integer("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    // CÓPIA do endereço de entrega usada neste pedido (migração 0009). Nula nos pedidos antigos.
+    shipZip: text("ship_zip"),
+    shipStreet: text("ship_street"),
+    shipNumber: text("ship_number"),
+    shipComplement: text("ship_complement"),
+    shipDistrict: text("ship_district"),
+    shipCity: text("ship_city"),
+    shipState: text("ship_state"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

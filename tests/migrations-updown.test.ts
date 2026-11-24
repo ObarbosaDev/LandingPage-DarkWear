@@ -47,10 +47,11 @@ describe("rollbackMigrations (descida)", () => {
     await runMigrations(runner);
     const colunasDeClientes = async () =>
       (await c.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'customers'")).rows.map((r) => (r as { column_name: string }).column_name);
-    expect(await colunasDeClientes()).toContain("role");
+    expect(await colunasDeClientes()).toContain("address_zip");
     expect(await rollbackMigrations(runner)).toEqual([ids.at(-1)]);
-    // A última migração (o papel de administrador) saiu, mas a tabela de clientes da anterior continua.
-    expect(await colunasDeClientes()).not.toContain("role");
+    // A última migração (o endereço) saiu, mas o papel de administrador da anterior continua.
+    expect(await colunasDeClientes()).not.toContain("address_zip");
+    expect(await colunasDeClientes()).toContain("role");
     expect(await tabelas()).toContain("customers");
     expect(await tabelas()).toContain("product_images");
     // As anteriores continuam: o banco fica no estado exato de antes da última.
