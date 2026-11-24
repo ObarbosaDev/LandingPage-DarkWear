@@ -119,7 +119,9 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
           escolhido, ela é mantida. "Remover foto" volta a mostrar as iniciais. O seletor ao lado diz
           como a foto deve ser tratada. */}
       <div className="grid gap-8 sm:grid-cols-2">
-        <div className="flex flex-col gap-3">
+        {/* O bloco da foto ocupa a linha toda: o texto do seletor de arquivo ("Nenhum arquivo selecionado") é longo
+            e ficaria cortado numa coluna só. */}
+        <div className="flex flex-col gap-3 sm:col-span-2">
           <label htmlFor="photo" className={label}>Foto</label>
           <input type="hidden" name="image" value={currentImage} />
           {currentImage ? (

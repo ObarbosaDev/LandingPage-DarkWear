@@ -10,6 +10,7 @@
 // ============================================================================
 
 import type { Metadata } from "next";
+import { CabecalhoDePagina } from "@/components/admin/CabecalhoDePagina";
 import { requireAdmin } from "@/server/admin/auth";
 import { CUSTOM_STATUS, listCustomOrders } from "@/server/admin/custom-orders";
 import { changeCustomStatusAction } from "@/app/admin/actions";
@@ -30,10 +31,11 @@ export default async function EncomendasPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Encomendas</h1>
-      <p className="max-w-2xl text-xl font-medium">
-        Pedidos de camiseta com arte do cliente. O arquivo da arte chega pelo WhatsApp, aqui fica o registro do pedido.
-      </p>
+      <CabecalhoDePagina
+        sobretitulo="Operação"
+        titulo="Encomendas"
+        descricao="Pedidos de camiseta com arte do cliente. O arquivo da arte chega pelo WhatsApp, aqui fica o registro do pedido."
+      />
 
       {lista.length === 0 ? (
         <p className="text-xl font-medium">Nenhuma encomenda ainda.</p>

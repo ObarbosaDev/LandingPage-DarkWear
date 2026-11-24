@@ -14,6 +14,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CabecalhoDePagina } from "@/components/admin/CabecalhoDePagina";
 import { requireAdmin } from "@/server/admin/auth";
 import { listAllProducts } from "@/server/admin/products";
 import { formatCents } from "@/lib/money";
@@ -33,15 +34,19 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
   return (
     <div className="flex flex-col gap-10">
       {/* Título e o botão de cadastrar um produto novo. */}
-      <div className="flex flex-wrap items-end justify-between gap-6">
-        <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">Produtos</h1>
-        <Link
-          href="/admin/produtos/novo"
-          className="border-2 border-foreground bg-foreground px-6 py-3 font-display text-xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
-        >
-          Novo produto
-        </Link>
-      </div>
+      <CabecalhoDePagina
+        sobretitulo="Catálogo"
+        titulo="Produtos"
+        descricao="Preço, fotos, estoque e o que aparece na loja. Tudo se edita aqui."
+        acoes={
+          <Link
+            href="/admin/produtos/novo"
+            className="border-2 border-foreground bg-foreground px-6 py-3 font-display text-xl uppercase tracking-wide text-background transition-colors hover:bg-transparent hover:text-foreground"
+          >
+            Novo produto
+          </Link>
+        }
+      />
 
       {/* Confirmação depois de salvar o formulário (o formulário redireciona para cá com ?salvo=1). */}
       {salvo ? (

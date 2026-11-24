@@ -10,6 +10,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/server/admin/auth";
 import { getProductRow } from "@/server/admin/products";
 import { updateProductAction } from "@/app/admin/actions";
+import { CabecalhoDePagina } from "@/components/admin/CabecalhoDePagina";
 import { ProductForm } from "../ProductForm";
 
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
@@ -27,7 +28,7 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-display text-[clamp(3rem,8vw,7rem)] uppercase leading-[0.9]">{product.name}</h1>
+      <CabecalhoDePagina sobretitulo="Editar produto" titulo={product.name} descricao="Mude preço, foto, tamanhos e cores. O estoque se ajusta na lista de produtos." />
       {/* Com "product" = formulário de edição (campos preenchidos, endereço travado). */}
       <ProductForm action={updateProductAction} product={product} />
     </div>
