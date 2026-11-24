@@ -19,6 +19,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { buildCartMessage, whatsappLink } from "@/lib/whatsapp";
 import { OrderError, cancelOrder, createOrder } from "@/server/orders";
+import { getAddress } from "@/server/customers/address";
 import { currentCustomer } from "@/server/customers/session";
 import { startPayment } from "@/server/payments";
 import { mpConfigurado } from "@/server/payments/mercadopago";
@@ -57,6 +58,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
   }
 
+  // Comprar exige endereço de entrega. Ele vem SÓ da conta de quem está logado (nunca do corpo da requisição) e o
+  // pedido guarda uma cópia. Sem endereço: 422 com um código que a sacola usa para levar a pessoa a cadastrá-lo.
+  // Conferido ANTES de criar o pedido, para não baixar estoque à toa.
+  const endereco = await getAddress(cliente.id);
+  if (!endereco) {
+    return NextResponse.json({ error: "Cadastre o endereço de entrega na sua conta antes de comprar.", code: "sem-endereco" }, { status: 422 });
+  }
+
   // Pagamento online só existe se o Mercado Pago estiver configurado. Conferido ANTES de criar o
   // pedido, para não baixar estoque à toa.
   const online = (body as { payment?: unknown })?.payment === "online";
@@ -66,7 +75,7 @@ export async function POST(request: Request) {
 
   try {
     // Só os "items" são usados do que veio: preços e totais enviados pelo navegador são ignorados.
-    const order = await createOrder((body as { items?: unknown })?.items, cliente.id);
+    const order = await createOrder((body as { items?: unknown })?.items, cliente.id, endereco);
 
     // O estoque mudou: o catálogo precisa refletir isso já na próxima leitura (sem servir valor antigo).
     revalidateTag("products", { expire: 0 });

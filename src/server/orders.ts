@@ -15,6 +15,7 @@
 import "server-only";
 import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { getDb, type Db } from "@/server/db";
+import type { Address } from "@/server/customers/address";
 import {
   orderItems,
   orders,
@@ -90,9 +91,11 @@ function parseItems(input: unknown): OrderItemInput[] {
  *
  * @param input      itens do carrinho, como vieram do navegador (ainda não confiáveis)
  * @param customerId cliente que está comprando (vem da sessão, nunca do navegador)
+ * @param address    endereço de entrega, copiado da CONTA do cliente pela rota (nunca do navegador). O pedido guarda
+ *                   uma CÓPIA: mudar o endereço da conta depois não muda um pedido já feito. Ausente = sem cópia.
  * @throws OrderError com a mensagem a mostrar ao cliente
  */
-export async function createOrder(input: unknown, customerId: number): Promise<OrderView> {
+export async function createOrder(input: unknown, customerId: number, address?: Address | null): Promise<OrderView> {
   const lines = parseItems(input);
   const db = await getDb();
 
@@ -135,7 +138,18 @@ export async function createOrder(input: unknown, customerId: number): Promise<O
     const [order] = await tx
       .insert(orders)
       // Quem comprou. Obrigatório: comprar exige conta, e o id vem da SESSÃO (ver /api/orders), nunca do navegador.
-      .values({ totalCents: total, customerId })
+      .values({
+        totalCents: total,
+        customerId,
+        // A cópia do endereço de entrega (todos os campos ou nenhum: o banco confere).
+        shipZip: address?.zip ?? null,
+        shipStreet: address?.street ?? null,
+        shipNumber: address?.number ?? null,
+        shipComplement: address?.complement ?? null,
+        shipDistrict: address?.district ?? null,
+        shipCity: address?.city ?? null,
+        shipState: address?.state ?? null,
+      })
       .returning({ id: orders.id, status: orders.status });
 
     // Primeira linha do histórico: o pedido nasceu (não veio de nenhum status anterior).
