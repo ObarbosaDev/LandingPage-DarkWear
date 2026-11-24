@@ -48,9 +48,11 @@ describe("rollbackMigrations (descida)", () => {
     const colunasDeClientes = async () =>
       (await c.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'customers'")).rows.map((r) => (r as { column_name: string }).column_name);
     expect(await colunasDeClientes()).toContain("address_zip");
+    expect(await tabelas()).toContain("product_stock");
     expect(await rollbackMigrations(runner)).toEqual([ids.at(-1)]);
-    // A última migração (o endereço) saiu, mas o papel de administrador da anterior continua.
-    expect(await colunasDeClientes()).not.toContain("address_zip");
+    // A última migração (o estoque por variação) saiu, mas o endereço e o papel de administrador das anteriores continuam.
+    expect(await tabelas()).not.toContain("product_stock");
+    expect(await colunasDeClientes()).toContain("address_zip");
     expect(await colunasDeClientes()).toContain("role");
     expect(await tabelas()).toContain("customers");
     expect(await tabelas()).toContain("product_images");

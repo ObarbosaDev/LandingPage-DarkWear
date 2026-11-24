@@ -5,7 +5,7 @@
 // no banco são as migrações (src/server/db/migrations.ts). Mudou aqui? Crie também uma migração.
 // ============================================================================
 
-import { boolean, customType, index, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 // Coluna de bytes (bytea): o Drizzle não traz pronta. O Neon devolve Buffer e o PGlite devolve
 // Uint8Array; os dois são normalizados para Uint8Array.
@@ -45,6 +45,24 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// product_stock: o estoque de cada VARIAÇÃO (peça x tamanho x cor), migração 0010.
+// É aqui que a compra baixa e o cancelamento devolve. O total da peça (products.stock) é a SOMA destas linhas,
+// mantida por um gatilho do banco: o código nunca grava products.stock diretamente.
+// ---------------------------------------------------------------------------
+export const productStock = pgTable(
+  "product_stock",
+  {
+    productSlug: text("product_slug")
+      .notNull()
+      .references(() => products.slug, { onDelete: "cascade" }),
+    size: text("size").notNull(),
+    color: text("color").notNull(),
+    stock: integer("stock").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.productSlug, t.size, t.color] })],
+);
 
 // Estados possíveis de um pedido, na ordem natural do fluxo. As transições permitidas ficam em
 // src/server/admin/orders.ts (NEXT_STATUS).
