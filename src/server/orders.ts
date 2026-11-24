@@ -92,7 +92,7 @@ function parseItems(input: unknown): OrderItemInput[] {
  * @param customerId cliente que está comprando (vem da sessão, nunca do navegador)
  * @throws OrderError com a mensagem a mostrar ao cliente
  */
-export async function createOrder(input: unknown, customerId?: number): Promise<OrderView> {
+export async function createOrder(input: unknown, customerId: number): Promise<OrderView> {
   const lines = parseItems(input);
   const db = await getDb();
 
@@ -134,8 +134,8 @@ export async function createOrder(input: unknown, customerId?: number): Promise<
     // Cabeçalho do pedido. O status nasce "pendente" (padrão da tabela) até o dono confirmar o pagamento.
     const [order] = await tx
       .insert(orders)
-      // Quem comprou (nulo só para testes e pedidos antigos; a rota exige login, ver /api/orders).
-      .values({ totalCents: total, customerId: customerId ?? null })
+      // Quem comprou. Obrigatório: comprar exige conta, e o id vem da SESSÃO (ver /api/orders), nunca do navegador.
+      .values({ totalCents: total, customerId })
       .returning({ id: orders.id, status: orders.status });
 
     // Primeira linha do histórico: o pedido nasceu (não veio de nenhum status anterior).
