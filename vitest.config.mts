@@ -31,5 +31,8 @@ export default defineConfig({
     setupFiles: ["tests/setup.ts"],
     // Tempo máximo de um teste. Folgado, porque o banco embutido leva alguns segundos para subir.
     testTimeout: 30_000,
+    // Tempo máximo dos preparos (beforeEach). Cada arquivo sobe o seu próprio banco em memória, e com
+    // muitos arquivos rodando juntos o primeiro arranque passa de 10 s (o padrão), sem haver erro algum.
+    hookTimeout: 60_000,
   },
 });
