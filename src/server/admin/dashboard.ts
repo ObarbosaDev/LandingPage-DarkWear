@@ -9,9 +9,9 @@
 // Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
 import "server-only";
-import { and, asc, count, eq, lte } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { customOrders, orders, products, type OrderStatus } from "@/server/db/schema";
+import { customOrders, customers, orders, payments, products, type OrderStatus } from "@/server/db/schema";
 import { listOrders } from "@/server/admin/orders";
 
 /** Junta todos os números do resumo numa chamada só. */
@@ -31,6 +31,35 @@ export async function dashboardStats() {
   // Os 5 pedidos mais recentes, para a lista "Últimos pedidos".
   const latest = await listOrders(undefined, 5);
 
+  // Os "dias" e "meses" do dono são os de São Paulo, não os do servidor (que pode estar em outro fuso).
+  const inicioDoDia = sql`date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'`;
+  const inicioDoMes = sql`date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'`;
+
+  // Pedidos feitos hoje.
+  const [hoje] = await db.select({ n: count() }).from(orders).where(gte(orders.createdAt, inicioDoDia));
+  // Faturamento do mês: só pedidos que o cliente PAGOU (pago, enviado ou entregue), feitos neste mês.
+  const [mes] = await db
+    .select({ total: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int` })
+    .from(orders)
+    .where(and(inArray(orders.status, ["pago", "enviado", "entregue"]), gte(orders.createdAt, inicioDoMes)));
+  // Pagamentos que pedem a atenção do dono: aprovado em pedido CANCELADO (o cliente pagou e não vai receber)
+  // ou aprovado com valor DIFERENTE do total num pedido ainda pendente. Cada pedido conta uma vez.
+  const [conferir] = await db
+    .select({ n: sql<number>`count(distinct ${orders.id})::int` })
+    .from(orders)
+    .innerJoin(payments, eq(payments.orderId, orders.id))
+    .where(
+      and(
+        eq(payments.status, "aprovado"),
+        sql`(${orders.status} = 'cancelado' or (${orders.status} = 'pendente' and ${payments.amountCents} is distinct from ${orders.totalCents}))`,
+      ),
+    );
+  // Clientes ativos (sem contar administradores nem contas excluídas).
+  const [clientes] = await db
+    .select({ n: count() })
+    .from(customers)
+    .where(and(eq(customers.role, "cliente"), isNull(customers.anonymizedAt)));
+
   // Quantidade de um status (0 se nenhum pedido está nele).
   const n = (s: OrderStatus) => byStatus.find((r) => r.status === s)?.n ?? 0;
   return {
@@ -38,6 +67,10 @@ export async function dashboardStats() {
     pagos: n("pago"),
     enviados: n("enviado"),
     novasEncomendas: novas.n,
+    pedidosHoje: hoje.n,
+    faturamentoMesCents: mes.total,
+    pagamentosParaConferir: conferir.n,
+    totalClientes: clientes.n,
     lowStock,
     latest,
   };
