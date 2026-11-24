@@ -53,7 +53,7 @@ const TEM_CONTROLE = /[\u0000-\u001f\u007f]/;
  * Lê o celular digitado e devolve só os dígitos (DDD + número), ou null se não for um celular/telefone
  * brasileiro plausível. Aceita máscara, parênteses, hífen e o "+55" na frente.
  */
-function parsePhone(raw: string): string | null {
+export function parsePhone(raw: string): string | null {
   let d = raw.replace(/[\s().+-]/g, "");
   if (!/^\d+$/.test(d)) return null;
   // Com o código do país (55) na frente, tira.
@@ -64,6 +64,18 @@ function parsePhone(raw: string): string | null {
   // Celular tem 11 dígitos e começa com 9 depois do DDD.
   if (d.length === 11 && d[2] !== "9") return null;
   return d;
+}
+
+/**
+ * Limpa e confere um e-mail: minúsculas, sem espaços nas pontas, formato básico (algo@algo.algo), até 254
+ * caracteres. Devolve o e-mail pronto para guardar, ou null se for inválido.
+ * Só ASCII visível (de "!" a "~", menos "@" no meio de cada parte): o JavaScript e o Postgres minusculizam alguns
+ * caracteres não-ASCII de jeitos diferentes, e o banco recusaria depois de nós aceitarmos.
+ */
+export function parseEmail(raw: string): string | null {
+  const email = String(raw ?? "").trim().toLowerCase();
+  if (email.length > 254 || !/^[!-?A-~]+@[!-?A-~]+\.[!-?A-~]{2,}$/.test(email)) return null;
+  return email;
 }
 
 /**
@@ -78,13 +90,8 @@ export function parseRegisterForm(form: FormData): { ok: true; data: RegisterInp
   const tamanhoNome = Array.from(name).length;
   if (tamanhoNome < 2 || tamanhoNome > 80 || TEM_CONTROLE.test(name)) return { ok: false, error: "Informe o nome, de 2 a 80 caracteres." };
 
-  // E-mail: minúsculas, sem espaços nas pontas, formato básico (algo@algo.algo) e até 254 caracteres.
-  // Só ASCII visível (de "!" a "~", menos "@" no meio de cada parte): o JavaScript e o Postgres
-  // minusculizam alguns caracteres não-ASCII de jeitos diferentes, e o banco recusaria depois de nós aceitarmos.
-  const email = texto("email").trim().toLowerCase();
-  if (email.length > 254 || !/^[!-?A-~]+@[!-?A-~]+\.[!-?A-~]{2,}$/.test(email)) {
-    return { ok: false, error: "Informe um e-mail válido." };
-  }
+  const email = parseEmail(texto("email"));
+  if (!email) return { ok: false, error: "Informe um e-mail válido." };
 
   const phone = parsePhone(texto("phone"));
   if (!phone) return { ok: false, error: "Informe um celular com DDD, por exemplo (11) 98765-4321." };
@@ -247,13 +254,18 @@ export async function anonymizeCustomer(id: number): Promise<void> {
 // Letras e números sem os que se confundem ao ler (0/O, 1/l/I), para a senha provisória poder ser ditada.
 const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
+/** Uma senha provisória aleatória de 16 caracteres (sorteio criptográfico, sem caracteres que se confundem). */
+export function novaSenhaProvisoria(): string {
+  return Array.from({ length: 16 }, () => ALFABETO[randomInt(ALFABETO.length)]).join("");
+}
+
 /**
  * Gera uma senha PROVISÓRIA (a recuperação por e-mail ainda não existe): o dono a repassa ao cliente,
  * que é obrigado a trocá-la no primeiro acesso. Os cookies antigos deixam de valer. Devolve a senha em
  * texto, que é mostrada UMA vez e nunca guardada em claro.
  */
 export async function setTemporaryPassword(id: number): Promise<string> {
-  const temporaria = Array.from({ length: 16 }, () => ALFABETO[randomInt(ALFABETO.length)]).join("");
+  const temporaria = novaSenhaProvisoria();
   const passwordHash = await hashPassword(temporaria);
   const db = await getDb();
   const feito = await db
