@@ -17,6 +17,10 @@ import { requireAdmin } from "@/server/admin/auth";
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
 export const instant = false;
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: { absolute: "Painel · DarkWear" } };
+
 export default async function PainelPage() {
   // Confere a sessão também aqui (e não só no layout): cada página se protege sozinha.
   await requireAdmin();

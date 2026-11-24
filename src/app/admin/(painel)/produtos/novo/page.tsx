@@ -13,7 +13,7 @@ import { ProductForm } from "../ProductForm";
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
 export const instant = false;
 
-export const metadata: Metadata = { title: "Novo produto" };
+export const metadata: Metadata = { title: { absolute: "Novo produto · Painel DarkWear" } };
 
 export default async function NovoProdutoPage() {
   await requireAdmin();

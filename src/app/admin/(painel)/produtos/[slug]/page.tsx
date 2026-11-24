@@ -15,7 +15,7 @@ import { ProductForm } from "../ProductForm";
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
 export const instant = false;
 
-export const metadata: Metadata = { title: "Editar produto" };
+export const metadata: Metadata = { title: { absolute: "Editar produto · Painel DarkWear" } };
 
 // params: o trecho variável do endereço. Em /admin/produtos/camisa-preta, slug = "camisa-preta".
 export default async function EditarProdutoPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -22,7 +22,7 @@ import { setActiveAction, setStockAction } from "@/app/admin/actions";
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
 export const instant = false;
 
-export const metadata: Metadata = { title: "Produtos" };
+export const metadata: Metadata = { title: { absolute: "Produtos · Painel DarkWear" } };
 
 // searchParams: "salvo" aparece (?salvo=1) quando o dono acabou de salvar um produto no formulário.
 export default async function ProdutosPage({ searchParams }: { searchParams: Promise<{ salvo?: string }> }) {

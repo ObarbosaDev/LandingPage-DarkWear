@@ -17,7 +17,7 @@ import { changeCustomStatusAction } from "@/app/admin/actions";
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
 export const instant = false;
 
-export const metadata: Metadata = { title: "Encomendas" };
+export const metadata: Metadata = { title: { absolute: "Encomendas · Painel DarkWear" } };
 
 // Data/hora no padrão brasileiro e fuso de São Paulo.
 const dataHora = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });

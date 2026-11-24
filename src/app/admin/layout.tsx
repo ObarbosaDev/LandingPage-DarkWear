@@ -9,9 +9,10 @@ import type { Metadata } from "next";
 
 // O painel nunca deve aparecer em buscadores.
 // "index: false" = não listar a página nos resultados; "follow: false" = não seguir os links dela.
+// ATENÇÃO: este layout NÃO define título. Cada página do painel define o seu (absoluto). Se o layout
+// definisse, o título "Painel" apareceria também na resposta "não encontrado" que um visitante comum recebe
+// ao abrir /admin, entregando que existe um painel ali.
 export const metadata: Metadata = {
-  // O "template" faz as abas aparecerem como "Pedidos · Painel DarkWear".
-  title: { default: "Painel", template: "%s · Painel DarkWear" },
   robots: { index: false, follow: false },
 };
 

@@ -22,7 +22,7 @@ import { ConfirmButton } from "../ConfirmButton";
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
 export const instant = false;
 
-export const metadata: Metadata = { title: "Pedidos" };
+export const metadata: Metadata = { title: { absolute: "Pedidos · Painel DarkWear" } };
 
 // Formata a data/hora no padrão brasileiro e no fuso de São Paulo (o servidor pode estar em outro fuso).
 const dataHora = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
