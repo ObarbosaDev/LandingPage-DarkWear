@@ -52,6 +52,27 @@ export const ORDER_STATUS = ["pendente", "pago", "enviado", "entregue", "cancela
 export type OrderStatus = (typeof ORDER_STATUS)[number];
 
 // ---------------------------------------------------------------------------
+// customers: as contas de cliente (migração 0007). Comprar exige conta.
+// Nunca guarda a senha, só o hash. O e-mail é único e sempre em minúsculas (o banco confere).
+// "sessionVersion" invalida os cookies antigos; "anonymizedAt" marca a conta excluída (dados
+// pessoais apagados, pedidos mantidos).
+// ---------------------------------------------------------------------------
+export const customers = pgTable("customers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  // Só dígitos (DDD + número, 10 ou 11), ou vazio em conta anonimizada.
+  phone: text("phone").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  sessionVersion: integer("session_version").notNull().default(1),
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
+  privacyAcceptedAt: timestamp("privacy_accepted_at", { withTimezone: true }).notNull(),
+  anonymizedAt: timestamp("anonymized_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
 // orders: o cabeçalho de cada pedido de peças prontas (criado em /carrinho → POST /api/orders).
 // ---------------------------------------------------------------------------
 export const orders = pgTable(
@@ -62,6 +83,8 @@ export const orders = pgTable(
     status: text("status").$type<OrderStatus>().notNull().default("pendente"),
     // Total já calculado pelo servidor (o cliente não consegue alterar).
     totalCents: integer("total_cents").notNull(),
+    // Quem comprou. Nulo só nos pedidos antigos, feitos antes de existir cadastro.
+    customerId: integer("customer_id").references(() => customers.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
