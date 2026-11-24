@@ -1,12 +1,15 @@
 // ============================================================================
-// Tela de clientes do painel: /admin/clientes.
+// Tela de clientes do painel: /admin/clientes. A ideia: a CADERNETA, a agenda de contatos da loja.
 //
-// O que o dono faz aqui: ver quem tem conta na loja (nome, e-mail, celular, quantos pedidos fez e quanto já
-// gastou), BUSCAR por nome, e-mail ou celular, chamar o cliente no WhatsApp e gerar uma senha provisória para
-// quem esqueceu a senha (ainda não há recuperação por e-mail).
+// Os clientes aparecem agrupados pela inicial do nome (A, B, C...), cada grupo com a letra em tamanho gigante
+// ao lado, como numa agenda telefônica de papel, com linhas pontilhadas entre os contatos. Em cada contato: o
+// nome, há quanto tempo é cliente, o e-mail, o celular (com link para chamar no WhatsApp), quantos pedidos fez e
+// quanto já gastou. Um índice de letras no topo leva direto a cada grupo.
 //
-// Administradores aparecem marcados e NÃO têm botão de senha: eles são geridos só pelo comando de terminal
-// (npm run admin:criar, admin:senha, admin:remover). O painel nunca concede nem retira esse papel.
+// Dá para BUSCAR por nome, e-mail ou celular e gerar uma senha provisória para quem esqueceu a senha (ainda
+// não há recuperação por e-mail). Administradores aparecem marcados e NÃO têm botão de senha: eles são geridos só
+// pelo comando de terminal (npm run admin:criar, admin:senha, admin:remover). O painel nunca concede nem retira
+// esse papel.
 //
 // De onde vêm os dados: listCustomers (src/server/admin/customers.ts), que nunca devolve a senha.
 // ============================================================================
@@ -14,7 +17,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CabecalhoDePagina } from "@/components/admin/CabecalhoDePagina";
+import { agruparPorInicial } from "@/lib/grouping";
 import { formatCents } from "@/lib/money";
+import { tempoRelativo } from "@/lib/relative-time";
 import { clienteWhatsappLink } from "@/lib/whatsapp";
 import { requireAdmin } from "@/server/admin/auth";
 import { listCustomers } from "@/server/admin/customers";
@@ -23,9 +28,7 @@ import { SenhaProvisoria } from "./SenhaProvisoria";
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
 export const instant = false;
 
-export const metadata: Metadata = { title: { absolute: "Clientes · Painel DarkWear" } };
-
-const dataBr = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeZone: "America/Sao_Paulo" });
+export const metadata: Metadata = { title: { absolute: "Caderneta · Painel DarkWear" } };
 
 /** "11987654321" → "(11) 98765-4321". */
 function celular(d: string): string {
@@ -40,13 +43,14 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
   // A busca vem do endereço: só texto, no máximo 80 caracteres.
   const q = (Array.isArray(qBruto) ? qBruto[0] : qBruto)?.slice(0, 80) ?? "";
   const clientes = await listCustomers(q);
+  const grupos = agruparPorInicial(clientes);
 
   return (
     <div className="flex flex-col gap-10">
       <CabecalhoDePagina
         sobretitulo="Relacionamento"
-        titulo="Clientes"
-        descricao="Quem tem conta na loja. Para dar acesso ao painel a alguém, use o comando admin:criar no terminal."
+        titulo="Caderneta"
+        descricao="Todo mundo que tem conta na loja, por ordem alfabética. Para dar acesso ao painel a alguém, use o comando admin:criar no terminal."
         acoes={
           <form action="/admin/clientes" method="get" role="search" className="flex flex-wrap items-center gap-2">
             <label htmlFor="busca-clientes" className="sr-only">
@@ -75,69 +79,98 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
       {clientes.length === 0 ? (
         <p className="text-xl font-medium">{q ? `Nenhum cliente encontrado para "${q}".` : "Ainda não há clientes cadastrados."}</p>
       ) : (
-        <ul className="flex flex-col">
-          {/* Cabeçalho da tabela: só em telas largas. No celular, cada cliente vira um bloco com os rótulos dentro. */}
-          <li aria-hidden="true" className="hidden grid-cols-[2fr_2fr_1.4fr_0.7fr_1fr_1fr] gap-4 border-b-2 border-foreground pb-3 font-mono text-xs font-bold uppercase tracking-[0.15em] lg:grid">
-            <span>Cliente</span>
-            <span>E-mail</span>
-            <span>Celular</span>
-            <span>Pedidos</span>
-            <span>Gasto</span>
-            <span>Desde</span>
-          </li>
-          {clientes.map((c) => {
-            const zap = clienteWhatsappLink(c.phone, `Olá, ${c.name.split(" ")[0]}! Aqui é da DarkWear.`);
-            return (
-              <li key={c.id} className="border-b-2 border-foreground py-5">
-                <div className="grid gap-x-4 gap-y-2 text-lg font-medium lg:grid-cols-[2fr_2fr_1.4fr_0.7fr_1fr_1fr] lg:items-center">
-                  <p className="flex flex-wrap items-center gap-2 font-bold">
-                    {c.name}
-                    {c.role === "admin" && <span className="border-2 border-foreground px-2 py-0.5 font-mono text-xs uppercase tracking-[0.12em]">Administrador</span>}
-                    {c.mustChangePassword && <span className="border-2 border-foreground bg-foreground px-2 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-background">Senha provisória</span>}
-                  </p>
-                  <p className="break-all">
-                    <span className="mr-2 font-mono text-xs uppercase tracking-[0.12em] lg:hidden">E-mail</span>
-                    {c.email}
-                  </p>
-                  <p>
-                    <span className="mr-2 font-mono text-xs uppercase tracking-[0.12em] lg:hidden">Celular</span>
-                    {zap ? (
-                      <a href={zap} className="underline underline-offset-4">
-                        {celular(c.phone)}
-                      </a>
-                    ) : (
-                      celular(c.phone)
-                    )}
-                  </p>
-                  <p>
-                    <span className="mr-2 font-mono text-xs uppercase tracking-[0.12em] lg:hidden">Pedidos</span>
-                    {c.pedidos > 0 ? (
-                      <Link href={`/admin/pedidos?q=${encodeURIComponent(c.email)}`} className="underline underline-offset-4">
-                        {c.pedidos}
-                      </Link>
-                    ) : (
-                      "0"
-                    )}
-                  </p>
-                  <p>
-                    <span className="mr-2 font-mono text-xs uppercase tracking-[0.12em] lg:hidden">Gasto</span>
-                    {formatCents(c.gastoCents)}
-                  </p>
-                  <p>
-                    <span className="mr-2 font-mono text-xs uppercase tracking-[0.12em] lg:hidden">Desde</span>
-                    {dataBr.format(c.createdAt)}
-                  </p>
-                </div>
-                {/* Administrador não tem botão de senha: só o comando de terminal mexe nele. */}
-                {c.role !== "admin" && (
-                  <div className="mt-4">
-                    <SenhaProvisoria id={c.id} nome={c.name} />
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          {/* O índice da caderneta: uma letra por grupo, cada uma leva ao seu grupo. */}
+          <nav aria-label="Índice da caderneta" className="flex flex-wrap gap-2">
+            {grupos.map((g) => (
+              <a
+                key={g.letra}
+                href={`#letra-${g.letra === "#" ? "outros" : g.letra}`}
+                className="flex h-11 w-11 items-center justify-center border-2 border-foreground font-display text-2xl leading-none transition-colors hover:bg-foreground hover:text-background"
+              >
+                {g.letra}
+              </a>
+            ))}
+            <span className="flex items-center pl-3 font-mono text-sm font-bold">
+              {clientes.length} {clientes.length === 1 ? "contato" : "contatos"}
+            </span>
+          </nav>
+
+          <div className="flex flex-col">
+            {grupos.map((g) => (
+              <section key={g.letra} id={`letra-${g.letra === "#" ? "outros" : g.letra}`} className="grid gap-x-10 border-t-2 border-foreground py-8 lg:grid-cols-[9rem_1fr]">
+                {/* A letra do grupo, gigante, como a orelha de uma agenda. */}
+                <h2 className="font-display text-[clamp(5rem,12vw,9rem)] uppercase leading-[0.8]" aria-label={`Clientes com a inicial ${g.letra}`}>
+                  {g.letra}
+                </h2>
+
+                <ul className="mt-4 lg:mt-0">
+                  {g.itens.map((c) => {
+                    const zap = clienteWhatsappLink(c.phone, `Olá, ${c.name.split(" ")[0]}! Aqui é da DarkWear.`);
+                    return (
+                      <li key={c.id} className="border-b-2 border-dotted border-foreground py-5 first:pt-0 last:border-b-0">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+                          <p className="flex flex-wrap items-center gap-3 font-display text-4xl uppercase leading-none">
+                            {c.name}
+                            {c.role === "admin" && (
+                              <span className="bg-foreground px-2 py-1 font-mono text-xs font-bold uppercase tracking-[0.12em] text-background">Administrador</span>
+                            )}
+                            {c.mustChangePassword && (
+                              <span className="border-2 border-foreground px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em]">Senha provisória</span>
+                            )}
+                          </p>
+                          <span className="font-mono text-xs font-bold uppercase tracking-[0.12em]">cliente {tempoRelativo(c.createdAt)}</span>
+                        </div>
+
+                        <dl className="mt-3 grid gap-x-8 gap-y-1 text-lg font-medium sm:grid-cols-2">
+                          <div>
+                            <dt className="font-mono text-xs font-bold uppercase tracking-[0.12em]">E-mail</dt>
+                            <dd className="break-all">{c.email}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-mono text-xs font-bold uppercase tracking-[0.12em]">Celular</dt>
+                            <dd>
+                              {zap ? (
+                                <a href={zap} className="underline underline-offset-4">
+                                  {celular(c.phone)} · chamar
+                                </a>
+                              ) : (
+                                celular(c.phone)
+                              )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-mono text-xs font-bold uppercase tracking-[0.12em]">Pedidos</dt>
+                            <dd>
+                              {c.pedidos > 0 ? (
+                                <Link href={`/admin/pedidos?q=${encodeURIComponent(c.email)}`} className="underline underline-offset-4">
+                                  {c.pedidos} {c.pedidos === 1 ? "pedido" : "pedidos"}
+                                </Link>
+                              ) : (
+                                "Nenhum ainda"
+                              )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-mono text-xs font-bold uppercase tracking-[0.12em]">Já gastou</dt>
+                            <dd>{formatCents(c.gastoCents)}</dd>
+                          </div>
+                        </dl>
+
+                        {/* Administrador não tem botão de senha: só o comando de terminal mexe nele. */}
+                        {c.role !== "admin" && (
+                          <div className="mt-4">
+                            <SenhaProvisoria id={c.id} nome={c.name} />
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
