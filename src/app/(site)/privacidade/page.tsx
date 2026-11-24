@@ -18,7 +18,7 @@ const BLOCOS = [
   {
     titulo: "Que dados guardamos",
     texto:
-      "Quando você cria uma conta: nome, e-mail, celular e a sua senha (a senha é guardada apenas de forma embaralhada, nunca em texto: nem nós conseguimos lê-la). Quando você cadastra a entrega: o endereço (CEP, rua, número, complemento, bairro, cidade e estado). Quando você compra: as peças do pedido, os valores, as datas, a situação do pagamento e uma cópia do endereço usado naquele pedido. Não pedimos CPF.",
+      "Quando você cria uma conta: nome, e-mail, celular e a sua senha (a senha é guardada apenas de forma embaralhada, nunca em texto: nem nós conseguimos lê-la). Quando você cadastra a entrega: o endereço (CEP, rua, número, complemento, bairro, cidade e estado). Quando você compra: as peças do pedido, os valores (com o cupom de desconto, se você usou), as datas, a situação do pagamento, o código de rastreio do envio e uma cópia do endereço usado naquele pedido. Não pedimos CPF.",
   },
   {
     titulo: "Para que usamos",
@@ -38,7 +38,7 @@ const BLOCOS = [
   {
     titulo: "Seus direitos",
     texto:
-      "Você pode ver os seus dados na página Sua conta, trocar a senha, sair de todos os aparelhos e excluir a conta a qualquer momento, sem precisar pedir a ninguém. Para qualquer outra dúvida sobre os seus dados, fale com a gente pelo WhatsApp.",
+      "Você pode ver os seus dados na página Sua conta, baixar uma cópia deles em um arquivo, trocar a senha, sair de todos os aparelhos e excluir a conta a qualquer momento, sem precisar pedir a ninguém. Para qualquer outra dúvida sobre os seus dados, fale com a gente pelo WhatsApp.",
   },
 ];
 

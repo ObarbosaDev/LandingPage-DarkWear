@@ -127,6 +127,16 @@ export default async function ContaPage({ searchParams }: { searchParams: Promis
             </form>
           </Etiqueta>
 
+          <Etiqueta titulo="Seus dados">
+            <p className="text-base font-medium">
+              Baixe uma cópia de tudo o que a loja guarda de você (conta, endereço e pedidos) em um arquivo que você pode guardar.
+            </p>
+            {/* Um link comum: o servidor responde com o arquivo para baixar (só os dados de quem está logado). */}
+            <a href="/api/conta/dados" download className={`${botao} mt-5 inline-block`}>
+              Baixar meus dados
+            </a>
+          </Etiqueta>
+
           <Etiqueta titulo="Excluir">
             {/* O formulário só aparece depois de abrir: excluir não pode ser um clique sem querer. */}
             <details>
