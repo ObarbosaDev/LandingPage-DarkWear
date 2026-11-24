@@ -17,6 +17,7 @@ const completo = {
   DATABASE_URL: "postgres://x",
   ADMIN_PASSWORD: "uma-senha-bem-longa-123",
   ADMIN_SESSION_SECRET: SEGREDO,
+  CUSTOMER_SESSION_SECRET: "y".repeat(40), // diferente do segredo do painel
   CRON_SECRET: "cron",
   SITE_URL: "https://exemplo.com.br",
 };
@@ -31,8 +32,9 @@ describe("checkEnv", () => {
   it("desenvolvimento sem nada configurado só avisa do painel", () => {
     const r = checkEnv({ NODE_ENV: "development" }, WHATSAPP_EXEMPLO);
     expect(r.errors).toEqual([]);
-    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings).toHaveLength(2);
     expect(r.warnings[0]).toMatch(/painel/);
+    expect(r.warnings[1]).toMatch(/CUSTOMER_SESSION_SECRET/);
   });
 
   // Na Vercel o disco some a cada execução: sem banco de verdade, os pedidos se perderiam.
@@ -118,5 +120,34 @@ describe("checkEnv: Mercado Pago", () => {
 
   it("segredo do aviso sem token avisa que o pagamento continua desligado", () => {
     expect(checkEnv({ ...completo, MERCADOPAGO_WEBHOOK_SECRET: "x" }, REAL).warnings.join(" ")).toMatch(/desligado/);
+  });
+});
+
+// Contas de cliente: comprar exige login, e o login depende do segredo que assina o cookie.
+describe("checkEnv: sessão do cliente", () => {
+  it("em produção, sem CUSTOMER_SESSION_SECRET é erro (ninguém conseguiria comprar)", () => {
+    const r = checkEnv({ ...completo, CUSTOMER_SESSION_SECRET: undefined }, REAL);
+    expect(r.errors.join(" ")).toMatch(/CUSTOMER_SESSION_SECRET/);
+  });
+
+  it.each(["", "curto", "x".repeat(31)])("em produção, segredo %j (menos de 32 caracteres) é erro", (segredo) => {
+    expect(checkEnv({ ...completo, CUSTOMER_SESSION_SECRET: segredo }, REAL).errors.join(" ")).toMatch(/32/);
+  });
+
+  it("com 32 caracteres ou mais, está certo", () => {
+    expect(checkEnv({ ...completo, CUSTOMER_SESSION_SECRET: "x".repeat(32) }, REAL).errors).toEqual([]);
+  });
+
+  it("em desenvolvimento, sem o segredo é só aviso", () => {
+    const r = checkEnv({ NODE_ENV: "development", CUSTOMER_SESSION_SECRET: undefined }, WHATSAPP_EXEMPLO);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings.join(" ")).toMatch(/CUSTOMER_SESSION_SECRET/);
+  });
+
+  // Usar o mesmo segredo do painel não é erro (os tokens têm prefixos diferentes), mas é descuido.
+  it("segredo igual ao do painel gera aviso", () => {
+    const r = checkEnv({ ...completo, CUSTOMER_SESSION_SECRET: completo.ADMIN_SESSION_SECRET }, REAL);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings.join(" ")).toMatch(/igual ao do painel|ADMIN_SESSION_SECRET/);
   });
 });

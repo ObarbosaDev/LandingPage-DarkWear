@@ -55,6 +55,18 @@ export function checkEnv(env: Env = process.env, whatsapp: string = SITE.whatsap
     if (senha && producao && senha.length < 12) warnings.push("ADMIN_PASSWORD tem menos de 12 caracteres: use uma senha mais longa.");
   }
 
+  // Contas de cliente: comprar exige login, e o login depende deste segredo (assina o cookie da sessão).
+  // Sem ele, ninguém consegue entrar e, portanto, ninguém consegue comprar: em produção é erro.
+  const segredoCliente = env.CUSTOMER_SESSION_SECRET ?? "";
+  if (segredoCliente.length < 32) {
+    (producao ? errors : warnings).push(
+      "CUSTOMER_SESSION_SECRET não definida ou com menos de 32 caracteres: cadastro e login de clientes (e, portanto, as compras) não funcionam.",
+    );
+  } else if (segredoCliente === segredo) {
+    // Funciona (os tokens têm prefixos diferentes), mas uma chave vazada do painel passaria a comprometer as contas.
+    warnings.push("CUSTOMER_SESSION_SECRET é igual ao ADMIN_SESSION_SECRET: use um valor diferente para cada um.");
+  }
+
   // Expiração de pedidos pendentes: sem CRON_SECRET a rota do cron fica fechada e nada expira.
   if (producao && !env.CRON_SECRET) {
     warnings.push("CRON_SECRET não definida: pedidos pendentes não expiram e seguram o estoque até serem cancelados à mão.");
