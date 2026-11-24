@@ -47,9 +47,12 @@ const assinar = (dados: string, segredo: string) => createHmac("sha256", segredo
  * startCustomerSession, que a chama.
  * @throws se o segredo for curto: um segredo fraco é fácil de adivinhar por tentativa e erro
  */
-export function signSession(p: { id: number; version: number; exp: number }, segredo: string): string {
+export function signSession(p: { id: number; version: number; exp: number }, segredo: string, iat: number = Date.now()): string {
   if (typeof segredo !== "string" || segredo.length < 32) throw new Error("O segredo da sessão precisa ter pelo menos 32 caracteres.");
-  const dados = Buffer.from(JSON.stringify({ id: p.id, v: p.version, exp: p.exp })).toString("base64url");
+  // "iat" (emitido em) = o instante do LOGIN. O painel só abre para logins recentes (ver admin/auth.ts), então
+  // este horário não pode ser renovado sem a pessoa provar a senha: ao reabrir a sessão de um aparelho já
+  // logado, repassa-se o iat original.
+  const dados = Buffer.from(JSON.stringify({ id: p.id, v: p.version, exp: p.exp, iat })).toString("base64url");
   return `${dados}.${assinar(dados, segredo)}`;
 }
 
@@ -60,7 +63,7 @@ export function signSession(p: { id: number; version: number; exp: number }, seg
  *
  * @param agora o "agora" em milissegundos (parâmetro só para os testes)
  */
-export function verifySession(token: string, segredo: string, agora: number = Date.now()): { id: number; version: number } | null {
+export function verifySession(token: string, segredo: string, agora: number = Date.now()): { id: number; version: number; iat: number } | null {
   if (typeof token !== "string" || token.length === 0 || token.length > 1000) return null;
   if (typeof segredo !== "string" || segredo.length < 32) return null;
   const partes = token.split(".");
@@ -75,12 +78,13 @@ export function verifySession(token: string, segredo: string, agora: number = Da
 
   // A assinatura bateu: agora confere o conteúdo. Mesmo assinado por nós, um valor estranho é recusado.
   try {
-    const { id, v, exp } = JSON.parse(Buffer.from(dados, "base64url").toString("utf8")) as { id?: unknown; v?: unknown; exp?: unknown };
+    const { id, v, exp, iat } = JSON.parse(Buffer.from(dados, "base64url").toString("utf8")) as { id?: unknown; v?: unknown; exp?: unknown; iat?: unknown };
     if (typeof id !== "number" || !Number.isSafeInteger(id) || id < 1) return null;
     if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 1) return null;
     // Vencido, ou com validade maior que a que nós damos (mais de 31 dias): não foi feito por nós.
     if (typeof exp !== "number" || !Number.isFinite(exp) || exp <= agora || exp > agora + (DIAS + 1) * MS_DIA) return null;
-    return { id, version: v };
+    // Cookie de antes desta regra (sem "iat") conta como login antigo: vale para o site, nunca para o painel.
+    return { id, version: v, iat: typeof iat === "number" && Number.isFinite(iat) ? iat : 0 };
   } catch {
     return null;
   }
@@ -89,11 +93,14 @@ export function verifySession(token: string, segredo: string, agora: number = Da
 /**
  * Abre a sessão: grava o cookie no navegador. Chamada depois de uma senha certa (ou de um cadastro novo).
  * @param version a versão da sessão da conta naquele momento (customers.session_version)
+ * @param iat     o instante do LOGIN. Padrão: agora. Ao reabrir a sessão de um aparelho que já estava logado
+ *                (ex.: "sair de todos os outros"), passe o original: renovar sem a senha deixaria um cookie
+ *                roubado manter o acesso ao painel para sempre.
  */
-export async function startCustomerSession(id: number, version: number): Promise<void> {
+export async function startCustomerSession(id: number, version: number, iat: number = Date.now()): Promise<void> {
   const segredo = segredoDaSessao();
   if (!segredo) throw new Error("CUSTOMER_SESSION_SECRET ausente ou curto (mínimo 32 caracteres).");
-  const token = signSession({ id, version, exp: Date.now() + DIAS * MS_DIA }, segredo);
+  const token = signSession({ id, version, exp: Date.now() + DIAS * MS_DIA }, segredo, iat);
   (await cookies()).set(COOKIE_CLIENTE, token, {
     // httpOnly: o JavaScript da página não lê o cookie (protege contra roubo por script injetado).
     httpOnly: true,
@@ -113,12 +120,13 @@ export async function endCustomerSession(): Promise<void> {
 }
 
 /**
- * Quem está logado agora, ou null. Confere, nesta ordem: o cookie existe, a assinatura e a validade
- * estão certas, a conta existe e NÃO foi anonimizada, e a versão da sessão do cookie é EXATAMENTE a da
- * conta (se a senha mudou ou a pessoa saiu de todos os aparelhos, a versão avançou e o cookie velho cai).
- * Sem segredo configurado, ninguém está logado.
+ * A sessão atual: quem está logado e QUANDO fez o login (iat). null se não há sessão válida.
+ * É o que o painel usa (precisa do horário do login); o resto do site usa currentCustomer.
+ * Confere, nesta ordem: o cookie existe, a assinatura e a validade estão certas, a conta existe e NÃO foi
+ * anonimizada, e a versão da sessão do cookie é EXATAMENTE a da conta (se a senha mudou ou a pessoa saiu de
+ * todos os aparelhos, a versão avançou e o cookie velho cai). Sem segredo configurado, ninguém está logado.
  */
-export async function currentCustomer(): Promise<CustomerView | null> {
+export async function currentSession(): Promise<{ customer: CustomerView; iat: number } | null> {
   await connection(); // a validade depende da hora atual: sempre no momento do pedido
   const segredo = segredoDaSessao();
   if (!segredo) return null;
@@ -128,7 +136,12 @@ export async function currentCustomer(): Promise<CustomerView | null> {
   if (!sessao) return null;
   const cliente = await getCustomer(sessao.id);
   if (!cliente || cliente.sessionVersion !== sessao.version) return null;
-  return cliente;
+  return { customer: cliente, iat: sessao.iat };
+}
+
+/** Quem está logado agora, ou null (ver currentSession para o que é conferido). */
+export async function currentCustomer(): Promise<CustomerView | null> {
+  return (await currentSession())?.customer ?? null;
 }
 
 /**
@@ -136,11 +149,15 @@ export async function currentCustomer(): Promise<CustomerView | null> {
  * para onde voltar. Cada página e cada ação repete a conferência de propósito: uma ação pode ser
  * chamada direto, sem passar pela página.
  *
- * @param next para onde voltar depois de entrar (passa por safeNext; qualquer destino suspeito vira /conta)
+ * @param next   para onde voltar depois de entrar (passa por safeNext; qualquer destino suspeito vira /conta)
+ * @param opcoes permitirSenhaProvisoria: só a página da conta usa, para a pessoa poder trocar a senha provisória
  */
-export async function requireCustomer(next?: string): Promise<CustomerView> {
+export async function requireCustomer(next?: string, opcoes: { permitirSenhaProvisoria?: boolean } = {}): Promise<CustomerView> {
   const cliente = await currentCustomer();
   if (!cliente) redirect(`/conta/entrar?next=${encodeURIComponent(safeNext(next))}`);
+  // Quem entrou com uma senha PROVISÓRIA (gerada pelo painel ou pelo comando do dono) só pode trocá-la: todo o
+  // resto fica fechado até a troca. A única tela que deixa passar é a própria página da conta.
+  if (cliente.mustChangePassword && !opcoes.permitirSenhaProvisoria) redirect("/conta?trocar=1");
   return cliente;
 }
 

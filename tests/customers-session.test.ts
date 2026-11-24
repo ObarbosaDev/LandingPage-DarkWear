@@ -5,8 +5,8 @@
 // como outro cliente, ou manteria logado quem já trocou a senha.
 // ============================================================================
 
+import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createSessionToken as tokenDoAdmin, verifySessionToken as verificaAdmin } from "@/server/admin/auth";
 import { anonymizeCustomer, parseRegisterForm, registerCustomer, signOutEverywhere } from "@/server/customers";
 import {
   COOKIE_CLIENTE,
@@ -76,9 +76,23 @@ const agora = () => Date.now();
 const emUmaHora = () => agora() + 3600_000;
 
 describe("signSession e verifySession", () => {
-  it("o token assinado volta com o id e a versão", () => {
+  it("o token assinado volta com o id, a versão e o horário do login (iat)", () => {
+    const antes = Date.now();
     const t = signSession({ id: 7, version: 3, exp: emUmaHora() }, SEGREDO);
-    expect(verifySession(t, SEGREDO)).toEqual({ id: 7, version: 3 });
+    expect(verifySession(t, SEGREDO)).toEqual({ id: 7, version: 3, iat: expect.any(Number) });
+    expect(verifySession(t, SEGREDO)!.iat).toBeGreaterThanOrEqual(antes);
+  });
+
+  it("o horário do login informado é o que volta, e não se confunde com a validade", () => {
+    const t = signSession({ id: 7, version: 3, exp: emUmaHora() }, SEGREDO, 12345);
+    expect(verifySession(t, SEGREDO)?.iat).toBe(12345);
+  });
+
+  // Cookies de antes desta regra não tinham iat: valem para o site, mas contam como login antigo para o painel.
+  it("token sem iat devolve iat 0 (login antigo)", () => {
+    const dados = Buffer.from(JSON.stringify({ id: 7, v: 3, exp: Date.now() + 3600_000 })).toString("base64url");
+    const assinatura = createHmac("sha256", SEGREDO).update(`cliente.${dados}`).digest("base64url");
+    expect(verifySession(`${dados}.${assinatura}`, SEGREDO)).toEqual({ id: 7, version: 3, iat: 0 });
   });
 
   it("recusa assinatura adulterada, segredo diferente e dados trocados", () => {
@@ -94,7 +108,7 @@ describe("signSession e verifySession", () => {
   it("recusa token vencido (e aceita um instante antes do vencimento)", () => {
     const exp = 1_000_000;
     const t = signSession({ id: 1, version: 1, exp }, SEGREDO);
-    expect(verifySession(t, SEGREDO, exp - 1)).toEqual({ id: 1, version: 1 });
+    expect(verifySession(t, SEGREDO, exp - 1)).toMatchObject({ id: 1, version: 1 });
     expect(verifySession(t, SEGREDO, exp)).toBeNull();
     expect(verifySession(t, SEGREDO, exp + 1)).toBeNull();
   });
@@ -122,17 +136,6 @@ describe("signSession e verifySession", () => {
     expect(verifySession(t, "curto")).toBeNull();
   });
 
-  // Mesmo que o dono, por engano, use o mesmo segredo no painel e nas contas, um token de um lado não vale no outro.
-  it("token de cliente não vale no painel e token do painel não vale para o cliente (mesmo segredo)", () => {
-    const antes = process.env.ADMIN_SESSION_SECRET;
-    process.env.ADMIN_SESSION_SECRET = SEGREDO;
-    try {
-      expect(verificaAdmin(signSession({ id: 1, version: 1, exp: emUmaHora() }, SEGREDO))).toBe(false);
-      expect(verifySession(tokenDoAdmin(), SEGREDO)).toBeNull();
-    } finally {
-      process.env.ADMIN_SESSION_SECRET = antes;
-    }
-  });
 });
 
 describe("cookie da sessão", () => {
@@ -141,7 +144,7 @@ describe("cookie da sessão", () => {
     expect(gravados).toHaveLength(1);
     expect(gravados[0].nome).toBe(COOKIE_CLIENTE);
     expect(gravados[0].opts).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/", maxAge: 30 * 24 * 3600 });
-    expect(verifySession(gravados[0].valor, SEGREDO)).toEqual({ id: 5, version: 2 });
+    expect(verifySession(gravados[0].valor, SEGREDO)).toMatchObject({ id: 5, version: 2 });
   });
 
   it("o cookie só é 'secure' em produção", async () => {

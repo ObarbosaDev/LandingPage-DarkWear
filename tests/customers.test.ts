@@ -126,7 +126,7 @@ describe("registerCustomer", () => {
 describe("authenticate", () => {
   it("senha certa entra (em qualquer caixa do e-mail)", async () => {
     const id = await criar();
-    expect(await authenticate("ana@exemplo.com", SENHA)).toEqual({ id, sessionVersion: 1, mustChangePassword: false });
+    expect(await authenticate("ana@exemplo.com", SENHA)).toEqual({ id, sessionVersion: 1, mustChangePassword: false, role: "cliente" });
     expect(await authenticate("  ANA@exemplo.com ", SENHA)).toMatchObject({ id });
   });
 
@@ -172,7 +172,7 @@ describe("changePassword", () => {
     const id = await criar();
     expect(await changePassword(id, SENHA, "outra senha forte 456")).toBe("ok");
     expect(await authenticate("ana@exemplo.com", SENHA)).toBeNull();
-    expect(await authenticate("ana@exemplo.com", "outra senha forte 456")).toEqual({ id, sessionVersion: 2, mustChangePassword: false });
+    expect(await authenticate("ana@exemplo.com", "outra senha forte 456")).toEqual({ id, sessionVersion: 2, mustChangePassword: false, role: "cliente" });
   });
 
   it("senha atual errada ou senha nova inválida não mudam nada", async () => {
@@ -242,7 +242,7 @@ describe("setTemporaryPassword", () => {
     const temp = await setTemporaryPassword(id);
     expect(temp).toMatch(/^[A-Za-z0-9]{16}$/);
     expect(await authenticate("ana@exemplo.com", SENHA)).toBeNull(); // a antiga deixa de valer
-    expect(await authenticate("ana@exemplo.com", temp)).toEqual({ id, sessionVersion: 2, mustChangePassword: true });
+    expect(await authenticate("ana@exemplo.com", temp)).toEqual({ id, sessionVersion: 2, mustChangePassword: true, role: "cliente" });
     // Trocar a senha limpa a obrigação.
     expect(await changePassword(id, temp, "senha definitiva 789")).toBe("ok");
     expect(await authenticate("ana@exemplo.com", "senha definitiva 789")).toMatchObject({ mustChangePassword: false });

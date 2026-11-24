@@ -34,6 +34,8 @@ export type CustomerView = {
   sessionVersion: number;
   /** Verdadeiro depois de uma senha provisória: a pessoa só deve conseguir trocar a senha. */
   mustChangePassword: boolean;
+  /** "admin" abre o painel (ver src/server/admin/auth.ts); todo o resto é "cliente". */
+  role: "cliente" | "admin";
   createdAt: Date;
 };
 
@@ -139,7 +141,7 @@ export async function registerCustomer(input: RegisterInput): Promise<{ ok: true
 export async function authenticate(
   email: string,
   password: string,
-): Promise<{ id: number; sessionVersion: number; mustChangePassword: boolean } | null> {
+): Promise<{ id: number; sessionVersion: number; mustChangePassword: boolean; role: "cliente" | "admin" } | null> {
   if (typeof email !== "string" || typeof password !== "string") {
     await fakeVerify();
     return null;
@@ -154,7 +156,7 @@ export async function authenticate(
     return null;
   }
   if (!(await verifyPassword(password, c.passwordHash))) return null;
-  return { id: c.id, sessionVersion: c.sessionVersion, mustChangePassword: c.mustChangePassword };
+  return { id: c.id, sessionVersion: c.sessionVersion, mustChangePassword: c.mustChangePassword, role: c.role };
 }
 
 /** Um cliente pelo id, sem o hash da senha. null se não existe ou se a conta foi anonimizada. */
@@ -169,6 +171,7 @@ export async function getCustomer(id: number): Promise<CustomerView | null> {
       phone: customers.phone,
       sessionVersion: customers.sessionVersion,
       mustChangePassword: customers.mustChangePassword,
+      role: customers.role,
       createdAt: customers.createdAt,
     })
     .from(customers)
