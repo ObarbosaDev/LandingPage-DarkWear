@@ -124,16 +124,34 @@ Os arquivos `.sql` são incluídos no pacote de produção pelo `outputFileTraci
 
 **Histórico de status.** A tabela `order_status_history` guarda cada mudança de status de um pedido: de qual status, para qual, quando e por quem (o cliente, o painel ou o prazo de expiração). Ele aparece em cada pedido em `/admin/pedidos` e responde "quando esse pedido foi pago?". Pedidos que já existiam antes dessa tabela ganham um histórico reconstruído (criação e status atual).
 
-### Painel do dono
+### Contas, clientes e painel do dono
 
-O painel fica em `/admin` e protege tudo com uma senha única.
+**Comprar exige conta.** O cliente se cadastra (nome, e-mail, celular e senha; sem CPF) em `/conta/cadastro`, entra em `/conta/entrar` e acompanha os pedidos em `/conta/pedidos`. A senha nunca é guardada: só um hash `scrypt`. A sessão é um cookie assinado de 30 dias (`httpOnly`, `sameSite=lax`); trocar a senha ou "sair de todos os aparelhos" derruba os cookies antigos. Entrar tem limite de tentativas por origem (8 em 15 min) e por e-mail (5 erros em 15 min). Cada cliente só vê os próprios pedidos: o de outra pessoa responde "não encontrado", igual a um número que não existe. "Excluir minha conta" apaga os dados pessoais e mantém os pedidos, sem ligação com a pessoa. A política de privacidade está em `/privacidade`.
 
 | Variável | Para que serve |
 | --- | --- |
-| `ADMIN_PASSWORD` | Senha de entrada do painel. |
-| `ADMIN_SESSION_SECRET` | Segredo que assina o cookie de sessão (mínimo de 32 caracteres, aleatório). |
+| `CUSTOMER_SESSION_SECRET` | Segredo que assina o cookie da sessão (mínimo de 32 caracteres, aleatório). **Obrigatório em produção**: sem ele ninguém consegue entrar e, portanto, comprar. |
 
-Copie `.env.example` para `.env.local` e preencha as duas. Sem elas, o painel não abre. A sessão dura 12 horas, o cookie é `httpOnly` e `sameSite=strict`, e cada página e cada ação conferem a sessão. O login tem limite de 5 erros em 15 minutos por origem, guardado no banco (vale entre instâncias). A origem vem do cabeçalho que a hospedagem define (`x-vercel-forwarded-for` ou `x-real-ip`); fora de uma hospedagem assim, todos compartilham a mesma origem.
+**O painel não tem senha própria nem tela de login.** Quem administra a loja é uma **conta com papel `admin`**, que entra pela **mesma tela de todo mundo**, com e-mail e senha pessoais, e é levada ao painel. Não existe botão, link nem gesto de admin no site. O papel **só** é concedido por comando de terminal do dono (nunca por formulário ou API):
+
+| Comando | O que faz |
+| --- | --- |
+| `npm run admin:criar -- --email maria@loja.com --nome "Maria Souza" --celular 11987654321` | cria (ou promove, se a conta já existe) um administrador e mostra uma **senha provisória, uma única vez** |
+| `npm run admin:senha -- --email maria@loja.com` | gera outra senha provisória (esqueceu a senha) |
+| `npm run admin:remover -- --email maria@loja.com` | tira o acesso ao painel e derruba as sessões abertas |
+| `npm run admin:listar` | lista quem administra hoje |
+
+Para dar acesso a alguém: rode `admin:criar`, copie o e-mail e a senha provisória e passe à pessoa. No primeiro acesso ela é **obrigada a trocar a senha**. Com `DATABASE_URL` os comandos falam com o banco de produção; sem ela, com o banco local (pare o servidor de desenvolvimento antes).
+
+Como o painel é protegido (três camadas):
+
+1. **Porteiro (`src/proxy.ts`):** antes de qualquer página de `/admin`, confere o cookie assinado. Quem não tem um cookie de administrador válido recebe um **404 de verdade**, idêntico ao de qualquer endereço que não existe (sem título, sem texto, sem pista de que há um painel). O papel no cookie é só uma dica rápida, sem banco.
+2. **Banco (`requireAdmin`):** o layout e **cada ação** do painel conferem de novo, no banco, se a conta existe, ainda é administradora e entrou há **menos de 12 horas** (o cookie de cliente vale 30 dias; o acesso ao painel, 12 h). Uma ação chamada direto, sem passar pela tela, é barrada do mesmo jeito.
+3. **Papel inalterável pela web:** nenhuma tela escreve o papel. A senha provisória gerada em `/admin/clientes` recusa contas de administrador (elas só se gerenciam pelo terminal).
+
+O painel é o "bastidores" da loja, com uma ideia por tela: **Painel** (fechamento de caixa em forma de recibo e quadro de avisos), **Esteira** (pedidos em colunas Pendente → Pago → Enviado → Entregue, com o botão do passo seguinte no cartão), **Encomendas** (fila de arte, com a ficha de estampa e o mapa da posição), **Prateleira** (produtos em quadrados com a pilha de estoque) e **Caderneta** (clientes em ordem alfabética, com busca e senha provisória). Um letreiro no topo mostra o que espera pelo dono.
+
+A conta de administrador é uma conta como as outras (aparece em `/conta`). `ADMIN_PASSWORD` e `ADMIN_SESSION_SECRET` **não são mais usadas** (o servidor avisa se sobrarem no ambiente).
 
 Na Vercel, sem `DATABASE_URL` a aplicação falha com uma mensagem clara, em vez de usar um banco que se perderia a cada execução.
 
@@ -213,7 +231,7 @@ Todo arquivo de código começa com um cabeçalho que diz **o que ele é, quem o
 Um caminho sugerido para entender o sistema:
 
 1. `src/server/orders.ts`: como um pedido é registrado e o estoque é protegido.
-2. `src/server/admin/auth.ts`: como o painel do dono é protegido.
+2. `src/proxy.ts`, `src/server/admin/auth.ts` e `src/server/customers/`: como as contas e o painel são protegidos (porteiro, sessão, senha e papel).
 3. `src/app/(site)/carrinho/page.tsx` e `src/app/api/orders/route.ts`: o caminho do clique em "Finalizar" até o WhatsApp.
 4. `src/app/admin/actions.ts`: tudo o que o dono pode fazer no painel.
 5. `tests/`: cada teste explica, em uma frase, a regra que ele garante.
@@ -230,7 +248,11 @@ Um caminho sugerido para entender o sistema:
 | `/sobre` | Sobre a marca, com o processo DTF em quatro etapas |
 | `/faq` | Perguntas frequentes em formato de conversa |
 | `/contato` | Folha para escrever a mensagem que abre pronta no WhatsApp |
-| `/admin` | Painel do dono (exige senha): resumo, pedidos, encomendas e produtos |
+| `/conta/entrar`, `/conta/cadastro` | Entrar e criar conta (a mesma entrada vale para clientes e administradores) |
+| `/conta`, `/conta/pedidos`, `/conta/pedidos/[numero]` | A conta, os pedidos do cliente e o comprovante de cada um |
+| `/pagamento/retorno` | Situação do pagamento (do próprio cliente) |
+| `/privacidade` | Política de privacidade |
+| `/admin/*` | Painel do dono (só administradores; para os demais é um 404 comum): resumo, esteira, encomendas, prateleira e caderneta |
 
 ## API
 
@@ -263,13 +285,14 @@ curl -X POST http://localhost:3000/api/orders \
 
 O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **persistidos em banco**. Ainda faltam peças para ser um e-commerce completo:
 
-- **Painel simples:** senha única, sem vários usuários nem recuperação de senha (para isso, migrar para um provedor como o Clerk).
+- **Sem recuperação de senha por e-mail:** quem esquece a senha pede ao dono, que gera uma senha provisória em `/admin/clientes` (administradores, pelo `admin:senha`). A recuperação automática precisa de um serviço de e-mail, que ainda não existe.
+- **Sem entrar com Google nem link por e-mail:** dependem de contas externas do dono.
 - **Fotos no banco:** o upload do painel guarda a imagem no Postgres (até 2 MB, sem redimensionar). Serve bem para um catálogo pequeno; se o volume crescer, migrar para um armazenamento de arquivos como o Vercel Blob. Prefira fotos já otimizadas (WebP).
 - **Pagamento online ainda não testado contra o Mercado Pago real:** a integração foi validada com a API simulada. O formato da assinatura do aviso (`x-signature`) precisa ser conferido com o botão "Simular" do painel deles antes de publicar. Sem `MERCADOPAGO_ACCESS_TOKEN`, Pix e cartão seguem combinados no WhatsApp e o pedido nasce `pendente`.
 - **Sem estorno pelo painel:** estornos e disputas são feitos no painel do Mercado Pago.
 - **Pedido pendente expira só por prazo fixo:** a baixa acontece quando o pedido é registrado, e o cron cancela os pendentes depois de 48 horas. Não há aviso ao cliente nem prazo por pedido.
-- **Sem cálculo de frete.**
-- **Sem contas de cliente:** a compra é sem cadastro.
+- **Sem cálculo de frete:** previsto para a etapa 3 (Correios, com plano B no WhatsApp). Precisa de contrato com os Correios.
+- **Sem endereço na conta:** o endereço de entrega ainda é combinado no WhatsApp (etapa 2 do plano em `docs/superpowers/plans/`).
 - **Neon ainda não testado:** o caminho de produção usa o driver serverless do Neon, mas foi validado apenas contra o Postgres embutido. Teste com um banco Neon real antes de publicar.
 - **Catálogo de exemplo:** nomes, preços e estoque são de exemplo e devem ser substituídos pelos reais.
 
@@ -278,9 +301,9 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 1. Provisionar o Neon na Vercel (precisa da conta do dono) e testar contra o banco real.
 2. Trocar o número de WhatsApp de exemplo em `src/lib/site.ts` pelo número da loja.
 3. Criar a conta e a aplicação no Mercado Pago, cadastrar o aviso e testar o pagamento com as credenciais de teste.
-4. Mostrar o pagamento (forma, parcelas) em cada pedido do painel.
-5. Cálculo de frete.
-6. Área "Meus pedidos", opcional e sem cadastro obrigatório.
+4. Criar o primeiro administrador em produção (`npm run admin:criar`) e definir `CUSTOMER_SESSION_SECRET` na Vercel.
+5. Endereço na conta (etapa 2) e cálculo de frete pelos Correios (etapa 3).
+6. Serviço de e-mail, para recuperação de senha.
 
 ## Direitos de imagem
 
