@@ -247,11 +247,21 @@ describe("contagensDoPainel (os números pequenos da barra de navegação)", () 
     await createOrder(item(), ana);
     await createOrder(item(), ana);
     await setStatus(a.id, "pago"); // saiu dos pendentes
-    expect(await contagensDoPainel()).toEqual({ pedidosPendentes: 2, encomendasNovas: 0 });
+    expect(await contagensDoPainel()).toMatchObject({ pedidosPendentes: 2, encomendasNovas: 0 });
   });
 
   it("sem nada, devolve zeros", async () => {
-    expect(await contagensDoPainel()).toEqual({ pedidosPendentes: 0, encomendasNovas: 0 });
+    expect(await contagensDoPainel()).toEqual({ pedidosPendentes: 0, encomendasNovas: 0, pedidosHoje: 0, pagamentosParaConferir: 0 });
+  });
+
+  // Os mesmos números do ticker (a faixa que corre no topo do painel): hoje e pagamentos a conferir.
+  it("também traz os pedidos de hoje e os pagamentos a conferir, para a faixa do topo", async () => {
+    const ana = await clienteDeTeste();
+    const a = await createOrder(item(), ana);
+    await createOrder(item(), ana);
+    await setStatus(a.id, "cancelado");
+    await (await getDb()).insert(payments).values({ orderId: a.id, provider: "mercadopago", providerPaymentId: "55", status: "aprovado", amountCents: 8990 });
+    expect(await contagensDoPainel()).toEqual({ pedidosPendentes: 1, encomendasNovas: 0, pedidosHoje: 2, pagamentosParaConferir: 1 });
   });
 });
 

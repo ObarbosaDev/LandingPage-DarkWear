@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import { agruparPorInicial } from "@/lib/grouping";
+import { saudacao } from "@/lib/greeting";
 import { medidorDeEstoque } from "@/lib/stock-meter";
 import { tempoRelativo } from "@/lib/relative-time";
 
@@ -124,3 +125,25 @@ describe("medidorDeEstoque (a pilha de camisetas)", () => {
     }
   });
 });
+
+describe("saudacao (pelo horário de São Paulo, não do servidor)", () => {
+  // 15:00 UTC = 12:00 em São Paulo (UTC-3).
+  const em = (iso: string) => new Date(iso);
+  it.each([
+    ["2026-11-23T08:00:00Z", "Bom dia"], // 05:00 em SP
+    ["2026-11-23T14:59:00Z", "Bom dia"], // 11:59
+    ["2026-11-23T15:00:00Z", "Boa tarde"], // 12:00
+    ["2026-11-23T20:59:00Z", "Boa tarde"], // 17:59
+    ["2026-11-23T21:00:00Z", "Boa noite"], // 18:00
+    ["2026-11-24T01:00:00Z", "Boa noite"], // 22:00 do dia 23
+    ["2026-11-24T03:00:00Z", "Boa madrugada"], // 00:00
+    ["2026-11-24T07:59:00Z", "Boa madrugada"], // 04:59
+  ])("%s → %s", (iso, texto) => {
+    expect(saudacao(em(iso))).toBe(texto);
+  });
+
+  it("data inválida não quebra: cai num cumprimento neutro", () => {
+    expect(saudacao(new Date("lixo"))).toBe("Olá");
+  });
+});
+

@@ -14,15 +14,50 @@ import { getDb } from "@/server/db";
 import { customOrders, customers, orders, payments, products, type OrderStatus } from "@/server/db/schema";
 import { listOrders } from "@/server/admin/orders";
 
+type Db = Awaited<ReturnType<typeof getDb>>;
+
+// Os "dias" e "meses" do dono são os de São Paulo, não os do servidor (que pode estar em outro fuso).
+const inicioDoDia = sql`date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'`;
+const inicioDoMes = sql`date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'`;
+
+/** Pedidos feitos hoje (dia de São Paulo). */
+async function contarPedidosHoje(db: Db): Promise<number> {
+  const [hoje] = await db.select({ n: count() }).from(orders).where(gte(orders.createdAt, inicioDoDia));
+  return hoje.n;
+}
+
 /**
- * Os dois números pequenos da barra de navegação do painel: pedidos esperando pagamento e encomendas que ninguém
- * atendeu. São só duas contagens, porque rodam em TODA tela do painel.
+ * Pagamentos que pedem a atenção do dono: aprovado em pedido CANCELADO (o cliente pagou e não vai receber) ou
+ * aprovado com valor DIFERENTE do total num pedido ainda pendente. Cada pedido conta uma vez.
  */
-export async function contagensDoPainel(): Promise<{ pedidosPendentes: number; encomendasNovas: number }> {
+async function contarPagamentosParaConferir(db: Db): Promise<number> {
+  const [conferir] = await db
+    .select({ n: sql<number>`count(distinct ${orders.id})::int` })
+    .from(orders)
+    .innerJoin(payments, eq(payments.orderId, orders.id))
+    .where(
+      and(
+        eq(payments.status, "aprovado"),
+        sql`(${orders.status} = 'cancelado' or (${orders.status} = 'pendente' and ${payments.amountCents} is distinct from ${orders.totalCents}))`,
+      ),
+    );
+  return conferir.n;
+}
+
+/**
+ * Os números pequenos da faixa e da barra de navegação do painel, que aparecem em TODA tela: pedidos esperando
+ * pagamento, encomendas que ninguém atendeu, pedidos de hoje e pagamentos a conferir. Poucas contagens, de propósito.
+ */
+export async function contagensDoPainel(): Promise<{ pedidosPendentes: number; encomendasNovas: number; pedidosHoje: number; pagamentosParaConferir: number }> {
   const db = await getDb();
   const [pedidos] = await db.select({ n: count() }).from(orders).where(eq(orders.status, "pendente"));
   const [encomendas] = await db.select({ n: count() }).from(customOrders).where(eq(customOrders.status, "novo"));
-  return { pedidosPendentes: pedidos.n, encomendasNovas: encomendas.n };
+  return {
+    pedidosPendentes: pedidos.n,
+    encomendasNovas: encomendas.n,
+    pedidosHoje: await contarPedidosHoje(db),
+    pagamentosParaConferir: await contarPagamentosParaConferir(db),
+  };
 }
 
 /** Junta todos os números do resumo numa chamada só. */
@@ -42,29 +77,15 @@ export async function dashboardStats() {
   // Os 5 pedidos mais recentes, para a lista "Últimos pedidos".
   const latest = await listOrders(undefined, 5);
 
-  // Os "dias" e "meses" do dono são os de São Paulo, não os do servidor (que pode estar em outro fuso).
-  const inicioDoDia = sql`date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'`;
-  const inicioDoMes = sql`date_trunc('month', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'`;
-
   // Pedidos feitos hoje.
-  const [hoje] = await db.select({ n: count() }).from(orders).where(gte(orders.createdAt, inicioDoDia));
+  const pedidosHoje = await contarPedidosHoje(db);
   // Faturamento do mês: só pedidos que o cliente PAGOU (pago, enviado ou entregue), feitos neste mês.
   const [mes] = await db
     .select({ total: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`, pedidos: count() })
     .from(orders)
     .where(and(inArray(orders.status, ["pago", "enviado", "entregue"]), gte(orders.createdAt, inicioDoMes)));
-  // Pagamentos que pedem a atenção do dono: aprovado em pedido CANCELADO (o cliente pagou e não vai receber)
-  // ou aprovado com valor DIFERENTE do total num pedido ainda pendente. Cada pedido conta uma vez.
-  const [conferir] = await db
-    .select({ n: sql<number>`count(distinct ${orders.id})::int` })
-    .from(orders)
-    .innerJoin(payments, eq(payments.orderId, orders.id))
-    .where(
-      and(
-        eq(payments.status, "aprovado"),
-        sql`(${orders.status} = 'cancelado' or (${orders.status} = 'pendente' and ${payments.amountCents} is distinct from ${orders.totalCents}))`,
-      ),
-    );
+  // Pagamentos a conferir (cliente que pagou e o pedido não ficou pago).
+  const pagamentosParaConferir = await contarPagamentosParaConferir(db);
   // Clientes ativos (sem contar administradores nem contas excluídas).
   const [clientes] = await db
     .select({ n: count() })
@@ -78,12 +99,12 @@ export async function dashboardStats() {
     pagos: n("pago"),
     enviados: n("enviado"),
     novasEncomendas: novas.n,
-    pedidosHoje: hoje.n,
+    pedidosHoje,
     faturamentoMesCents: mes.total,
     // Fechamento do mês: quantos pedidos foram pagos e quanto cada um rendeu, em média (0 se nenhum, sem dividir por zero).
     pedidosPagosMes: mes.pedidos,
     ticketMedioCents: mes.pedidos > 0 ? Math.round(mes.total / mes.pedidos) : 0,
-    pagamentosParaConferir: conferir.n,
+    pagamentosParaConferir,
     totalClientes: clientes.n,
     lowStock,
     latest,
