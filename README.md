@@ -126,7 +126,9 @@ Os arquivos `.sql` são incluídos no pacote de produção pelo `outputFileTraci
 
 ### Contas, clientes e painel do dono
 
-**Comprar exige conta.** O cliente se cadastra (nome, e-mail, celular e senha; sem CPF) em `/conta/cadastro`, entra em `/conta/entrar` e acompanha os pedidos em `/conta/pedidos`. A senha nunca é guardada: só um hash `scrypt`. A sessão é um cookie assinado de 30 dias (`httpOnly`, `sameSite=lax`); trocar a senha ou "sair de todos os aparelhos" derruba os cookies antigos. Entrar tem limite de tentativas por origem (8 em 15 min) e por e-mail (5 erros em 15 min). Cada cliente só vê os próprios pedidos: o de outra pessoa responde "não encontrado", igual a um número que não existe. "Excluir minha conta" apaga os dados pessoais e mantém os pedidos, sem ligação com a pessoa. A política de privacidade está em `/privacidade`.
+**Comprar exige conta.** O cliente se cadastra (nome, e-mail, celular e senha; sem CPF) em `/conta/cadastro`, entra em `/conta/entrar` e acompanha os pedidos em `/conta/pedidos`. A senha nunca é guardada: só um hash `scrypt`. A sessão é um cookie assinado de 30 dias (`httpOnly`, `sameSite=lax`); trocar a senha ou "sair de todos os aparelhos" derruba os cookies antigos. Entrar tem limite de tentativas por origem (8 em 15 min) e por e-mail (5 erros em 15 min). **Endereço de entrega.** Cada conta tem um endereço (CEP, rua, número, complemento, bairro, cidade e estado), cadastrado na etiqueta "Entrega" de `/conta`, e **comprar exige endereço** (a sacola leva o cliente até lá se faltar). Ao digitar o CEP, o formulário preenche o resto sozinho: a consulta ao ViaCEP é feita pelo **servidor** (só os 8 números saem; o navegador nunca fala com terceiros) e, se falhar, o cliente digita à mão. O pedido guarda uma **cópia** do endereço usado: mudar o endereço da conta depois não desvia pedidos já feitos, e o dono vê para onde despachar em cada ordem da esteira. Ao excluir a conta, o endereço some da conta e dos pedidos já entregues ou cancelados (pedidos em andamento mantêm a cópia até a entrega). O banco garante que não existe endereço pela metade ou inválido.
+
+Cada cliente só vê os próprios pedidos: o de outra pessoa responde "não encontrado", igual a um número que não existe. "Excluir minha conta" apaga os dados pessoais e mantém os pedidos, sem ligação com a pessoa. A política de privacidade está em `/privacidade`.
 
 | Variável | Para que serve |
 | --- | --- |
@@ -263,7 +265,8 @@ As rotas que recebem dados validam a entrada no servidor. No pedido, produto, ta
 | Método e rota | Função |
 | --- | --- |
 | `GET /api/products` | Lista os produtos |
-| `POST /api/orders` | Valida o carrinho, baixa o estoque em transação, registra o pedido e devolve o link do WhatsApp |
+| `POST /api/orders` | Exige login **e endereço de entrega** (422 `sem-endereco` sem ele), valida o carrinho, baixa o estoque em transação, registra o pedido com uma cópia do endereço e devolve o link do WhatsApp |
+| `GET /api/cep/[cep]` | Só para quem está logado (limite de 30 por 10 min): consulta o CEP no ViaCEP pelo servidor e devolve rua, bairro, cidade e UF |
 | `POST /api/custom-orders` | Valida e registra a encomenda personalizada e devolve o link do WhatsApp |
 
 Exemplo:
@@ -292,7 +295,7 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 - **Sem estorno pelo painel:** estornos e disputas são feitos no painel do Mercado Pago.
 - **Pedido pendente expira só por prazo fixo:** a baixa acontece quando o pedido é registrado, e o cron cancela os pendentes depois de 48 horas. Não há aviso ao cliente nem prazo por pedido.
 - **Sem cálculo de frete:** previsto para a etapa 3 (Correios, com plano B no WhatsApp). Precisa de contrato com os Correios.
-- **Sem endereço na conta:** o endereço de entrega ainda é combinado no WhatsApp (etapa 2 do plano em `docs/superpowers/plans/`).
+- **Um endereço por conta:** quem entrega em mais de um lugar troca o endereço antes de cada compra (cada pedido guarda o seu).
 - **Neon ainda não testado:** o caminho de produção usa o driver serverless do Neon, mas foi validado apenas contra o Postgres embutido. Teste com um banco Neon real antes de publicar.
 - **Catálogo de exemplo:** nomes, preços e estoque são de exemplo e devem ser substituídos pelos reais.
 
@@ -302,7 +305,7 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 2. Trocar o número de WhatsApp de exemplo em `src/lib/site.ts` pelo número da loja.
 3. Criar a conta e a aplicação no Mercado Pago, cadastrar o aviso e testar o pagamento com as credenciais de teste.
 4. Criar o primeiro administrador em produção (`npm run admin:criar`) e definir `CUSTOMER_SESSION_SECRET` na Vercel.
-5. Endereço na conta (etapa 2) e cálculo de frete pelos Correios (etapa 3).
+5. Cálculo de frete pelos Correios (etapa 3, precisa de contrato com os Correios).
 6. Serviço de e-mail, para recuperação de senha.
 
 ## Direitos de imagem
