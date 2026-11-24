@@ -79,7 +79,7 @@ describe("signSession e verifySession", () => {
   it("o token assinado volta com o id, a versão e o horário do login (iat)", () => {
     const antes = Date.now();
     const t = signSession({ id: 7, version: 3, exp: emUmaHora() }, SEGREDO);
-    expect(verifySession(t, SEGREDO)).toEqual({ id: 7, version: 3, iat: expect.any(Number) });
+    expect(verifySession(t, SEGREDO)).toEqual({ id: 7, version: 3, iat: expect.any(Number), role: "cliente" });
     expect(verifySession(t, SEGREDO)!.iat).toBeGreaterThanOrEqual(antes);
   });
 
@@ -92,7 +92,7 @@ describe("signSession e verifySession", () => {
   it("token sem iat devolve iat 0 (login antigo)", () => {
     const dados = Buffer.from(JSON.stringify({ id: 7, v: 3, exp: Date.now() + 3600_000 })).toString("base64url");
     const assinatura = createHmac("sha256", SEGREDO).update(`cliente.${dados}`).digest("base64url");
-    expect(verifySession(`${dados}.${assinatura}`, SEGREDO)).toEqual({ id: 7, version: 3, iat: 0 });
+    expect(verifySession(`${dados}.${assinatura}`, SEGREDO)).toEqual({ id: 7, version: 3, iat: 0, role: "cliente" });
   });
 
   it("recusa assinatura adulterada, segredo diferente e dados trocados", () => {

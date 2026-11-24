@@ -102,7 +102,7 @@ export async function loginAction(_prev: ClienteFormState, form: FormData): Prom
   }
 
   await clearFailures(chave);
-  await startCustomerSession(entrou.id, entrou.sessionVersion);
+  await startCustomerSession(entrou.id, entrou.sessionVersion, Date.now(), entrou.role);
   // Para onde ir:
   //   - senha provisória: só pode trocá-la, antes de qualquer outra coisa;
   //   - destino pedido (a sacola, por exemplo): vale, depois de passar por safeNext (nunca outro site);
@@ -147,7 +147,7 @@ export async function changePasswordAction(_prev: ClienteFormState, form: FormDa
   // Este aparelho continua logado com a versão nova da sessão. Aqui o horário do login É renovado, de propósito:
   // a pessoa acabou de provar a senha atual (é o que dá direito a um login novo).
   const depois = await getCustomer(cliente.id);
-  if (depois) await startCustomerSession(depois.id, depois.sessionVersion);
+  if (depois) await startCustomerSession(depois.id, depois.sessionVersion, Date.now(), depois.role);
   revalidatePath("/conta");
   return { ok: "Senha alterada. Os outros aparelhos foram desconectados." };
 }
@@ -161,7 +161,7 @@ export async function signOutEverywhereAction(): Promise<void> {
   const versao = await signOutEverywhere(cliente.id);
   // Conta que sumiu no meio do caminho: volta à entrada em vez de abrir uma sessão que não vale.
   if (versao === 0) redirect("/conta/entrar");
-  await startCustomerSession(cliente.id, versao, loginOriginal);
+  await startCustomerSession(cliente.id, versao, loginOriginal, cliente.role);
   revalidatePath("/conta");
 }
 

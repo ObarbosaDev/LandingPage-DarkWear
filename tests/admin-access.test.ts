@@ -66,7 +66,7 @@ async function criarAdmin(email = "admin@exemplo.com"): Promise<number> {
 
 /** Abre a sessão como se o login tivesse sido feito há "horasAtras" horas. */
 async function entrarComo(id: number, horasAtras = 0, version = 1) {
-  await startCustomerSession(id, version, Date.now() - horasAtras * HORA);
+  await startCustomerSession(id, version, Date.now() - horasAtras * HORA, (await (await getDb()).select({ r: customers.role }).from(customers).where(eq(customers.id, id)))[0]?.r ?? "cliente");
 }
 
 const form = (o: Record<string, string>) => {

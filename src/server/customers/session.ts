@@ -20,74 +20,19 @@
 // ============================================================================
 
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getCustomer, type CustomerView } from "@/server/customers";
+import { COOKIE_CLIENTE, DIAS_DA_SESSAO as DIAS, MS_DIA, signSession, verifySession, type PapelNoToken } from "@/server/customers/token";
 
-/** Nome do cookie da sessão do cliente. */
-export const COOKIE_CLIENTE = "dw_cliente";
-
-// A sessão dura 30 dias. Passar disso, a pessoa entra de novo.
-const DIAS = 30;
-const MS_DIA = 24 * 3600 * 1000;
+// O token (montar e conferir o texto assinado) vive em ./token.ts, um arquivo puro que o porteiro do painel também usa.
+export { COOKIE_CLIENTE, signSession, verifySession };
 
 /** O segredo que assina as sessões, ou null se não está configurado ou é curto demais (mínimo 32 caracteres). */
 function segredoDaSessao(): string | null {
   const s = process.env.CUSTOMER_SESSION_SECRET;
   return typeof s === "string" && s.length >= 32 ? s : null;
-}
-
-// A assinatura de um texto. O prefixo "cliente." separa estes tokens dos do painel (ver o topo do arquivo).
-const assinar = (dados: string, segredo: string) => createHmac("sha256", segredo).update(`cliente.${dados}`).digest("base64url");
-
-/**
- * Monta o token da sessão: "<dados>.<assinatura>". Exportada para os testes; o login usa
- * startCustomerSession, que a chama.
- * @throws se o segredo for curto: um segredo fraco é fácil de adivinhar por tentativa e erro
- */
-export function signSession(p: { id: number; version: number; exp: number }, segredo: string, iat: number = Date.now()): string {
-  if (typeof segredo !== "string" || segredo.length < 32) throw new Error("O segredo da sessão precisa ter pelo menos 32 caracteres.");
-  // "iat" (emitido em) = o instante do LOGIN. O painel só abre para logins recentes (ver admin/auth.ts), então
-  // este horário não pode ser renovado sem a pessoa provar a senha: ao reabrir a sessão de um aparelho já
-  // logado, repassa-se o iat original.
-  const dados = Buffer.from(JSON.stringify({ id: p.id, v: p.version, exp: p.exp, iat })).toString("base64url");
-  return `${dados}.${assinar(dados, segredo)}`;
-}
-
-/**
- * Confere um token e devolve o id e a versão que ele afirma, ou null se for inválido: malformado,
- * assinatura errada (adulterado ou feito com outro segredo), vencido, com validade absurda ou com
- * id/versão que não são inteiros positivos. Não consulta o banco (isso é o currentCustomer).
- *
- * @param agora o "agora" em milissegundos (parâmetro só para os testes)
- */
-export function verifySession(token: string, segredo: string, agora: number = Date.now()): { id: number; version: number; iat: number } | null {
-  if (typeof token !== "string" || token.length === 0 || token.length > 1000) return null;
-  if (typeof segredo !== "string" || segredo.length < 32) return null;
-  const partes = token.split(".");
-  if (partes.length !== 2) return null;
-  const [dados, assinatura] = partes;
-  if (!dados || !assinatura) return null;
-
-  // Refaz a assinatura e compara em tempo constante (não revela a assinatura certa pelo tempo de resposta).
-  const esperada = Buffer.from(assinar(dados, segredo));
-  const recebida = Buffer.from(assinatura);
-  if (esperada.length !== recebida.length || !timingSafeEqual(esperada, recebida)) return null;
-
-  // A assinatura bateu: agora confere o conteúdo. Mesmo assinado por nós, um valor estranho é recusado.
-  try {
-    const { id, v, exp, iat } = JSON.parse(Buffer.from(dados, "base64url").toString("utf8")) as { id?: unknown; v?: unknown; exp?: unknown; iat?: unknown };
-    if (typeof id !== "number" || !Number.isSafeInteger(id) || id < 1) return null;
-    if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 1) return null;
-    // Vencido, ou com validade maior que a que nós damos (mais de 31 dias): não foi feito por nós.
-    if (typeof exp !== "number" || !Number.isFinite(exp) || exp <= agora || exp > agora + (DIAS + 1) * MS_DIA) return null;
-    // Cookie de antes desta regra (sem "iat") conta como login antigo: vale para o site, nunca para o painel.
-    return { id, version: v, iat: typeof iat === "number" && Number.isFinite(iat) ? iat : 0 };
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -96,11 +41,12 @@ export function verifySession(token: string, segredo: string, agora: number = Da
  * @param iat     o instante do LOGIN. Padrão: agora. Ao reabrir a sessão de um aparelho que já estava logado
  *                (ex.: "sair de todos os outros"), passe o original: renovar sem a senha deixaria um cookie
  *                roubado manter o acesso ao painel para sempre.
+ * @param role    o papel da conta agora: vai no cookie só como dica para o porteiro do painel (ver src/proxy.ts)
  */
-export async function startCustomerSession(id: number, version: number, iat: number = Date.now()): Promise<void> {
+export async function startCustomerSession(id: number, version: number, iat: number = Date.now(), role: PapelNoToken = "cliente"): Promise<void> {
   const segredo = segredoDaSessao();
   if (!segredo) throw new Error("CUSTOMER_SESSION_SECRET ausente ou curto (mínimo 32 caracteres).");
-  const token = signSession({ id, version, exp: Date.now() + DIAS * MS_DIA }, segredo, iat);
+  const token = signSession({ id, version, exp: Date.now() + DIAS * MS_DIA }, segredo, iat, role);
   (await cookies()).set(COOKIE_CLIENTE, token, {
     // httpOnly: o JavaScript da página não lê o cookie (protege contra roubo por script injetado).
     httpOnly: true,
