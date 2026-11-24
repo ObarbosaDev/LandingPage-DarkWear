@@ -63,7 +63,13 @@ export default function CarrinhoPage() {
         router.push("/conta/entrar?next=%2Fcarrinho");
         return;
       }
-      const data = (await res.json()) as { whatsappUrl?: string; paymentUrl?: string; error?: string };
+      const data = (await res.json()) as { whatsappUrl?: string; paymentUrl?: string; error?: string; code?: string };
+      // Falta o endereço de entrega: leva à conta, direto na etiqueta "Entrega". A sacola continua intacta.
+      if (res.status === 422 && data.code === "sem-endereco") {
+        setStatus("idle");
+        router.push("/conta?endereco=1#endereco");
+        return;
+      }
       const destino = modo === "online" ? data.paymentUrl : data.whatsappUrl;
       // Falhou (sem estoque, muitas tentativas...): mostra a mensagem que o servidor mandou.
       if (!res.ok || !destino) throw new Error(data.error ?? "Não foi possível registrar o pedido.");
