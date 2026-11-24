@@ -11,7 +11,11 @@
     "test:watch": "vitest",
     "db:status": "tsx scripts/db.ts status",
     "db:migrate": "tsx scripts/db.ts migrate",
-    "db:rollback": "tsx scripts/db.ts rollback"
+    "db:rollback": "tsx scripts/db.ts rollback",
+    "admin:criar": "tsx --conditions=react-server scripts/admin.ts criar",
+    "admin:senha": "tsx --conditions=react-server scripts/admin.ts senha",
+    "admin:remover": "tsx --conditions=react-server scripts/admin.ts remover",
+    "admin:listar": "tsx --conditions=react-server scripts/admin.ts listar"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",
