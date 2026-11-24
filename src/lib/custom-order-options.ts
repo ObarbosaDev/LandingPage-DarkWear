@@ -11,7 +11,8 @@
 
 // "as const" faz o TypeScript tratar cada lista como valores fixos (e não como "texto qualquer"),
 // o que permite derivar tipos exatos a partir delas.
-export const MODELS = ["Camiseta", "Moletom", "Oversized"] as const;
+// A loja não trabalha com moletom: só camiseta e oversized.
+export const MODELS = ["Camiseta", "Oversized"] as const;
 export const SIZES = ["P", "M", "G", "GG", "XG"] as const;
 export const COLORS = ["Preta", "Off-white", "Cinza chumbo"] as const;
 

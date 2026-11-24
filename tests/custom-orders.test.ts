@@ -27,6 +27,14 @@ describe("validateCustom", () => {
     for (const p of PLACEMENTS) expect(validateCustom({ ...ok, placement: p.id }).ok, p.id).toBe(true);
   });
 
+  // A loja não trabalha com moletom: nenhuma encomenda dele é aceita (nem escrito de outro jeito).
+  it("não aceita moletom, nem com outra grafia", () => {
+    for (const model of ["Moletom", "moletom", "MOLETOM", " Moletom", "Hoodie"]) {
+      expect(validateCustom({ ...ok, model }).ok, model).toBe(false);
+    }
+    expect(MODELS).toEqual(["Camiseta", "Oversized"]);
+  });
+
   it("recusa opções fora da lista", () => {
     expect(validateCustom({ ...ok, model: "Jaqueta" }).ok).toBe(false);
     expect(validateCustom({ ...ok, size: "XXG" }).ok).toBe(false);
