@@ -9,7 +9,8 @@
 // ============================================================================
 
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import Link from "next/link";
+import { Arara, Etiqueta } from "@/components/conta/Arara";
 import { ExcluirContaForm, TrocarSenhaForm } from "@/components/conta/FormulariosDaConta";
 import { logoutAction, signOutEverywhereAction } from "@/app/actions-cliente";
 import { requireCustomer } from "@/server/customers/session";
@@ -28,26 +29,6 @@ function formatarCelular(d: string): string {
   return d;
 }
 
-/**
- * Uma etiqueta pendurada na barra: um trecho da barra no topo, um fio curto e o papel branco embaixo.
- * Cada etiqueta traz o SEU trecho de barra, que se emenda com o do vizinho (a grade não tem espaço entre as
- * colunas): assim cada fila tem a sua própria arara e nenhuma etiqueta fica pendurada no vazio.
- * A barra, o fio e o furo são enfeite (aria-hidden); o conteúdo é só o que está dentro do papel.
- */
-function Etiqueta({ titulo, children }: { titulo: string; children: ReactNode }) {
-  return (
-    <section aria-label={titulo} className="relative flex flex-col items-center px-4 pb-6">
-      <span aria-hidden="true" className="absolute inset-x-0 top-0 block h-1.5 bg-foreground" />
-      <span aria-hidden="true" className="mt-1.5 block h-8 w-0.5 bg-foreground" />
-      <div className="relative w-full bg-foreground px-6 pb-7 pt-9 text-background">
-        <span aria-hidden="true" className="absolute left-1/2 top-3 block h-3.5 w-3.5 -translate-x-1/2 rounded-full bg-background" />
-        <h2 className="font-mono text-xs font-bold uppercase tracking-[0.2em]">{titulo}</h2>
-        <div className="mt-4">{children}</div>
-      </div>
-    </section>
-  );
-}
-
 const botao =
   "border-2 border-background bg-background px-5 py-3 font-display text-xl uppercase tracking-wide text-foreground transition-colors hover:bg-transparent hover:text-background";
 
@@ -63,8 +44,8 @@ export default async function ContaPage() {
           conta
         </h1>
 
-        {/* A arara: cada etiqueta traz o seu trecho de barra (ver Etiqueta acima). */}
-        <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3">
+        {/* A arara: cada etiqueta traz o seu trecho de barra (ver components/conta/Arara.tsx). */}
+        <Arara>
           <Etiqueta titulo={`Peça nº ${String(c.id).padStart(5, "0")}`}>
             <p className="font-display text-4xl uppercase leading-none">{c.name}</p>
             <dl className="mt-4 flex flex-col gap-2 font-mono text-sm font-bold">
@@ -81,6 +62,13 @@ export default async function ContaPage() {
                 <dd>{dataBr.format(c.createdAt)}</dd>
               </div>
             </dl>
+          </Etiqueta>
+
+          <Etiqueta titulo="Pedidos">
+            <p className="text-base font-medium">Acompanhe cada peça, do pagamento até a entrega.</p>
+            <Link href="/conta/pedidos" className={`${botao} mt-5 inline-block`}>
+              Meus pedidos
+            </Link>
           </Etiqueta>
 
           <Etiqueta titulo="Senha">
@@ -116,7 +104,7 @@ export default async function ContaPage() {
               </div>
             </details>
           </Etiqueta>
-        </div>
+        </Arara>
       </div>
     </section>
   );
