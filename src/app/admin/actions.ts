@@ -18,6 +18,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { requireAdmin } from "@/server/admin/auth";
+import { resetCustomerPassword } from "@/server/admin/customers";
 import { setCustomStatus } from "@/server/admin/custom-orders";
 import { checkImageFile, deleteImageByUrl, saveImage } from "@/server/admin/images";
 import { updateOrderStatus } from "@/server/admin/orders";
@@ -170,4 +171,28 @@ export async function setActiveAction(form: FormData): Promise<void> {
   await setProductActive(slug, form.get("active") === "true");
   refreshCatalog();
   revalidatePath("/admin/produtos");
+}
+
+// ---------- Clientes ----------
+
+/** O que a tela recebe de volta ao gerar uma senha provisória: a senha (mostrada UMA vez) ou o erro. */
+export type SenhaProvisoriaState = { error?: string; senha?: string; para?: string };
+
+/**
+ * Botão "Senha provisória" de cada cliente em /admin/clientes. Como ainda não há recuperação de senha por
+ * e-mail, o dono gera uma senha provisória e a passa ao cliente (pelo WhatsApp, por exemplo); o cliente é
+ * obrigado a trocá-la no próximo login. A senha aparece só na resposta desta ação e não fica guardada em claro.
+ * Contas de administrador são recusadas (só se gerenciam pelo comando de terminal).
+ */
+export async function resetCustomerPasswordAction(_prev: SenhaProvisoriaState, form: FormData): Promise<SenhaProvisoriaState> {
+  await requireAdmin();
+  const id = Number(form.get("id"));
+  const para = String(form.get("nome") ?? "");
+  if (!Number.isSafeInteger(id) || id < 1) return { error: "Cliente inválido." };
+  try {
+    const senha = await resetCustomerPassword(id);
+    return { senha, para };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Não foi possível gerar a senha." };
+  }
 }

@@ -16,6 +16,15 @@ import { startCustomerSession, currentSession } from "@/server/customers/session
 import { isAdmin, requireAdmin, SESSAO_ADMIN_HORAS } from "@/server/admin/auth";
 import { changePasswordAction, deleteAccountAction, loginAction, registerAction, signOutEverywhereAction } from "@/app/actions-cliente";
 import { hashPassword } from "@/server/customers/password";
+import {
+  changeCustomStatusAction,
+  changeOrderStatusAction,
+  createProductAction,
+  resetCustomerPasswordAction,
+  setActiveAction,
+  setStockAction,
+  updateProductAction,
+} from "@/app/admin/actions";
 import { clienteDeTeste, resetDb } from "./helpers/db";
 
 // ---------- o "navegador" de mentira ----------
@@ -248,6 +257,54 @@ describe("senha provisória fecha o resto do site", () => {
     const res = await POST(new Request("http://x/api/orders", { method: "POST", body: JSON.stringify({ items: [{ slug: "oversized-gt3-rs", size: "M", color: "Preta", qty: 1 }] }) }));
     expect(res.status).toBe(403);
     expect((await res.json()).error).toMatch(/senha provisória/i);
+  });
+});
+
+// Uma ação do painel pode ser chamada DIRETO (sem passar pela tela). Por isso cada uma confere o acesso por conta
+// própria: é isto que impede um cliente comum de mudar preço, estoque ou pedido chamando a ação por fora.
+describe("toda ação do painel recusa quem não é administrador", () => {
+  const f = (o: Record<string, string> = {}) => form({ id: "1", slug: "oversized-gt3-rs", next: "pago", stock: "5", active: "true", status: "novo", ...o });
+  const acoes: [string, () => Promise<unknown>][] = [
+    ["mudar status do pedido", () => changeOrderStatusAction(f())],
+    ["mudar andamento da encomenda", () => changeCustomStatusAction(f())],
+    ["cadastrar produto", () => createProductAction({}, f({ name: "X", price: "10", category: "Coleção", sizes: "M", colors: "Preta" }))],
+    ["editar produto", () => updateProductAction({}, f({ name: "X", price: "10", category: "Coleção", sizes: "M", colors: "Preta" }))],
+    ["ajustar estoque", () => setStockAction(f())],
+    ["mostrar ou ocultar produto", () => setActiveAction(f())],
+    ["gerar senha provisória de cliente", () => resetCustomerPasswordAction({}, f())],
+  ];
+
+  it.each(acoes)("anônimo: %s → 404", async (_nome, acao) => {
+    expect(await resultado(acao)).toBe("NOT_FOUND");
+  });
+
+  it.each(acoes)("cliente comum logado: %s → 404", async (_nome, acao) => {
+    const id = await clienteDeTeste("cliente-comum@exemplo.com");
+    await entrarComo(id);
+    expect(await resultado(acao)).toBe("NOT_FOUND");
+  });
+
+  it("e nada foi alterado pelas tentativas (a senha de um cliente continua a mesma)", async () => {
+    const alvo = await clienteDeTeste("alvo@exemplo.com");
+    await (await getDb()).update(customers).set({ passwordHash: await hashPassword(SENHA) }).where(eq(customers.id, alvo));
+    const intruso = await clienteDeTeste("intruso@exemplo.com");
+    await entrarComo(intruso);
+    await resultado(() => resetCustomerPasswordAction({}, form({ id: String(alvo), nome: "Alvo" })));
+    const [c] = await (await getDb()).select().from(customers).where(eq(customers.id, alvo));
+    expect(c.mustChangePassword).toBe(false);
+    expect(c.sessionVersion).toBe(1);
+  });
+
+  it("o administrador consegue gerar a senha provisória de um cliente, e não a de outro administrador", async () => {
+    const adm = await criarAdmin();
+    await entrarComo(adm);
+    const cliente = await clienteDeTeste("cliente2@exemplo.com");
+    const ok = await resetCustomerPasswordAction({}, form({ id: String(cliente), nome: "Cliente" }));
+    expect(ok.senha).toMatch(/^[A-Za-z0-9]{16}$/);
+    const outroAdm = await criarAdmin("adm2@exemplo.com");
+    const recusado = await resetCustomerPasswordAction({}, form({ id: String(outroAdm), nome: "Adm" }));
+    expect(recusado.error).toMatch(/administrador/i);
+    expect(recusado.senha).toBeUndefined();
   });
 });
 
