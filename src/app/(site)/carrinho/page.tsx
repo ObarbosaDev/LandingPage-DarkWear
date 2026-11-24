@@ -4,6 +4,7 @@
 // Visual: a sacola é um "recibo de papel" (fonte de máquina, pontilhado entre o item e o preço, borda
 // serrilhada). À esquerda, o título e um atalho para continuar comprando.
 //
+// Comprar exige conta: sem login, o botão leva a /conta/entrar e volta para cá com a sacola intacta.
 // Dois jeitos de fechar:
 //   - "Pagar com cartão ou Pix" (só aparece se o Mercado Pago estiver configurado): o cliente é levado
 //     à página de pagamento do Mercado Pago. Os dados do cartão NUNCA passam por este site;
@@ -20,12 +21,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useCart } from "@/lib/cart";
 import { SITE } from "@/lib/site";
 import { formatCents } from "@/lib/money";
 
 export default function CarrinhoPage() {
+  const router = useRouter();
   const { items, totalCents, setQty, remove, clear, ready } = useCart();
   // Situação do botão "Finalizar": parado, enviando, ou deu erro (com a mensagem em "error").
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -53,6 +56,13 @@ export default function CarrinhoPage() {
           payment: modo,
         }),
       });
+      // Comprar exige conta: sem sessão o servidor responde 401. Leva a pessoa a entrar (ou cadastrar) e
+      // ela volta para esta sacola, com os itens intactos (o carrinho só é esvaziado quando o pedido é feito).
+      if (res.status === 401) {
+        setStatus("idle");
+        router.push("/conta/entrar?next=%2Fcarrinho");
+        return;
+      }
       const data = (await res.json()) as { whatsappUrl?: string; paymentUrl?: string; error?: string };
       const destino = modo === "online" ? data.paymentUrl : data.whatsappUrl;
       // Falhou (sem estoque, muitas tentativas...): mostra a mensagem que o servidor mandou.
