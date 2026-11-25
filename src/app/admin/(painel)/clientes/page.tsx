@@ -22,7 +22,7 @@ import { formatCents } from "@/lib/money";
 import { tempoRelativo } from "@/lib/relative-time";
 import { clienteWhatsappLink } from "@/lib/whatsapp";
 import { requireAdmin } from "@/server/admin/auth";
-import { listCustomers } from "@/server/admin/customers";
+import { CLIENTES_POR_PAGINA, contarClientes, listCustomers } from "@/server/admin/customers";
 import { SenhaProvisoria } from "./SenhaProvisoria";
 
 // Página privada: bloqueia no servidor até validar a sessão (sem casca estática instantânea).
@@ -37,12 +37,15 @@ function celular(d: string): string {
   return d;
 }
 
-export default async function ClientesPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
+export default async function ClientesPage({ searchParams }: { searchParams: Promise<{ q?: string | string[]; pagina?: string }> }) {
   await requireAdmin();
-  const { q: qBruto } = await searchParams;
+  const { q: qBruto, pagina: paginaBruta } = await searchParams;
   // A busca vem do endereço: só texto, no máximo 80 caracteres.
   const q = (Array.isArray(qBruto) ? qBruto[0] : qBruto)?.slice(0, 80) ?? "";
-  const clientes = await listCustomers(q);
+  const pagina = Number.isInteger(Number(paginaBruta)) && Number(paginaBruta) >= 1 ? Number(paginaBruta) : 1;
+  const [clientes, total] = await Promise.all([listCustomers(q, pagina), contarClientes(q)]);
+  const paginas = Math.max(1, Math.ceil(total / CLIENTES_POR_PAGINA));
+  const linkPagina = (p: number) => `/admin/clientes?${q ? `q=${encodeURIComponent(q)}&` : ""}pagina=${p}`;
   const grupos = agruparPorInicial(clientes);
 
   return (
@@ -92,7 +95,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
               </a>
             ))}
             <span className="flex items-center pl-3 font-mono text-sm font-bold">
-              {clientes.length} {clientes.length === 1 ? "contato" : "contatos"}
+              {total} {total === 1 ? "contato" : "contatos"}
             </span>
           </nav>
 
@@ -170,6 +173,25 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
               </section>
             ))}
           </div>
+
+          {/* Mais de uma página: anterior, qual página é e próxima (a busca é mantida). */}
+          {paginas > 1 ? (
+            <nav aria-label="Páginas" className="flex flex-wrap items-center gap-4 border-t-2 border-foreground pt-6 font-mono text-sm font-bold uppercase">
+              {pagina > 1 ? (
+                <Link href={linkPagina(pagina - 1)} className="underline underline-offset-4">
+                  ← Anterior
+                </Link>
+              ) : null}
+              <span>
+                Página {pagina} de {paginas}
+              </span>
+              {pagina < paginas ? (
+                <Link href={linkPagina(pagina + 1)} className="underline underline-offset-4">
+                  Próxima →
+                </Link>
+              ) : null}
+            </nav>
+          ) : null}
         </>
       )}
     </div>

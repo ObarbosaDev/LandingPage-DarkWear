@@ -17,7 +17,7 @@ import Link from "next/link";
 import { CabecalhoDePagina } from "@/components/admin/CabecalhoDePagina";
 import { formatCents } from "@/lib/money";
 import { requireAdmin } from "@/server/admin/auth";
-import { listOrders } from "@/server/admin/orders";
+import { POR_PAGINA, carregarEsteira } from "@/server/admin/orders";
 import { ORDER_STATUS, type OrderStatus } from "@/server/db/schema";
 import { Ordem } from "./Ordem";
 
@@ -40,22 +40,27 @@ const COLUNAS: { status: OrderStatus; titulo: string; vazio: string }[] = [
 export default async function PedidosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; aviso?: string; q?: string | string[]; conferir?: string }>;
+  searchParams: Promise<{ status?: string; aviso?: string; q?: string | string[]; conferir?: string; pagina?: string }>;
 }) {
   await requireAdmin();
-  const { status, aviso, q: qBruto, conferir } = await searchParams;
+  const { status, aviso, q: qBruto, conferir, pagina: paginaBruta } = await searchParams;
   // Só aceita um status que exista; qualquer outro valor no endereço vira "todas as colunas".
   const filtro = ORDER_STATUS.find((s) => s === status);
   // A busca vem do endereço: só texto, no máximo 80 caracteres.
   const q = (Array.isArray(qBruto) ? qBruto[0] : qBruto)?.slice(0, 80) ?? "";
   const soConferir = conferir === "1";
 
-  const encontrados = await listOrders(undefined, 200, q);
-  const pedidos = soConferir ? encontrados.filter((o) => o.alerta) : encontrados;
-  const cancelados = pedidos.filter((o) => o.status === "cancelado");
-  // Uma coluna só quando o filtro pede; senão, as quatro.
-  const colunas = filtro && filtro !== "cancelado" ? COLUNAS.filter((c) => c.status === filtro) : COLUNAS;
+  // Cada coluna é carregada por conta própria (ver carregarEsteira): pedido em aberto nunca some do quadro por causa
+  // de muitos pedidos novos já encerrados, e os totais contam todos os pedidos da coluna.
+  const esteira = await carregarEsteira({ filtro, pagina: Number(paginaBruta), busca: q, soConferir });
+  const doStatus = (s: OrderStatus) => esteira.colunas.find((c) => c.status === s);
+  const nada = esteira.colunas.every((c) => c.total === 0);
+  // Uma coluna só quando o filtro pede; senão, as quatro. Os cancelados ficam à parte, recolhidos.
+  const colunas = filtro ? COLUNAS.filter((c) => c.status === filtro) : COLUNAS;
+  const cancelados = doStatus("cancelado");
   const mostrarCancelados = !filtro || filtro === "cancelado";
+  // Endereço de uma página da coluna aberta (mantém a busca).
+  const linkPagina = (p: number) => `/admin/pedidos?status=${filtro}${q ? `&q=${encodeURIComponent(q)}` : ""}&pagina=${p}`;
 
   // Chip de filtro: o selecionado fica preenchido; os outros invertem ao passar o mouse.
   const chip = (on: boolean) =>
@@ -122,7 +127,7 @@ export default async function PedidosPage({
         </Link>
       </nav>
 
-      {pedidos.length === 0 ? (
+      {nada ? (
         <p className="text-xl font-medium">
           {q ? `Nenhum pedido encontrado para "${q}".` : soConferir ? "Nenhum pagamento para conferir. Tudo certo." : "Nenhum pedido ainda."}
         </p>
@@ -131,8 +136,8 @@ export default async function PedidosPage({
           {/* A esteira: uma coluna por etapa, com a quantidade e o valor que está nela. */}
           <div className={`grid gap-x-8 gap-y-12 ${colunas.length > 1 ? "md:grid-cols-2 xl:grid-cols-4" : "max-w-xl"}`}>
             {colunas.map((c, i) => {
-              const daColuna = pedidos.filter((o) => o.status === c.status);
-              const soma = daColuna.reduce((n, o) => n + o.totalCents, 0);
+              const carregada = doStatus(c.status)!;
+              const daColuna = carregada.pedidos;
               return (
                 <section key={c.status} id={c.status} aria-label={c.titulo} className="min-w-0">
                   <header className="border-b-2 border-foreground pb-3">
@@ -143,28 +148,73 @@ export default async function PedidosPage({
                     </p>
                     <h2 className="mt-1 font-display text-6xl uppercase leading-[0.9]">{c.titulo}</h2>
                     <p className="mt-2 font-mono text-sm font-bold">
-                      {daColuna.length} {daColuna.length === 1 ? "pedido" : "pedidos"} · {formatCents(soma)}
+                      {carregada.total} {carregada.total === 1 ? "pedido" : "pedidos"} · {formatCents(carregada.somaCents)}
                     </p>
                   </header>
                   <div className="mt-5 flex flex-col gap-5">
                     {daColuna.length === 0 ? <p className="font-mono text-sm font-bold uppercase tracking-[0.08em]">{c.vazio}</p> : daColuna.map((o) => <Ordem key={o.id} o={o} />)}
                   </div>
+                  {/* Há mais pedidos do que os mostrados: na visão geral, abre a coluna; na coluna aberta, as páginas. */}
+                  {carregada.temMais && !filtro ? (
+                    <Link href={`/admin/pedidos?status=${c.status}${q ? `&q=${encodeURIComponent(q)}` : ""}`} className="mt-5 inline-block text-base font-bold underline underline-offset-4">
+                      Mostrando {daColuna.length} de {carregada.total}. Ver todos →
+                    </Link>
+                  ) : null}
+                  {filtro === c.status && (esteira.pagina > 1 || carregada.temMais) ? (
+                    <nav aria-label="Páginas" className="mt-6 flex flex-wrap items-center gap-4 font-mono text-sm font-bold uppercase">
+                      {esteira.pagina > 1 ? (
+                        <Link href={linkPagina(esteira.pagina - 1)} className="underline underline-offset-4">
+                          ← Anterior
+                        </Link>
+                      ) : null}
+                      <span>
+                        Página {esteira.pagina} de {Math.max(1, Math.ceil(carregada.total / POR_PAGINA))}
+                      </span>
+                      {carregada.temMais ? (
+                        <Link href={linkPagina(esteira.pagina + 1)} className="underline underline-offset-4">
+                          Próxima →
+                        </Link>
+                      ) : null}
+                    </nav>
+                  ) : null}
                 </section>
               );
             })}
           </div>
 
           {/* Os cancelados ficam recolhidos: não são trabalho, só registro. */}
-          {mostrarCancelados && cancelados.length > 0 && (
+          {mostrarCancelados && cancelados && cancelados.total > 0 && (
             <details open={filtro === "cancelado" || soConferir || Boolean(q)} className="border-t-2 border-foreground pt-6">
               <summary className="cursor-pointer font-display text-4xl uppercase leading-none underline-offset-8 hover:underline">
-                Cancelados ({cancelados.length})
+                Cancelados ({cancelados.total})
               </summary>
               <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                {cancelados.map((o) => (
+                {cancelados.pedidos.map((o) => (
                   <Ordem key={o.id} o={o} />
                 ))}
               </div>
+              {cancelados.temMais && !filtro ? (
+                <Link href={`/admin/pedidos?status=cancelado${q ? `&q=${encodeURIComponent(q)}` : ""}`} className="mt-5 inline-block text-base font-bold underline underline-offset-4">
+                  Mostrando {cancelados.pedidos.length} de {cancelados.total}. Ver todos →
+                </Link>
+              ) : null}
+              {filtro === "cancelado" && (esteira.pagina > 1 || cancelados.temMais) ? (
+                <nav aria-label="Páginas" className="mt-6 flex flex-wrap items-center gap-4 font-mono text-sm font-bold uppercase">
+                  {esteira.pagina > 1 ? (
+                    <Link href={linkPagina(esteira.pagina - 1)} className="underline underline-offset-4">
+                      ← Anterior
+                    </Link>
+                  ) : null}
+                  <span>
+                    Página {esteira.pagina} de {Math.max(1, Math.ceil(cancelados.total / POR_PAGINA))}
+                  </span>
+                  {cancelados.temMais ? (
+                    <Link href={linkPagina(esteira.pagina + 1)} className="underline underline-offset-4">
+                      Próxima →
+                    </Link>
+                  ) : null}
+                </nav>
+              ) : null}
             </details>
           )}
         </>

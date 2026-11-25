@@ -43,22 +43,14 @@ export function padraoContem(texto: string): string {
 }
 
 /**
- * Os clientes ativos, do mais novo para o mais antigo (no máximo 200), com a quantidade de pedidos e o total
+ * Os clientes ativos, do mais novo para o mais antigo (CLIENTES_POR_PAGINA por página), com a quantidade de pedidos e o total
  * gasto. A busca (opcional) acha por parte do nome, do e-mail ou do celular (a máscara do celular não atrapalha).
  */
-export async function listCustomers(busca?: string): Promise<AdminCustomer[]> {
+export async function listCustomers(busca?: string, pagina = 1): Promise<AdminCustomer[]> {
   const db = await getDb();
-  const termo = typeof busca === "string" ? busca.trim() : "";
-
-  const condicoes: SQL[] = [isNull(customers.anonymizedAt)];
-  if (termo) {
-    const padrao = padraoContem(termo);
-    const digitos = termo.replace(/\D/g, "");
-    const achar = [ilike(customers.name, padrao), ilike(customers.email, padrao)];
-    // Só procura no celular se há dígitos suficientes para ser um pedaço de número (evita casar tudo com "1").
-    if (digitos.length >= 3) achar.push(ilike(customers.phone, padraoContem(digitos)));
-    condicoes.push(or(...achar) as SQL);
-  }
+  const condicoes = condicoesDeClientes(busca);
+  // Página inválida (zero, negativa, texto) vira a primeira.
+  const deslocamento = Number.isInteger(pagina) && pagina > 1 ? (pagina - 1) * CLIENTES_POR_PAGINA : 0;
 
   return db
     .select({
@@ -77,7 +69,33 @@ export async function listCustomers(busca?: string): Promise<AdminCustomer[]> {
     .where(and(...condicoes))
     .groupBy(customers.id)
     .orderBy(desc(customers.createdAt), desc(customers.id))
-    .limit(200);
+    .limit(CLIENTES_POR_PAGINA)
+    .offset(deslocamento);
+}
+
+/** Quantos clientes a lista tem por página (do mais novo para o mais antigo). */
+export const CLIENTES_POR_PAGINA = 100;
+
+/** Quantos clientes ativos batem com a busca (todos, não só os da página), para a paginação. */
+export async function contarClientes(busca?: string): Promise<number> {
+  const db = await getDb();
+  const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(customers).where(and(...condicoesDeClientes(busca)));
+  return r.n;
+}
+
+/** As condições da lista de clientes: só contas ativas, e a busca por nome, e-mail ou celular (se houver). */
+function condicoesDeClientes(busca?: string): SQL[] {
+  const termo = typeof busca === "string" ? busca.trim() : "";
+  const condicoes: SQL[] = [isNull(customers.anonymizedAt)];
+  if (termo) {
+    const padrao = padraoContem(termo);
+    const digitos = termo.replace(/\D/g, "");
+    const achar = [ilike(customers.name, padrao), ilike(customers.email, padrao)];
+    // Só procura no celular se há dígitos suficientes para ser um pedaço de número (evita casar tudo com "1").
+    if (digitos.length >= 3) achar.push(ilike(customers.phone, padraoContem(digitos)));
+    condicoes.push(or(...achar) as SQL);
+  }
+  return condicoes;
 }
 
 /**

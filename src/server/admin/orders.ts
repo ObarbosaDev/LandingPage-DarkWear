@@ -8,7 +8,7 @@
 // Só roda no servidor; quem chama precisa ter passado por requireAdmin().
 
 import "server-only";
-import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, exists, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { customers, orderItems, orders, orderStatusHistory, payments, ORDER_STATUS, type OrderStatus, type PaymentStatus, type StatusOrigin } from "@/server/db/schema";
 import { padraoContem } from "@/server/admin/customers";
@@ -72,17 +72,8 @@ export function alertaDePagamento(status: OrderStatus, totalCents: number, pagam
   return null;
 }
 
-/**
- * Lista os pedidos, do mais novo para o mais antigo.
- *
- * @param status se informado, só os pedidos desse status (filtro da tela)
- * @param limit  máximo de pedidos devolvidos
- * @param busca  texto digitado na busca: acha pelo NÚMERO do pedido (DW-00012, 00012 ou 12) ou por parte do
- *               nome ou do e-mail do cliente. É tratado como texto, nunca como curinga nem como SQL.
- */
-export async function listOrders(status?: OrderStatus, limit = 100, busca?: string): Promise<AdminOrder[]> {
-  const db = await getDb();
-
+/** As condições de busca de pedidos (status, texto digitado e "tem pagamento aprovado"), iguais na lista e nos totais. */
+function condicoesDePedidos(status: OrderStatus | undefined, busca: string | undefined, comPagamentoAprovado: boolean): SQL[] {
   const condicoes: SQL[] = [];
   if (status) condicoes.push(eq(orders.status, status));
   const termo = typeof busca === "string" ? busca.trim() : "";
@@ -94,6 +85,105 @@ export async function listOrders(status?: OrderStatus, limit = 100, busca?: stri
     if (numero) achar.push(eq(orders.id, Number(numero[1])));
     condicoes.push(or(...achar) as SQL);
   }
+  if (comPagamentoAprovado) {
+    condicoes.push(exists(sql`(select 1 from ${payments} where ${payments.orderId} = ${orders.id} and ${payments.status} = 'aprovado')`));
+  }
+  return condicoes;
+}
+
+/** Quantos pedidos e quanto dinheiro há em cada status, para a mesma busca (conta TODOS, não só os que aparecem). */
+async function resumoPorStatus(busca: string | undefined, comPagamentoAprovado: boolean): Promise<Record<OrderStatus, { pedidos: number; somaCents: number }>> {
+  const db = await getDb();
+  const condicoes = condicoesDePedidos(undefined, busca, comPagamentoAprovado);
+  const linhas = await db
+    .select({ status: orders.status, pedidos: sql<number>`count(*)::int`, soma: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int` })
+    .from(orders)
+    .leftJoin(customers, eq(customers.id, orders.customerId))
+    .where(condicoes.length ? and(...condicoes) : undefined)
+    .groupBy(orders.status);
+  const r = Object.fromEntries(ORDER_STATUS.map((s) => [s, { pedidos: 0, somaCents: 0 }])) as Record<OrderStatus, { pedidos: number; somaCents: number }>;
+  for (const l of linhas) r[l.status] = { pedidos: l.pedidos, somaCents: l.soma };
+  return r;
+}
+
+/** Quantos pedidos EM ABERTO (pendente, pago, enviado) cada coluna da esteira mostra no máximo. */
+export const LIMITE_ABERTOS = 100;
+/** Quantos entregues e cancelados a visão geral mostra (os mais recentes). Para ver os outros, abre-se a coluna. */
+export const LIMITE_ENCERRADOS = 20;
+/** Quantos pedidos por página quando uma coluna é aberta sozinha. */
+export const POR_PAGINA = 40;
+
+/** Uma coluna da esteira já carregada. */
+export type ColunaDaEsteira = {
+  status: OrderStatus;
+  pedidos: AdminOrder[];
+  /** Quantos pedidos existem nesta coluna (todos, não só os mostrados). */
+  total: number;
+  somaCents: number;
+  /** Há pedidos além dos mostrados (a tela avisa e oferece o resto). */
+  temMais: boolean;
+};
+
+/**
+ * Carrega a esteira de /admin/pedidos, coluna por coluna.
+ *
+ * Por que por coluna: carregar "os 200 mais recentes de tudo" fazia um pedido pendente ou pago ANTIGO sumir do quadro
+ * quando havia muitos pedidos novos já encerrados. Aqui cada status tem a sua consulta: os pedidos em aberto aparecem
+ * (até LIMITE_ABERTOS), os encerrados mostram só os mais recentes, e os totais de cada coluna contam todos os pedidos.
+ *
+ * @param filtro    abre UMA coluna só, com paginação (POR_PAGINA por página)
+ * @param pagina    a página da coluna aberta (1 em diante; valor inválido vira 1)
+ * @param busca     o texto da busca (vale para as colunas e para os totais)
+ * @param soConferir só os pedidos com pagamento aprovado que NÃO ficaram pagos (o alerta do painel)
+ */
+export async function carregarEsteira(o: { filtro?: OrderStatus; pagina?: number; busca?: string; soConferir?: boolean }): Promise<{ colunas: ColunaDaEsteira[]; pagina: number }> {
+  const conferir = o.soConferir === true;
+  const pagina = Number.isInteger(o.pagina) && (o.pagina as number) >= 1 ? (o.pagina as number) : 1;
+  const status = o.filtro ? [o.filtro] : ORDER_STATUS;
+  const resumo = await resumoPorStatus(o.busca, conferir);
+
+  const colunas = await Promise.all(
+    status.map(async (s): Promise<ColunaDaEsteira> => {
+      const aberto = s === "pendente" || s === "pago" || s === "enviado";
+      const limite = o.filtro ? POR_PAGINA : aberto ? LIMITE_ABERTOS : LIMITE_ENCERRADOS;
+      const offset = o.filtro ? (pagina - 1) * POR_PAGINA : 0;
+      let pedidos = await listOrders(s, limite, o.busca, { offset, comPagamentoAprovado: conferir });
+      let total = resumo[s].pedidos;
+      let somaCents = resumo[s].somaCents;
+      if (conferir) {
+        // Pagamento aprovado nem sempre é um problema (pedido já pago): só ficam os que têm alerta.
+        pedidos = pedidos.filter((p) => p.alerta);
+        total = pedidos.length;
+        somaCents = pedidos.reduce((n, p) => n + p.totalCents, 0);
+      }
+      return { status: s, pedidos, total, somaCents, temMais: offset + pedidos.length < total };
+    }),
+  );
+  return { colunas, pagina };
+}
+
+/**
+ * Lista os pedidos, do mais novo para o mais antigo.
+ *
+ * @param status se informado, só os pedidos desse status (filtro da tela)
+ * @param limit  máximo de pedidos devolvidos
+ * @param busca  texto digitado na busca: acha pelo NÚMERO do pedido (DW-00012, 00012 ou 12) ou por parte do
+ *               nome ou do e-mail do cliente. É tratado como texto, nunca como curinga nem como SQL.
+ * @param opcoes.offset                quantos pedidos pular (paginação)
+ * @param opcoes.comPagamentoAprovado  só pedidos que têm algum pagamento aprovado (a conferência do painel)
+ */
+export async function listOrders(
+  status?: OrderStatus,
+  limit = 100,
+  busca?: string,
+  opcoes: { offset?: number; comPagamentoAprovado?: boolean } = {},
+): Promise<AdminOrder[]> {
+  const db = await getDb();
+  // Limite e deslocamento vêm de fora: valores estranhos viram valores seguros (nunca erro nem consulta enorme).
+  const max = Number.isInteger(limit) ? Math.min(limit, 500) : 100;
+  if (max <= 0) return [];
+  const offset = Number.isInteger(opcoes.offset) && (opcoes.offset as number) > 0 ? (opcoes.offset as number) : 0;
+  const condicoes = condicoesDePedidos(status, busca, opcoes.comPagamentoAprovado === true);
 
   const rows = await db
     .select({
@@ -105,7 +195,8 @@ export async function listOrders(status?: OrderStatus, limit = 100, busca?: stri
     // Sem condição = todos os pedidos.
     .where(condicoes.length ? and(...condicoes) : undefined)
     .orderBy(desc(orders.createdAt), desc(orders.id))
-    .limit(limit);
+    .offset(offset)
+    .limit(max);
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.order.id);
 
