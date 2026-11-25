@@ -94,6 +94,7 @@ Em desenvolvimento não é preciso configurar nada: sem `DATABASE_URL`, o projet
 | --- | --- |
 | `npm run db:status` | mostra quais migrações estão aplicadas, quais estão pendentes e quais podem ser desfeitas |
 | `npm run db:migrate` | aplica as migrações pendentes (as subidas) |
+| `npm run db:demo` | **só no banco local:** cria 8 clientes, 12 pedidos em todas as etapas e 2 cupons de exemplo (senha dos clientes impressa no fim; `-- --refazer` recomeça). Recusa rodar se `DATABASE_URL` existir |
 | `npm run db:rollback` | mostra o que seria desfeito; com `-- --confirm`, desfaz a última migração |
 | `npm run db:rollback -- 2 --confirm` | desfaz as duas últimas |
 

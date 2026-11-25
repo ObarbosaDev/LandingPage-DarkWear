@@ -12,6 +12,7 @@
     "db:status": "tsx scripts/db.ts status",
     "db:migrate": "tsx scripts/db.ts migrate",
     "db:rollback": "tsx scripts/db.ts rollback",
+    "db:demo": "tsx --conditions=react-server scripts/demo.ts",
     "admin:criar": "tsx --conditions=react-server scripts/admin.ts criar",
     "admin:senha": "tsx --conditions=react-server scripts/admin.ts senha",
     "admin:remover": "tsx --conditions=react-server scripts/admin.ts remover",
