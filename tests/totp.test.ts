@@ -108,7 +108,10 @@ describe("cifrarSegredo (o banco nunca guarda o segredo em claro)", () => {
   it("com outro segredo do site, ou texto adulterado, não decifra", () => {
     const c = cifrarSegredo(gerarSegredo(), SEGREDO_DO_SITE);
     expect(decifrarSegredo(c, "outro-segredo-qualquer-com-mais-de-32-caracteres-aqui")).toBeNull();
-    expect(decifrarSegredo(c.slice(0, -2) + "AA", SEGREDO_DO_SITE)).toBeNull();
+    // Troca o PRIMEIRO caractere do texto cifrado (alterar só o final do base64 pode não mudar nenhum byte).
+    const partes = c.split(".");
+    partes[3] = (partes[3][0] === "A" ? "B" : "A") + partes[3].slice(1);
+    expect(decifrarSegredo(partes.join("."), SEGREDO_DO_SITE)).toBeNull();
     expect(decifrarSegredo("lixo", SEGREDO_DO_SITE)).toBeNull();
     expect(decifrarSegredo("", SEGREDO_DO_SITE)).toBeNull();
   });
