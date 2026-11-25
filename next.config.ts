@@ -18,10 +18,10 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": ["./db/migrations/**/*.sql"],
   },
-  // Ações do painel aceitam até 3 MB: a foto do produto tem limite de 2 MB e o formulário
+  // Ações do painel aceitam até 4,5 MB (o teto da Vercel): a foto do produto tem limite de 4 MB e o formulário
   // acrescenta algum overhead. O padrão do Next (1 MB) recusaria fotos normais.
   experimental: {
-    serverActions: { bodySizeLimit: "3mb" },
+    serverActions: { bodySizeLimit: "4.5mb" },
   },
   // Pré-carrega, nos links visíveis, apenas a parte estática das páginas: a navegação parece instantânea.
   partialPrefetching: true,

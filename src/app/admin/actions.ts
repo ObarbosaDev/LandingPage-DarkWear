@@ -21,7 +21,7 @@ import { requireAdmin } from "@/server/admin/auth";
 import { auditar } from "@/server/admin/audit";
 import { resetCustomerPassword } from "@/server/admin/customers";
 import { setCustomStatus } from "@/server/admin/custom-orders";
-import { checkImageFile, deleteImageByUrl, saveImage } from "@/server/admin/images";
+import { checkImageFile, deleteImageByUrl, otimizarFoto, saveImage } from "@/server/admin/images";
 import { setTrackingCode, updateOrderStatus } from "@/server/admin/orders";
 import { createCoupon, parseCouponForm, setCouponActive } from "@/server/coupons";
 import {
@@ -107,7 +107,7 @@ export async function changeCustomStatusAction(form: FormData): Promise<void> {
 
 /**
  * Trata a foto do formulário de produto ANTES de conferir os outros campos.
- *   - arquivo escolhido: confere (tipo pelo conteúdo, até 2 MB), guarda no banco e põe o endereço novo
+ *   - arquivo escolhido: confere (tipo pelo conteúdo, até 4 MB), otimiza (reduz, WebP, sem EXIF), guarda no banco e põe o endereço novo
  *     no campo "image" do formulário;
  *   - caixa "Remover foto" marcada: esvazia o campo "image";
  *   - nada disso: mantém a foto atual (campo escondido).
@@ -118,7 +118,9 @@ async function processPhoto(form: FormData): Promise<{ error: string | null; cre
   if (file instanceof File && file.size > 0) {
     const checked = await checkImageFile(file);
     if (!checked.ok) return { error: checked.error, created: null };
-    const url = await saveImage(checked.bytes, checked.type);
+    const otimizada = await otimizarFoto(checked.bytes);
+    if (!otimizada.ok) return { error: otimizada.error, created: null };
+    const url = await saveImage(otimizada.bytes, otimizada.type);
     form.set("image", url);
     return { error: null, created: url };
   }

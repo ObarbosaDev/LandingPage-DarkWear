@@ -15,11 +15,18 @@
 
 import "server-only";
 import { eq } from "drizzle-orm";
+import sharp from "sharp";
 import { getDb } from "@/server/db";
 import { productImages } from "@/server/db/schema";
 
-/** Tamanho máximo de uma foto: 2 MB (o banco também confere). */
-export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+/**
+ * Tamanho máximo da foto ENVIADA: 4 MB (uma foto de celular passa disso às vezes; acima de 4,5 MB a própria Vercel recusa
+ * a requisição). A foto GUARDADA é bem menor: passa por otimizarFoto, e o banco recusa mais de 2 MB (MAX_FOTO_GUARDADA).
+ */
+export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+/** Tamanho máximo da foto já otimizada (o banco também confere, na migração 0006). */
+const MAX_FOTO_GUARDADA = 2 * 1024 * 1024;
 
 export type ImageType = "image/jpeg" | "image/png" | "image/webp";
 
@@ -46,11 +53,40 @@ export function detectImageType(b: Uint8Array): ImageType | null {
  * "o dono não trocou a foto" (quem chama trata o caso antes).
  */
 export async function checkImageFile(file: File): Promise<{ ok: true; bytes: Uint8Array; type: ImageType } | { ok: false; error: string }> {
-  if (file.size > MAX_IMAGE_BYTES) return { ok: false, error: "A foto é grande demais: o máximo é 2 MB." };
+  if (file.size > MAX_IMAGE_BYTES) return { ok: false, error: "A foto é grande demais: o máximo é 4 MB." };
   const bytes = new Uint8Array(await file.arrayBuffer());
   const type = detectImageType(bytes);
   if (!type) return { ok: false, error: "A foto deve ser um arquivo JPG, PNG ou WebP." };
   return { ok: true, bytes, type };
+}
+
+/** O maior lado, em pixels, que uma foto guardada pode ter (maior que isso é reduzida). */
+export const LADO_MAXIMO_DA_FOTO = 1600;
+
+/** Mais pixels que isto na foto de entrada é recusado antes de decodificar (protege a memória do servidor). */
+const PIXELS_MAXIMOS = 40_000_000;
+
+/**
+ * Prepara a foto para guardar: corrige a rotação do celular, reduz ao lado máximo (sem ampliar a pequena), converte
+ * para WebP (menor, e mantém a transparência) e REMOVE os metadados (EXIF: localização, modelo do aparelho...).
+ * Devolve a foto pronta, ou o motivo da recusa (arquivo corrompido ou grande demais em pixels). Nunca lança.
+ * Só deve receber bytes que passaram por checkImageFile (tipo conferido pelo conteúdo).
+ */
+export async function otimizarFoto(bytes: Uint8Array): Promise<{ ok: true; bytes: Uint8Array; type: ImageType } | { ok: false; error: string }> {
+  try {
+    const preparar = () =>
+      sharp(bytes, { limitInputPixels: PIXELS_MAXIMOS })
+        .rotate() // aplica a orientação do EXIF antes de apagá-lo
+        .resize({ width: LADO_MAXIMO_DA_FOTO, height: LADO_MAXIMO_DA_FOTO, fit: "inside", withoutEnlargement: true });
+    // Sem withMetadata(): o resultado sai sem EXIF. Uma foto cheia de detalhes pode passar do limite do banco com a
+    // qualidade normal: tenta de novo com qualidade menor antes de desistir.
+    let pronta = await preparar().webp({ quality: 85 }).toBuffer();
+    if (pronta.length > MAX_FOTO_GUARDADA) pronta = await preparar().webp({ quality: 60 }).toBuffer();
+    if (pronta.length > MAX_FOTO_GUARDADA) return { ok: false, error: "A foto tem detalhes demais e ficou grande. Tente uma foto mais simples ou menor." };
+    return { ok: true, bytes: new Uint8Array(pronta), type: "image/webp" };
+  } catch {
+    return { ok: false, error: "Não foi possível ler a foto: o arquivo está corrompido ou é grande demais em pixels." };
+  }
 }
 
 /** Guarda uma foto nova e devolve o endereço para gravar no produto (ex.: /api/images/12). */

@@ -118,7 +118,7 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
         <textarea id="description" name="description" rows={3} maxLength={600} defaultValue={v("description", product?.description ?? "")} className={field} />
       </div>
 
-      {/* Foto: o dono escolhe um arquivo (JPG, PNG ou WebP, até 2 MB) e ele é guardado no banco. O
+      {/* Foto: o dono escolhe um arquivo (JPG, PNG ou WebP, até 4 MB) e ele é guardado no banco, já reduzido. O
           campo escondido "image" leva a foto atual de volta ao servidor; se nenhum arquivo novo for
           escolhido, ela é mantida. "Remover foto" volta a mostrar as iniciais. O seletor ao lado diz
           como a foto deve ser tratada. */}
@@ -135,7 +135,7 @@ export function ProductForm({ action, product }: { action: Action; product?: Pro
             <p className="text-base font-medium">Sem foto: a loja mostra as iniciais da peça.</p>
           )}
           <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" className={`${field} text-base file:mr-4 file:border-0 file:bg-foreground file:px-4 file:py-2 file:font-mono file:uppercase file:text-background`} />
-          <p className="text-base font-medium">JPG, PNG ou WebP, até 2 MB. Escolher um arquivo novo substitui a foto atual.</p>
+          <p className="text-base font-medium">JPG, PNG ou WebP, até 4 MB (a loja a reduz e tira os dados do celular, como a localização). Escolher um arquivo novo substitui a foto atual.</p>
           {currentImage ? (
             <label className="flex items-center gap-3 text-base font-medium">
               <input type="checkbox" name="removeImage" className="h-5 w-5 accent-white" />

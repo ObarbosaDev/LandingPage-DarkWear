@@ -211,7 +211,7 @@ Para testar sem cobrar ninguém: use as credenciais de teste, `MERCADOPAGO_SANDB
 
 Os produtos ficam na tabela `products` do banco. O arquivo `src/data/products.ts` só popula um banco **vazio**: depois da primeira execução, editá-lo não muda o catálogo.
 
-1. Em `/admin/produtos/novo`, preencha os campos e **escolha a foto** (JPG, PNG ou WebP, até 2 MB). Ela é guardada no banco e entregue por `/api/images/<id>`: não precisa mexer no projeto nem publicar de novo. Para trocar ou remover a foto depois, edite o produto.
+1. Em `/admin/produtos/novo`, preencha os campos e **escolha a foto** (JPG, PNG ou WebP, até 4 MB). Ela é reduzida (no máximo 1600 px), convertida para WebP e limpa de metadados (EXIF, como a localização do celular) antes de ser guardada no banco e entregue por `/api/images/<id>`: não precisa mexer no projeto nem publicar de novo. Para trocar ou remover a foto depois, edite o produto.
 2. Para peça escura em foto com fundo transparente, escolha "Escura" em "Peça da foto". Ela ganha um contorno de luz fino e aparece sobre os cards escuros.
 
 Produto sem foto mostra as iniciais da peça no lugar. As fotos do catálogo de exemplo continuam sendo arquivos de `public/products/`; os dois jeitos convivem. Estoque, ocultar e mostrar na loja são feitos na lista de produtos do painel.
@@ -301,7 +301,7 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 
 - **Sem recuperação de senha por e-mail:** quem esquece a senha pede ao dono, que gera uma senha provisória em `/admin/clientes` (administradores, pelo `admin:senha`). A recuperação automática precisa de um serviço de e-mail, que ainda não existe.
 - **Sem entrar com Google nem link por e-mail:** dependem de contas externas do dono.
-- **Fotos no banco:** o upload do painel guarda a imagem no Postgres (até 2 MB, sem redimensionar). Serve bem para um catálogo pequeno; se o volume crescer, migrar para um armazenamento de arquivos como o Vercel Blob. Prefira fotos já otimizadas (WebP).
+- **Fotos no banco:** o upload do painel guarda a imagem no Postgres (até 4 MB de entrada; a foto guardada é reduzida e fica em geral abaixo de 500 KB). Serve bem para um catálogo pequeno; se o volume crescer, migrar para um armazenamento de arquivos como o Vercel Blob. Prefira fotos já otimizadas (WebP).
 - **Pagamento online ainda não testado contra o Mercado Pago real:** a integração foi validada com a API simulada. O formato da assinatura do aviso (`x-signature`) precisa ser conferido com o botão "Simular" do painel deles antes de publicar. Sem `MERCADOPAGO_ACCESS_TOKEN`, Pix e cartão seguem combinados no WhatsApp e o pedido nasce `pendente`.
 - **Sem estorno pelo painel:** estornos e disputas são feitos no painel do Mercado Pago.
 - **Desconto no Pix depende de conferência no Mercado Pago real:** a página "só Pix" exclui todos os outros tipos de pagamento (cartões, boleto, caixa eletrônico, saldo) e o aviso confirma que o pagamento foi por `bank_transfer`; os identificadores dos tipos foram escritos da documentação e precisam ser testados com o botão "Simular" e um Pix de teste.

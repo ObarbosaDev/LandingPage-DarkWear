@@ -58,7 +58,7 @@ describe("checkImageFile", () => {
     expect(r.ok).toBe(false);
   });
 
-  it("recusa arquivo acima de 2 MB e aceita o de exatamente 2 MB", async () => {
+  it("recusa arquivo acima de 4 MB e aceita o de exatamente 4 MB", async () => {
     const grande = new Uint8Array(MAX_IMAGE_BYTES + 1);
     grande.set(JPEG);
     expect((await checkImageFile(new File([grande], "g.jpg"))).ok).toBe(false);
