@@ -49,3 +49,7 @@ next-env.d.ts
 
 # exemplo de variáveis liberado para o git
 !.env.example
+
+# Playwright (testes ponta a ponta)
+/test-results/
+/playwright-report/

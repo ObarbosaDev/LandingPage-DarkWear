@@ -61,6 +61,7 @@ O site abre em `http://localhost:3000`.
 | `npm run start` | Serve o build de produção |
 | `npm run lint` | Roda o ESLint |
 | `npm test` | Roda os testes (Vitest), uma vez |
+| `npm run test:e2e` | Roda os testes **ponta a ponta** (Playwright, no Chrome do computador): a compra com cupom até o envio com rastreio e as portas que devem ficar fechadas (painel, prévia, dados). Usa um banco descartável em `.data/e2e` e o site na porta 3220; também roda no CI |
 | `npm run test:watch` | Roda os testes e repete a cada mudança |
 
 ### Testes

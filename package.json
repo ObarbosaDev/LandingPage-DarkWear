@@ -12,6 +12,7 @@
     "db:status": "tsx scripts/db.ts status",
     "db:migrate": "tsx scripts/db.ts migrate",
     "db:rollback": "tsx scripts/db.ts rollback",
+    "test:e2e": "playwright test",
     "db:demo": "tsx --conditions=react-server scripts/demo.ts",
     "admin:criar": "tsx --conditions=react-server scripts/admin.ts criar",
     "admin:senha": "tsx --conditions=react-server scripts/admin.ts senha",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.17",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^22.20.5",
     "@types/react": "^19",

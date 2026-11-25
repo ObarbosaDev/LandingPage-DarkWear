@@ -49,3 +49,27 @@ jobs:
         env:
           # Banco Postgres em memória: o CI não precisa de banco nem de segredos.
           PGLITE_DIR: memory://
+
+  # Testes ponta a ponta: um navegador de verdade (o Chrome que já vem na máquina do GitHub) percorre a compra, o painel e
+  # as portas que têm de ficar fechadas. Num trabalho separado, para rodar ao mesmo tempo que o de cima.
+  ponta-a-ponta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+      - name: Roteiros ponta a ponta
+        run: npx playwright test
+      # Se algo falhar, guarda as capturas de tela e os rastros para investigar depois.
+      - name: Guardar rastros dos testes que falharam
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rastros-e2e
+          path: test-results/
+          retention-days: 7
