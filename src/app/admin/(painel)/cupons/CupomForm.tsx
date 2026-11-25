@@ -12,7 +12,7 @@ import { useActionState, useState } from "react";
 import { createCouponAction, type FormState } from "@/app/admin/actions";
 
 const rotulo = "font-mono text-xs font-bold uppercase tracking-[0.15em]";
-const campo = "w-full border-2 border-foreground bg-transparent px-3 py-2 text-lg font-medium text-foreground outline-none focus:bg-foreground focus:text-background";
+const campo = "w-full border-2 border-foreground bg-transparent px-3 py-2 text-lg font-medium text-foreground outline-none placeholder:italic placeholder:text-foreground focus:bg-foreground focus:text-background focus:placeholder:text-background";
 
 export function CupomForm() {
   const [state, action, pending] = useActionState<FormState, FormData>(createCouponAction, {});

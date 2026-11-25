@@ -76,9 +76,9 @@ export default async function CuponsPage({ searchParams }: { searchParams: Promi
               const situacao = situacaoDoCupom(c, agora);
               const vale = situacao === "ativo";
               return (
-                <li key={c.code} className="flex bg-foreground text-background">
+                <li key={c.code} className="flex min-w-0 flex-col bg-foreground text-background sm:flex-row">
                   {/* Lado do desconto. */}
-                  <div className="flex flex-1 flex-col justify-between gap-4 p-5 font-mono">
+                  <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-5 font-mono">
                     <p className="text-sm font-bold uppercase tracking-[0.15em]">{PALAVRA[situacao]}</p>
                     <div>
                       <p className="break-all text-2xl font-bold">{c.code}</p>
@@ -96,9 +96,9 @@ export default async function CuponsPage({ searchParams }: { searchParams: Promi
                     </form>
                   </div>
                   {/* O picote. */}
-                  <div aria-hidden="true" className="border-l-2 border-dashed border-background" />
+                  <div aria-hidden="true" className="border-t-2 border-dashed border-background sm:border-l-2 sm:border-t-0" />
                   {/* Lado das regras. */}
-                  <dl className="flex w-44 shrink-0 flex-col gap-2 p-4 font-mono text-xs font-bold uppercase tracking-[0.08em]">
+                  <dl className="flex w-full shrink-0 flex-col gap-2 p-4 sm:w-44 font-mono text-xs font-bold uppercase tracking-[0.08em]">
                     <div>
                       <dt>Usos</dt>
                       <dd className="text-base">{c.maxUses === null ? `${c.usedCount}` : `${c.usedCount} de ${c.maxUses}`}</dd>
