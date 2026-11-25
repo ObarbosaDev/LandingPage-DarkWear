@@ -322,7 +322,9 @@ O catálogo, o estoque, os pedidos e as encomendas personalizadas já são **per
 3. Criar a conta e a aplicação no Mercado Pago, cadastrar o aviso e testar o pagamento com as credenciais de teste.
 4. Criar o primeiro administrador em produção (`npm run admin:criar`) e definir `CUSTOMER_SESSION_SECRET` na Vercel.
 5. Cálculo de frete pelos Correios (etapa 3, precisa de contrato com os Correios).
-6. Serviço de e-mail, para recuperação de senha.
+6. Serviço de e-mail (confirmação do e-mail, recuperação de senha e avisos de pedido pago, enviado e entregue).
+7. Ligar o segundo fator de cada administrador (`npm run admin:2fa`) e, se quiser, o desconto no Pix (`PIX_DISCOUNT_PERCENT`).
+8. Conferir o Pix "só Pix" e o desconto com o botão "Simular" e um Pix de teste no Mercado Pago.
 
 ## Direitos de imagem
 
