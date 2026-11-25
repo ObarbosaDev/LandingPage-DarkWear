@@ -7,14 +7,15 @@
 // ============================================================================
 
 import type { MetadataRoute } from "next";
+import { siteBase } from "@/lib/seo";
 import { getProducts } from "@/server/catalog";
 
 // Páginas fixas mais uma por produto ativo. O endereço do site vem de SITE_URL.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Os endereços no sitemap precisam ser completos (com o domínio), por isso SITE_URL.
-  const base = process.env.SITE_URL ?? "http://localhost:3000";
+  const base = siteBase();
   // "" é a home; os demais são as páginas do site (o carrinho fica de fora: não interessa a buscadores).
-  const fixas = ["", "/loja", "/personalizar", "/sobre", "/faq", "/contato"];
+  const fixas = ["", "/loja", "/personalizar", "/sobre", "/faq", "/contato", "/privacidade"];
   const produtos = await getProducts();
   return [
     ...fixas.map((p) => ({ url: `${base}${p}` })),

@@ -11,13 +11,14 @@
 // ============================================================================
 
 import type { MetadataRoute } from "next";
+import { siteBase } from "@/lib/seo";
 
 // A API e a conta do cliente não devem aparecer em buscadores.
 export default function robots(): MetadataRoute.Robots {
   // Endereço público do site (variável SITE_URL); sem ela, o endereço local de desenvolvimento.
-  const base = process.env.SITE_URL ?? "http://localhost:3000";
+  const base = siteBase();
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/api", "/conta"] },
+    rules: { userAgent: "*", allow: "/", disallow: ["/api", "/conta", "/carrinho", "/pagamento"] },
     sitemap: `${base}/sitemap.xml`,
   };
 }

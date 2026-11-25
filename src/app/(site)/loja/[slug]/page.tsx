@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getProduct, getProducts } from "@/server/catalog";
 import { formatCents } from "@/lib/money";
+import { descricaoParaBusca, jsonLdSeguro, produtoJsonLd } from "@/lib/seo";
 import { ProductBuy } from "./ProductBuy";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductZoom } from "@/components/ProductZoom";
@@ -31,7 +32,16 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProduct(slug);
-  return { title: product?.name ?? "Produto" };
+  if (!product) return { title: "Produto" };
+  const descricao = descricaoParaBusca(product);
+  return {
+    title: product.name,
+    description: descricao,
+    // O endereço "oficial" da peça: evita que o mesmo produto apareça duplicado na busca (com parâmetros no link).
+    alternates: { canonical: `/loja/${product.slug}` },
+    // Ao compartilhar o link: título, descrição e a foto da peça (se não tem foto, vale a imagem padrão da loja).
+    openGraph: { title: product.name, description: descricao, type: "website", url: `/loja/${product.slug}`, ...(product.image ? { images: [{ url: product.image }] } : {}) },
+  };
 }
 
 // params: o trecho variável do endereço. Em /loja/camisa-mumia, slug = "camisa-mumia".
@@ -51,6 +61,8 @@ export default async function ProdutoPage({
 
   return (
     <section className="bg-background text-foreground">
+      {/* Dados estruturados: é o que faz o Google mostrar preço e disponibilidade no resultado da busca. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSeguro(produtoJsonLd(product)) }} />
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-10 md:pt-14">
         <Link href="/loja" className="w-fit text-lg font-medium underline-offset-4 hover:underline">
           ← Voltar para a loja

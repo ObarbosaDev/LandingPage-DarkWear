@@ -13,6 +13,7 @@ import { Anton, Archivo, Geist_Mono } from "next/font/google";
 import "./globals.css";
 // Animações do site (revelação ao rolar, fundo tipográfico derivando).
 import "./motion.css";
+import { siteBase } from "@/lib/seo";
 import { SITE } from "@/lib/site";
 
 // As três fontes da marca, carregadas pelo Next (baixadas no build e servidas junto do site, sem
@@ -24,9 +25,15 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 // Título e descrição padrão (aba do navegador e resultados de busca).
 // O "template" faz cada página aparecer como "Loja · DarkWear", "FAQ · DarkWear" etc.
+// metadataBase: o endereço público (SITE_URL). É por ele que os endereços de imagem e de página nas etiquetas de
+// compartilhamento viram completos (o WhatsApp e as redes sociais exigem endereço completo).
 export const metadata: Metadata = {
+  metadataBase: new URL(siteBase()),
   title: { default: SITE.name, template: `%s · ${SITE.name}` },
   description: SITE.description,
+  // Como o link aparece ao ser compartilhado (WhatsApp, Instagram, Facebook...). A imagem padrão vem de opengraph-image.tsx.
+  openGraph: { siteName: SITE.name, locale: "pt_BR", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
